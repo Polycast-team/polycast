@@ -56,42 +56,63 @@ const renderHistoryStacked = (segments) => {
 };
 
 // Helper: render a segment with clickable words
-const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords, handleWordClick, isWordInSelectedListFn) => {
+const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords, handleWordClick, isWordInSelectedListFn, selectedWordInstances = []) => {
   // Default implementation if no function is provided
-  const checkWordInList = isWordInSelectedListFn || ((word) => {
-    return selectedWords.some(w => w.toLowerCase() === word.toLowerCase());
+  const checkWordInList = isWordInSelectedListFn || ((word, segmentIndex, wordIndex) => {
+    // Check if this specific word instance is selected
+    const instanceKey = `${segmentIndex}:${wordIndex}:${word.toLowerCase()}`;
+    return selectedWordInstances.some(instance => instance.key === instanceKey);
   });
+  
   if ((!segments || segments.length === 0) && lastPersisted) {
     return <span>{lastPersisted}</span>;
   }
   if (!segments || segments.length === 0) {
     return <p>Waiting...</p>;
   }
+  
   // Each segment on its own line
   return segments.map((segment, segIdx) => {
     // Tokenize: words (with apostrophes/accents), punctuation, and spaces
     // This regex matches words, punctuation, and spaces
     const tokens = segment.text.match(/([\p{L}\p{M}\d']+|[.,!?;:]+|\s+)/gu) || [];
+    
+    // Track word index within this segment
+    let wordIndex = -1;
+    
     return (
-      <div key={segIdx} className={segment.isNew ? 'new-text' : ''} style={{ display: 'block', marginBottom: 2 }}>
+      <div 
+        key={segIdx} 
+        className={segment.isNew ? 'new-text' : ''} 
+        style={{ display: 'block', marginBottom: 2 }}
+        data-segment-index={segIdx}
+      >
         {tokens.map((token, i) => {
           // Only words (letters, numbers, apostrophes, accents) are clickable
           const isWord = /^[\p{L}\p{M}\d']+$/u.test(token);
+          
+          // Only increment word index for actual words, not punctuation or spaces
+          if (isWord) wordIndex++;
+          
+          // Check if this specific instance is selected
+          const isSelected = isWord && checkWordInList(token.toLowerCase(), segIdx, wordIndex);
+          
           return (
             <span
               key={i}
-              onClick={isWord ? (e => { 
-                e.stopPropagation(); 
-                handleWordClick(token, e); // Pass the event to get the position
-              }) : undefined}
+              onClick={isWord ? (e) => { 
+                e.stopPropagation();
+                handleWordClick(token, e, segIdx, wordIndex);
+              } : undefined}
               style={{
                 cursor: isWord ? 'pointer' : 'default',
-                color: isWord && checkWordInList(token, segment.text) ? '#1976d2' : undefined,
-                background: isWord && checkWordInList(token, segment.text) ? 'rgba(25,118,210,0.07)' : undefined,
-                borderRadius: isWord && checkWordInList(token, segment.text) ? 3 : undefined,
+                color: isSelected ? '#1976d2' : undefined,
+                background: isSelected ? 'rgba(25,118,210,0.07)' : undefined,
+                borderRadius: isSelected ? 3 : undefined,
                 transition: 'color 0.2s',
                 userSelect: 'text',
               }}
+              data-word-index={isWord ? wordIndex : undefined}
             >
               {token}
             </span>
@@ -192,11 +213,16 @@ const TranscriptionDisplay = ({
   const [popupInfo, setPopupInfo] = useState({
     visible: false,
     word: '',
-    position: { x: 0, y: 0 }
+    position: { x: 0, y: 0 },
+    segmentIndex: -1,
+    wordIndex: -1
   });
+  
+  // Track selected word instances with their positions
+  const [selectedWordInstances, setSelectedWordInstances] = useState([]);
 
   // Only shows the popup when a word is clicked, doesn't add the word to dictionary
-  const handleWordClick = async (word, event) => {
+  const handleWordClick = async (word, event, segmentIndex, wordIndex) => {
     if (!event) return;
     
     const wordLower = word.toLowerCase();
@@ -214,6 +240,13 @@ const TranscriptionDisplay = ({
     
     // Position to the right if there's room, otherwise to the left
     const xPos = fitsOnRight ? rect.right + 5 : rect.left - popupWidth - 5;
+    
+    // Store the segment and word indices for this click
+    setPopupInfo(prev => ({
+      ...prev,
+      segmentIndex,
+      wordIndex
+    }));
     
     // Get the element that was clicked
     const clickedElement = event.currentTarget;
@@ -779,11 +812,27 @@ const TranscriptionDisplay = ({
         return;
       }
       
-      // Add the word to the selectedWords right away to update UI
+      // Add the word instance to our tracking
+      if (popupInfo.segmentIndex !== -1 && popupInfo.wordIndex !== -1) {
+        const instanceKey = `${popupInfo.segmentIndex}:${popupInfo.wordIndex}:${wordLower}`;
+        
+        setSelectedWordInstances(prev => {
+          // Check if this exact instance is already selected
+          if (!prev.some(instance => instance.key === instanceKey)) {
+            return [...prev, { 
+              key: instanceKey,
+              segmentIndex: popupInfo.segmentIndex,
+              wordIndex: popupInfo.wordIndex,
+              word: wordLower,
+              originalWord: word
+            }];
+          }
+          return prev;
+        });
+      }
+      
+      // Add the word to the selectedWords for backward compatibility
       setSelectedWords(prev => {
-        // We now allow multiple entries of the same word with different senses
-        console.log(`Adding "${word}" to selected words list in context: "${contextSentence.substring(0, 30)}..."`);
-        // Still add to the list for backward compatibility
         if (!prev.some(w => w.toLowerCase() === wordLower)) {
           return [...prev, word];
         }
@@ -1129,7 +1178,14 @@ const TranscriptionDisplay = ({
           ) : (
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
               <span style={{ fontWeight: 400, fontSize: fontSize }}>
-                {renderSegmentsWithClickableWords(englishSegments, null, selectedWords, handleWordClick, isWordInSelectedList)}
+                {renderSegmentsWithClickableWords(
+                  englishSegments, 
+                  null, 
+                  selectedWords, 
+                  handleWordClick, 
+                  isWordInSelectedList,
+                  selectedWordInstances
+                )}
               </span>
               <div className="scroll-end" />
             </div>
