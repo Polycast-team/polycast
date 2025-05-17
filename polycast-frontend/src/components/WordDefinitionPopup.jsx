@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import './WordDefinitionPopup.css';
 
-const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDefinition, position, onClose, onAddToDictionary, isInDictionary, loading }) => {
+const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDefinition, position, onClose, onAddToDictionary, onRemoveFromDictionary, isInDictionary, loading }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   // Add local state to track when a word is added, so we can show checkmark immediately
   const [localAdded, setLocalAdded] = useState(false);
@@ -143,17 +143,25 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                   </>
                 )}
                 {isWordInDictionary && (
-                  <div className="dict-added-indicator" style={{cursor: 'pointer'}}
-                    title="Remove from Dictionary"
-                    onClick={async () => {
+                  <div 
+                    className="dict-added-indicator"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
                       setLocalAdded(false);
-                      if (typeof onRemoveFromDictionary === 'function') {
-                        // Use wordSenseId if available, fallback to word
-                        const wordSenseId = definition?.wordSenseId || word;
-                        await onRemoveFromDictionary(wordSenseId);
+                      if (onRemoveFromDictionary) {
+                        onRemoveFromDictionary(word, definition?.wordSenseId || word);
                       }
                     }}
-                  >✓</div>
+                    onMouseEnter={() => setShowTooltip(true)}
+                    onMouseLeave={() => setShowTooltip(false)}
+                  >
+                    ✓
+                    {showTooltip && (
+                      <div className="dict-tooltip-container">
+                        <div className="dict-tooltip">Remove from Dictionary</div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
               {partOfSpeech && (
@@ -199,6 +207,7 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
 WordDefinitionPopup.propTypes = {
   word: PropTypes.string,
   definition: PropTypes.object,
+  onRemoveFromDictionary: PropTypes.func,
   dictDefinition: PropTypes.object,
   position: PropTypes.shape({
     x: PropTypes.number.isRequired,

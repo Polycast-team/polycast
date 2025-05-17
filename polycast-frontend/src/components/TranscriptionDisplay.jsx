@@ -1,8 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
-import DictionaryTable from './DictionaryTable'; // Ensure import for dictionary mode
-import axios from 'axios';
 
 // Helper function to render segments
 const renderSegments = (segments, lastPersisted) => {
@@ -733,23 +731,6 @@ const TranscriptionDisplay = ({
     }
   };
   
-  // Remove a flashcard for this profile and wordSenseId
-  const removeFlashcard = async (wordSenseId) => {
-    if (!selectedProfile || !wordSenseId) return;
-    try {
-      await axios.delete(`/api/profile/${selectedProfile}/flashcard/${wordSenseId}`);
-      setWordDefinitions(prev => {
-        const newDefs = { ...prev };
-        if (newDefs[wordSenseId]) {
-          delete newDefs[wordSenseId];
-        }
-        return newDefs;
-      });
-    } catch (err) {
-      console.error('Failed to delete flashcard:', err);
-    }
-  };
-
   // Run cleanup on component mount to fix any existing duplicates
   useEffect(() => {
     console.log('[INITIALIZATION] Checking for and removing any duplicate flashcards...');
@@ -1182,15 +1163,15 @@ const TranscriptionDisplay = ({
     >
       {/* Word Definition Popup */}
       {popupInfo.visible && (
-        <WordDefinitionPopup 
-  onRemoveFromDictionary={removeFlashcard} 
+        <WordDefinitionPopup
           word={popupInfo.word}
-          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
+          definition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
           dictDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.dictionaryDefinition}
           disambiguatedDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
           position={popupInfo.position}
           isInDictionary={wordDefinitions[popupInfo.word.toLowerCase()] ? doesWordSenseExist(popupInfo.word, wordDefinitions[popupInfo.word.toLowerCase()]?.contextSentence) : false}
           onAddToDictionary={handleAddWordToDictionary}
+          onRemoveFromDictionary={handleRemoveFromDictionary}
           loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
           onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
         />
