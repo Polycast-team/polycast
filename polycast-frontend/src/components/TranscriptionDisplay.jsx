@@ -124,6 +124,21 @@ function useWindowSize() {
 /**
  * Displays the received transcription and multiple translation texts in a split-screen style layout.
  */
+// Helper to normalize selectedWords to the expected format
+function normalizeSelectedWords(selectedWords) {
+  if (!Array.isArray(selectedWords)) return [];
+  if (
+    selectedWords.length > 0 &&
+    typeof selectedWords[0] === 'object' &&
+    'segmentIndex' in selectedWords[0] &&
+    'tokenIndex' in selectedWords[0]
+  ) {
+    return selectedWords;
+  }
+  // Otherwise, return empty array (or you could map strings to objects if you want to preserve old selections)
+  return [];
+}
+
 const TranscriptionDisplay = ({ 
   englishSegments, 
   targetLanguages, 
@@ -735,6 +750,10 @@ const TranscriptionDisplay = ({
         const fetchResponse = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
         const fetchedData = await fetchResponse.json();
         console.log(`[DEBUG] Data fetched back from backend for profile '${selectedProfile}':`, fetchedData);
+        // Normalize selectedWords before setting
+        if (fetchedData.selectedWords !== undefined && setSelectedWords) {
+          setSelectedWords(normalizeSelectedWords(fetchedData.selectedWords));
+        }
       } catch (fetchErr) {
         console.error(`[DEBUG] Error fetching data after save for profile '${selectedProfile}':`, fetchErr);
       }
