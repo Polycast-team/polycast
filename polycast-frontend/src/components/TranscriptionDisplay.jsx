@@ -220,6 +220,45 @@ const TranscriptionDisplay = ({
   
   // Track selected word instances with their positions
   const [selectedWordInstances, setSelectedWordInstances] = useState([]);
+  
+  // Update selectedWordInstances when selectedWords changes (e.g., when loading a profile)
+  useEffect(() => {
+    console.log('Selected words changed:', selectedWords);
+    // When words are loaded from a profile, we don't have the exact positions,
+    // so we'll just highlight the first instance of each word
+    const newInstances = [];
+    
+    englishSegments.forEach((segment, segIdx) => {
+      if (!segment.text) return;
+      
+      // Tokenize the segment into words
+      const tokens = segment.text.match(/[\p{L}\p{M}\d']+|[.,!?;:]+|\s+/gu) || [];
+      let wordIndex = -1;
+      
+      tokens.forEach((token, tokenIdx) => {
+        // Only process actual words (not punctuation or spaces)
+        if (/^[\p{L}\p{M}\d']+$/u.test(token)) {
+          wordIndex++;
+          const wordLower = token.toLowerCase();
+          
+          // If this word is in selectedWords and we haven't added an instance of it yet
+          if (selectedWords.includes(wordLower) && 
+              !newInstances.some(inst => inst.word === wordLower)) {
+            newInstances.push({
+              key: `${segIdx}:${wordIndex}:${wordLower}`,
+              segmentIndex: segIdx,
+              wordIndex: wordIndex,
+              word: wordLower,
+              originalWord: token
+            });
+          }
+        }
+      });
+    });
+    
+    console.log('Updating selectedWordInstances:', newInstances);
+    setSelectedWordInstances(newInstances);
+  }, [selectedWords, englishSegments]);
 
   // Only shows the popup when a word is clicked, doesn't add the word to dictionary
   const handleWordClick = async (word, event, segmentIndex, wordIndex) => {
@@ -774,6 +813,13 @@ const TranscriptionDisplay = ({
     }, 500);
   }, []);
 
+  // Function to check if a specific word instance is already selected
+  const isWordInstanceSelected = (word, segmentIndex, wordIndex) => {
+    const wordLower = word.toLowerCase();
+    const instanceKey = `${segmentIndex}:${wordIndex}:${wordLower}`;
+    return selectedWordInstances.some(instance => instance.key === instanceKey);
+  };
+
   // Function to add word to dictionary when the + button is clicked
   const handleAddWordToDictionary = async (word) => {
     try {
@@ -819,14 +865,23 @@ const TranscriptionDisplay = ({
         setSelectedWordInstances(prev => {
           // Check if this exact instance is already selected
           if (!prev.some(instance => instance.key === instanceKey)) {
-            return [...prev, { 
+            const newInstances = [...prev, { 
               key: instanceKey,
               segmentIndex: popupInfo.segmentIndex,
               wordIndex: popupInfo.wordIndex,
               word: wordLower,
               originalWord: word
             }];
+            console.log('Added word instance:', { 
+              key: instanceKey,
+              word: wordLower,
+              segmentIndex: popupInfo.segmentIndex,
+              wordIndex: popupInfo.wordIndex,
+              allInstances: newInstances
+            });
+            return newInstances;
           }
+          console.log('Word instance already selected:', instanceKey);
           return prev;
         });
       }
