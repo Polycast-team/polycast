@@ -1134,27 +1134,6 @@ app.get('/api/profile/:profile/words', async (req, res) => {
     }
 });
 
-// DELETE endpoint to remove a flashcard for a specific profile
-app.delete('/api/profile/:profile/flashcard/:wordSenseId', async (req, res) => {
-    const { profile, wordSenseId } = req.params;
-    try {
-        const client = await pool.connect();
-        const deleteResult = await client.query(
-            'DELETE FROM flashcards WHERE profile_name = $1 AND word_sense_id = $2 RETURNING *',
-            [profile, wordSenseId]
-        );
-        client.release();
-        if (deleteResult.rowCount > 0) {
-            res.json({ success: true, removed: wordSenseId });
-        } else {
-            res.status(404).json({ success: false, message: 'Flashcard not found' });
-        }
-    } catch (err) {
-        console.error(`[Profile API] ERROR deleting flashcard ${wordSenseId} for profile ${profile}:`, err);
-        res.status(500).json({ success: false, error: 'Failed to delete flashcard' });
-    }
-});
-
 // POST endpoint to save flashcards and highlighted words for a specific profile
 app.post('/api/profile/:profile/words', async (req, res) => {
     const { profile } = req.params;

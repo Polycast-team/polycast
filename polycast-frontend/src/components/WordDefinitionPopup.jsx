@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import './WordDefinitionPopup.css';
 
-const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDefinition, position, onClose, onAddToDictionary, onRemoveFromDictionary, isInDictionary, loading }) => {
+const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDefinition, position, onClose, onAddToDictionary, isInDictionary, loading }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   // Add local state to track when a word is added, so we can show checkmark immediately
   const [localAdded, setLocalAdded] = useState(false);
@@ -144,13 +144,11 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                 )}
                 {isWordInDictionary && (
                   <div 
-                    className="dict-added-indicator"
-                    style={{ cursor: 'pointer' }}
+                    className="dict-added-indicator dict-remove-btn"
                     onClick={() => {
+                      // Call handler to remove from dictionary
                       setLocalAdded(false);
-                      if (onRemoveFromDictionary) {
-                        onRemoveFromDictionary(word, definition?.wordSenseId || word);
-                      }
+                      onRemoveFromDictionary && onRemoveFromDictionary(word);
                     }}
                     onMouseEnter={() => setShowTooltip(true)}
                     onMouseLeave={() => setShowTooltip(false)}
@@ -207,15 +205,17 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
 WordDefinitionPopup.propTypes = {
   word: PropTypes.string,
   definition: PropTypes.object,
-  onRemoveFromDictionary: PropTypes.func,
   dictDefinition: PropTypes.object,
+  disambiguatedDefinition: PropTypes.object,
   position: PropTypes.shape({
     x: PropTypes.number.isRequired,
     y: PropTypes.number.isRequired
   }).isRequired,
   onClose: PropTypes.func.isRequired,
   onAddToDictionary: PropTypes.func,
-  isInDictionary: PropTypes.bool
+  onRemoveFromDictionary: PropTypes.func,
+  isInDictionary: PropTypes.bool,
+  loading: PropTypes.bool
 };
 
 WordDefinitionPopup.defaultProps = {

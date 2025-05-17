@@ -139,11 +139,18 @@
   width: 22px;
   height: 22px;
   background-color: #39e58c;
-  color: #262440;
+  color: #1a1a2e;
   border-radius: 50%;
   font-size: 14px;
-  font-weight: bold;
   margin-left: 4px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.dict-added-indicator:hover {
+  background-color: #4ad991;
+  transform: scale(1.05);
 }
 
 .dict-part-of-speech {

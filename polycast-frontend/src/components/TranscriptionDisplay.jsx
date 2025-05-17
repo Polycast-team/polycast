@@ -929,6 +929,59 @@ const TranscriptionDisplay = ({
     }
   };
 
+  // Function to remove a word from the dictionary/flashcards
+  const handleRemoveWordFromDictionary = (word) => {
+    try {
+      const wordLower = word.toLowerCase();
+      console.log(`Removing word from dictionary: ${wordLower}`);
+      
+      // First, check if the word exists in our flashcards
+      if (!wordDefinitions[wordLower]) {
+        console.warn(`Word ${wordLower} not found in flashcards.`);
+        return;
+      }
+      
+      // Get all the sense IDs associated with this word
+      const allSenses = wordDefinitions[wordLower]?.allSenses || [];
+      
+      // Update the wordDefinitions state to mark all senses as not in flashcards
+      setWordDefinitions(prev => {
+        const updated = { ...prev };
+        
+        // Update the base word entry
+        if (updated[wordLower]) {
+          updated[wordLower] = {
+            ...updated[wordLower],
+            inFlashcards: false
+          };
+        }
+        
+        // Update all sense entries
+        allSenses.forEach(senseId => {
+          if (updated[senseId]) {
+            updated[senseId] = {
+              ...updated[senseId],
+              inFlashcards: false
+            };
+          }
+        });
+        
+        console.log(`[DICTIONARY] Removed ${wordLower} and all its senses from flashcards.`);
+        return updated;
+      });
+      
+      // Save the updated state to the backend
+      if (selectedProfile !== 'non-saving') {
+        setTimeout(() => {
+          saveProfileData();
+          console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
+        }, 100);
+      }
+    } catch (error) {
+      console.error(`Error removing word from dictionary: ${error}`);
+    }
+  };
+
   const handleInputChange = (lang, value) => {
     setTextInputs(inputs => ({ ...inputs, [lang]: value }));
   };
@@ -1163,15 +1216,15 @@ const TranscriptionDisplay = ({
     >
       {/* Word Definition Popup */}
       {popupInfo.visible && (
-        <WordDefinitionPopup
+        <WordDefinitionPopup 
           word={popupInfo.word}
-          definition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
+          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
           dictDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.dictionaryDefinition}
           disambiguatedDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
           position={popupInfo.position}
           isInDictionary={wordDefinitions[popupInfo.word.toLowerCase()] ? doesWordSenseExist(popupInfo.word, wordDefinitions[popupInfo.word.toLowerCase()]?.contextSentence) : false}
           onAddToDictionary={handleAddWordToDictionary}
-          onRemoveFromDictionary={handleRemoveFromDictionary}
+          onRemoveFromDictionary={handleRemoveWordFromDictionary}
           loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
           onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
         />
