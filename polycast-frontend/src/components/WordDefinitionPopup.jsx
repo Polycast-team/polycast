@@ -219,7 +219,9 @@ WordDefinitionPopup.propTypes = {
 };
 
 WordDefinitionPopup.defaultProps = {
-  isInDictionary: false
+  isInDictionary: false,
+  onAddToDictionary: () => console.log('Default onAddToDictionary called - no handler provided'),
+  onRemoveFromDictionary: () => console.log('Default onRemoveFromDictionary called - no handler provided')
 };
 
 export default WordDefinitionPopup;
