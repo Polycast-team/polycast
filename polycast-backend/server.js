@@ -988,15 +988,7 @@ app.get('/api/profile/:profile/words', async (req, res) => {
             console.log(`[Profile API] DEBUG: Flashcards table columns:`, 
                 tableInfo.rows.map(row => row.column_name).join(', '));
             
-            // Upsert a test flashcard for the 'mouse' profile (without card_created_at)
-            const testResult = await client.query(
-                `INSERT INTO flashcards (profile_name, word, word_sense_id, definition, in_flashcards)
-                 VALUES ($1, $2, $3, $4, $5)
-                 ON CONFLICT (profile_name, word_sense_id) DO UPDATE SET definition = $4, in_flashcards = $5
-                 RETURNING *`,
-                [profile, 'testword', 'test1', 'WOW, THIS IS AMAZING! GREAT WORK!', true]
-            );
-            console.log(`[Profile API] DEBUG: Test flashcard created, result:`, testResult.rows[0]);
+
             client.release();
         } catch (err) {
             console.error('[DEBUG] Failed to upsert test flashcard for mouse:', err);
