@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import './WordDefinitionPopup.css';
 
-const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDefinition, position, onClose, onAddToDictionary, isInDictionary, loading }) => {
+const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDefinition, position, onClose, onAddToDictionary, onRemoveFromDictionary, isInDictionary, loading }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   // Add local state to track when a word is added, so we can show checkmark immediately
   const [localAdded, setLocalAdded] = useState(false);
