@@ -944,29 +944,34 @@ const TranscriptionDisplay = ({
       // Get all the sense IDs associated with this word
       const allSenses = wordDefinitions[wordLower]?.allSenses || [];
       
-      // Update the wordDefinitions state to mark all senses as not in flashcards
+      // Update the wordDefinitions state to COMPLETELY REMOVE entries
       setWordDefinitions(prev => {
         const updated = { ...prev };
         
-        // Update the base word entry
+        // Keep track of removed entries for logging
+        const removedEntries = [];
+        
+        // Completely remove the word entry and all its senses
         if (updated[wordLower]) {
-          updated[wordLower] = {
-            ...updated[wordLower],
-            inFlashcards: false
-          };
+          removedEntries.push(wordLower);
+          delete updated[wordLower];
         }
         
-        // Update all sense entries
+        // Remove all sense entries
         allSenses.forEach(senseId => {
           if (updated[senseId]) {
-            updated[senseId] = {
-              ...updated[senseId],
-              inFlashcards: false
-            };
+            removedEntries.push(senseId);
+            delete updated[senseId];
           }
         });
         
-        console.log(`[DICTIONARY] Removed ${wordLower} and all its senses from flashcards.`);
+        // Close the popup since we've removed the word
+        setPopupInfo(prevPopup => ({
+          ...prevPopup,
+          visible: false
+        }));
+        
+        console.log(`[DICTIONARY] Completely removed ${wordLower} and ${removedEntries.length - 1} senses from flashcards.`);
         return updated;
       });
       
