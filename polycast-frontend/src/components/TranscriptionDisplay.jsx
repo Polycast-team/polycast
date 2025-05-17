@@ -944,9 +944,6 @@ const TranscriptionDisplay = ({
       // Get all the sense IDs associated with this word
       const allSenses = wordDefinitions[wordLower]?.allSenses || [];
       
-      // Create a copy of selectedWords to ensure the UI re-renders after removal
-      const updatedSelectedWords = [...selectedWords];
-      
       // Update the wordDefinitions state to COMPLETELY REMOVE entries
       setWordDefinitions(prev => {
         const updated = { ...prev };
@@ -968,23 +965,24 @@ const TranscriptionDisplay = ({
           }
         });
         
-        // Close the popup since we've removed the word
-        setPopupInfo(prevPopup => ({
-          ...prevPopup,
-          visible: false
-        }));
-        
         console.log(`[DICTIONARY] Completely removed ${wordLower} and ${removedEntries.length - 1} senses from flashcards.`);
-        
-        // Force UI update by saving state changes
-        setTimeout(() => {
-          // Update selectedWords to force re-render, even if we're just setting it to the same value
-          // This triggers the component to re-evaluate the word highlighting
-          setSelectedWords([...updatedSelectedWords]);
-        }, 10);
         
         return updated;
       });
+      
+      // Close the popup after removing the word
+      setPopupInfo(prevPopup => ({
+        ...prevPopup,
+        visible: false,
+        wordAddedToDictionary: false // Update this flag to reflect the removal
+      }));
+      
+      // Trigger a UI refresh to update the word highlighting
+      // Using a small timeout to ensure state updates have been processed
+      setTimeout(() => {
+        // Using a dummy state update to force a re-render
+        setSelectedWords([...selectedWords]);
+      }, 50);
       
       // Also trigger saving to the backend
       if (selectedProfile !== 'non-saving') {
