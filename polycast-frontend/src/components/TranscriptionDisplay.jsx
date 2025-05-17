@@ -56,12 +56,14 @@ const renderHistoryStacked = (segments) => {
 };
 
 // Helper: render a segment with clickable words
-const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords, handleWordClick, isWordInSelectedListFn, selectedWordInstances = []) => {
+const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords, handleWordClick, isWordInSelectedListFn) => {
   // Default implementation if no function is provided
   const checkWordInList = isWordInSelectedListFn || ((word, segmentIndex, wordIndex) => {
-    // Check if this specific word instance is selected
-    const instanceKey = `${segmentIndex}:${wordIndex}:${word.toLowerCase()}`;
-    return selectedWordInstances.some(instance => instance.key === instanceKey);
+    return selectedWords.some(w => 
+      w.word.toLowerCase() === word.toLowerCase() &&
+      w.segmentIndex === segmentIndex &&
+      w.wordIndex === wordIndex
+    );
   });
   
   if ((!segments || segments.length === 0) && lastPersisted) {
@@ -71,38 +73,20 @@ const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords
     return <p>Waiting...</p>;
   }
   
-  // Each segment on its own line
   return segments.map((segment, segIdx) => {
-    // Tokenize: words (with apostrophes/accents), punctuation, and spaces
-    // This regex matches words, punctuation, and spaces
     const tokens = segment.text.match(/([\p{L}\p{M}\d']+|[.,!?;:]+|\s+)/gu) || [];
-    
-    // Track word index within this segment
-    let wordIndex = -1;
-    
     return (
-      <div 
-        key={segIdx} 
-        className={segment.isNew ? 'new-text' : ''} 
-        style={{ display: 'block', marginBottom: 2 }}
-        data-segment-index={segIdx}
-      >
-        {tokens.map((token, i) => {
-          // Only words (letters, numbers, apostrophes, accents) are clickable
+      <div key={segIdx} className={segment.isNew ? 'new-text' : ''} style={{ display: 'block', marginBottom: 2 }}>
+        {tokens.map((token, tokenIndex) => {
           const isWord = /^[\p{L}\p{M}\d']+$/u.test(token);
-          
-          // Only increment word index for actual words, not punctuation or spaces
-          if (isWord) wordIndex++;
-          
-          // Check if this specific instance is selected
-          const isSelected = isWord && checkWordInList(token.toLowerCase(), segIdx, wordIndex);
+          const isSelected = isWord && checkWordInList(token, segIdx, tokenIndex);
           
           return (
             <span
-              key={i}
+              key={`${segIdx}-${tokenIndex}`}
               onClick={isWord ? (e) => { 
                 e.stopPropagation();
-                handleWordClick(token, e, segIdx, wordIndex);
+                handleWordClick(token, e, segIdx, tokenIndex);
               } : undefined}
               style={{
                 cursor: isWord ? 'pointer' : 'default',
@@ -112,7 +96,6 @@ const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords
                 transition: 'color 0.2s',
                 userSelect: 'text',
               }}
-              data-word-index={isWord ? wordIndex : undefined}
             >
               {token}
             </span>
@@ -215,11 +198,9 @@ const TranscriptionDisplay = ({
     word: '',
     position: { x: 0, y: 0 },
     segmentIndex: -1,
-    wordIndex: -1
+    wordIndex: -1,
+    contextSentence: ''
   });
-  
-  // Track selected word instances with their positions
-  const [selectedWordInstances, setSelectedWordInstances] = useState([]);
 
   // Only shows the popup when a word is clicked, doesn't add the word to dictionary
   const handleWordClick = async (word, event, segmentIndex, wordIndex) => {
@@ -241,34 +222,31 @@ const TranscriptionDisplay = ({
     // Position to the right if there's room, otherwise to the left
     const xPos = fitsOnRight ? rect.right + 5 : rect.left - popupWidth - 5;
     
-    // Store the segment and word indices for this click
-    setPopupInfo(prev => ({
-      ...prev,
-      segmentIndex,
-      wordIndex
-    }));
+    // Try to get the segment text from the provided segmentIndex if available
+    let contextSentence = "";
+    if (segmentIndex !== undefined && englishSegments[segmentIndex]) {
+      contextSentence = englishSegments[segmentIndex].text;
+      console.log(`Using segment at index ${segmentIndex} for context`);
+    } 
     
-    // Get the element that was clicked
-    const clickedElement = event.currentTarget;
-    
-    // Find the parent segment element (which is the div containing the clicked word)
-    let segmentElement = clickedElement.closest('div');
-    let segmentText = segmentElement?.textContent || "";
-    
-    // Use the segment text as context rather than just finding the first occurrence
-    let contextSentence = segmentText || "";
-    
-    // If we couldn't get context from the clicked element, fall back to finding it in englishSegments
+    // Fallback to the old method if we couldn't get the segment
     if (!contextSentence) {
-      contextSentence = englishSegments.find(segment => 
-        segment.text.toLowerCase().includes(wordLower)
-      )?.text || "";
+      const clickedElement = event.currentTarget;
+      const segmentElement = clickedElement.closest('div');
+      contextSentence = segmentElement?.textContent || "";
+      
+      // If we still don't have context, try to find it in englishSegments
+      if (!contextSentence) {
+        contextSentence = englishSegments.find(segment => 
+          segment.text.toLowerCase().includes(wordLower)
+        )?.text || "";
+      }
+      console.log(`Fell back to DOM-based context for "${word}"`);
     }
     
-    console.log(`Using context for "${word}": "${contextSentence}"`, { from: segmentText ? 'clicked element' : 'segments search' });
+    console.log(`Using context for "${word}": "${contextSentence}"`);
     
     // Format the context with the target word emphasized with asterisks for Gemini
-    // (we'll use a case-insensitive replace to maintain the original casing of the word)
     if (contextSentence) {
       const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
       contextSentence = contextSentence.replace(regex, (match) => `*${match}*`);
@@ -279,9 +257,12 @@ const TranscriptionDisplay = ({
     const existingWordData = wordDefinitions[wordLower];
     const isAlreadyInDictionary = existingWordData ? doesWordSenseExist(word, contextSentence) : false;
     
-    // Set initial popup state
+    // Set initial popup state with position information
     setPopupInfo({
       visible: true,
+      segmentIndex,
+      wordIndex,
+      contextSentence,
       word: word,
       position: {
         x: Math.max(5, Math.min(viewportWidth - popupWidth - 5, xPos)), // Keep on screen
@@ -387,853 +368,131 @@ const TranscriptionDisplay = ({
     }
   };
   
-  // Function to check if a word in a specific context is in the selected words list
-  const isWordInSelectedList = (word, contextSentence) => {
-    if (!word || !contextSentence) return false;
+  const handleAddToDictionary = async (word, definition, translation, partOfSpeech, definitionNumber, contextSentence) => {
+    const wordLower = word.toLowerCase();
+    const wordSenseId = `${wordLower}${definitionNumber}`;
+    
+    // Get the position information from the popup
+    const { segmentIndex, wordIndex } = popupInfo;
+    
+    // Check if this word sense already exists in the dictionary
+    const existingWordData = wordDefinitions[wordLower];
+    const isAlreadyInDictionary = existingWordData && existingWordData[wordSenseId];
+    
+    // Update the word in the dictionary
+    setWordDefinitions(prev => ({
+      ...prev,
+      [wordLower]: {
+        ...(prev[wordLower] || {}),
+        [wordSenseId]: {
+          word: word,
+          definition: definition,
+          translation: translation,
+          partOfSpeech: partOfSpeech,
+          definitionNumber: definitionNumber,
+          contextSentence: contextSentence,
+          inFlashcards: true,
+          cardCreatedAt: new Date().toISOString(),
+          wordSenseId: wordSenseId
+        },
+        // Mark that this word has been added to the dictionary
+        inDictionary: true,
+        // Keep track of all senses of this word
+        allSenses: [...new Set([
+          ...(prev[wordLower]?.allSenses || []),
+          wordSenseId
+        ])],
+        // Mark that this word has multiple senses if there are multiple senses
+        hasMultipleSenses: (prev[wordLower]?.allSenses?.length || 0) >= 1
+      }
+    }));
+    
+    // Add to selected words with position information
+    const wordWithPosition = {
+      word: word,
+      segmentIndex,
+      wordIndex,
+      wordSenseId
+    };
+    
+    setSelectedWords(prev => {
+      // Check if this exact position is already selected
+      const isAlreadySelected = prev.some(w => 
+        w.word === word && 
+        w.segmentIndex === segmentIndex && 
+        w.wordIndex === wordIndex
+      );
+      
+      if (isAlreadySelected) {
+        return prev; // Already selected, no change needed
+      }
+      
+      // Add the new word with position information
+      return [...prev, wordWithPosition];
+    });
+    
+    // Close the popup
+    setPopupInfo(prev => ({ ...prev, visible: false }));
+
+  // Function to check if a word at a specific position is in the selected words list
+  const isWordInSelectedList = (word, segmentIndex, wordIndex) => {
+    if (!word || segmentIndex === undefined || wordIndex === undefined) return false;
     
     const wordLower = word.toLowerCase();
+    
+    // Check if any selected word matches the word, segment index, and word index
+    return selectedWords.some(entry => {
+      // If entry is an object (new format), check all fields
+      if (typeof entry === 'object' && entry !== null) {
+        return entry.word.toLowerCase() === wordLower && 
+               entry.segmentIndex === segmentIndex &&
+               entry.wordIndex === wordIndex;
+      }
+      // Fallback for legacy string format (shouldn't happen with our updates)
+      return false;
+    });
+  };
+
+  // Render the word definition popup if visible
+  const renderWordDefinitionPopup = () => {
+    if (!popupInfo.visible) return null;
+    
+    const wordLower = popupInfo.word.toLowerCase();
     const wordData = wordDefinitions[wordLower];
     
-    // Basic check (backward compatibility)
-    if (!wordData) return selectedWords.some(w => w.toLowerCase() === wordLower);
+    // Check if this specific instance of the word is already in the dictionary
+    const isThisInstanceInDictionary = isWordInSelectedList(
+      popupInfo.word, 
+      popupInfo.segmentIndex, 
+      popupInfo.wordIndex
+    );
     
-    // Get the part of speech from the contextual word if possible
-    let currentPoS = null;
-    
-    // Try to determine part of speech from the context
-    if (wordData.disambiguatedDefinition) {
-      currentPoS = wordData.disambiguatedDefinition.partOfSpeech;
-    } else if (wordData.dictionaryDefinition && wordData.dictionaryDefinition.partOfSpeech) {
-      currentPoS = wordData.dictionaryDefinition.partOfSpeech;
-    }
-    
-    // With our new storage format, check if this word has multiple senses
-    if (wordData.hasMultipleSenses && wordData.allSenses) {
-      // Check each stored sense for this word
-      for (const senseKey of wordData.allSenses) {
-        const sense = wordDefinitions[senseKey];
-        if (!sense || !sense.inFlashcards) continue;
-        
-        // Check if contexts are similar - this matches by sentence contexts
-        const contextMatch = sense.contextSentence && 
-                           contextSentence && 
-                           (contextSentence.includes(sense.contextSentence) || 
-                            sense.contextSentence.includes(contextSentence));
-                            
-        // If contexts match or parts of speech match for this specific case
-        if (contextMatch || (currentPoS && sense.partOfSpeech === currentPoS)) {
-          return true;
-        }
-      }
-      return false;
-    }
-    
-    // Fallback for legacy format: check all entries for matching contexts
-    for (const entry of Object.values(wordDefinitions)) {
-      if (entry.contextSentence && 
-          entry.contextSentence.toLowerCase().includes(wordLower) &&
-          contextSentence.includes(entry.contextSentence) &&
-          entry.inFlashcards === true) {
-        return true;
-      }
-    }
-    
-    return false;
-  };
-  
-  // Get all existing flashcard sense IDs
-  const getAllFlashcardSenseIds = () => {
-    return Object.values(wordDefinitions)
-      .filter(def => def.wordSenseId && def.inFlashcards)
-      .map(def => def.wordSenseId);
-  };
-  
-  // Helper function to get the definition numbers from dictionary data
-  const getDefinitionNumbers = (dictData, word) => {
-    const wordLower = word.toLowerCase();
-    const result = [];
-    
-    // If we have the MEANINGS format from the dictionary JSON
-    if (dictData && dictData.rawData && dictData.rawData.MEANINGS) {
-      // MEANINGS is already in numbered format, so just return the keys
-      return Object.keys(dictData.rawData.MEANINGS).map(num => parseInt(num, 10));
-    }
-    
-    // If we have allDefinitions array
-    if (dictData && dictData.allDefinitions && dictData.allDefinitions.length > 0) {
-      // Return an array with numbers 1 through length
-      return Array.from({length: dictData.allDefinitions.length}, (_, i) => i + 1);
-    }
-    
-    // Default: return single definition number
-    return [1];
-  };
-  
-  const doesWordSenseExist = (word, contextSentence) => {
-    const wordLower = word.toLowerCase();
-    console.log(`[DUPLICATE CHECK] Checking if '${wordLower}' already exists in dictionary...`);
-    
-    // First, determine the word sense ID this word would have
-    let definitionNumber = 1;
-    const contextLower = contextSentence ? contextSentence.toLowerCase() : '';
-    
-    // Special handling for different senses of "charge"
-    if (wordLower === 'charge') {
-      if (contextLower.includes('battle')) {
-        definitionNumber = 1; // attack sense
-      } else if (contextLower.includes('phone') || contextLower.includes('battery')) {
-        definitionNumber = 24; // electrical sense
-      } else if (contextLower.includes('murder')) {
-        definitionNumber = 5; // legal accusation sense
-      }
-    }
-    
-    // Generate the wordSenseId this word would get
-    const wordSenseId = `${wordLower}${definitionNumber}`;
-    console.log(`[DUPLICATE CHECK] This word would get wordSenseId: ${wordSenseId}`);
-    
-    // 1. Direct check: Is this exact wordSenseId already in the flashcards?
-    if (wordDefinitions[wordSenseId] && wordDefinitions[wordSenseId].inFlashcards) {
-      console.log(`[DUPLICATE CHECK] Found exact match: ${wordSenseId} is already in flashcards`);
-      return true;
-    }
-    
-    // Get the current word data
-    const currentWordData = wordDefinitions[wordLower];
-    if (!currentWordData) return false;
-    
-    // 2. Check the base word entry's allSenses array
-    if (currentWordData.hasMultipleSenses && currentWordData.allSenses) {
-      // Does the base word entry contain this sense ID in its allSenses array?
-      if (currentWordData.allSenses.includes(wordSenseId)) {
-        const senseEntry = wordDefinitions[wordSenseId];
-        // Confirm this entry actually exists and is marked as being in flashcards
-        if (senseEntry && senseEntry.inFlashcards) {
-          console.log(`[DUPLICATE CHECK] Found in allSenses array: ${wordSenseId} is already in flashcards`);
-          return true;
-        }
-      }
-    }
-    
-    // 3. Check all existing flashcards for this word to see if there's a similar word sense
-    const existingFlashcards = Object.entries(wordDefinitions)
-      .filter(([key, value]) => 
-        value && value.word === wordLower && 
-        value.inFlashcards && 
-        value.contextSentence);
-    
-    console.log(`[DUPLICATE CHECK] Found ${existingFlashcards.length} existing flashcards for word: ${wordLower}`);
-    
-    for (const [key, existingCard] of existingFlashcards) {
-      console.log(`[DUPLICATE CHECK] Checking existing card: ${key}`);
-      
-      // Compare context sentences for similarity
-      if (existingCard.contextSentence && contextSentence) {
-        const existingContext = existingCard.contextSentence.toLowerCase();
-        if (existingContext === contextLower) {
-          console.log(`[DUPLICATE CHECK] Found exact context match`);
-          return true;
-        }
-      }
-    }
-    
-    console.log(`[DUPLICATE CHECK] No duplicate found for '${wordLower}' - OK to add as new card`);
-    return false;
-  };
-  
-  // Function to check for and remove any duplicate flashcards with the same ID
-  const findAndRemoveDuplicateFlashcards = (state, baseWord) => {
-    console.log(`[DUPLICATE CHECK] Checking for duplicate flashcard IDs for ${baseWord}...`);
-    
-    // Get all the entries in the state object
-    const allEntries = Object.entries(state);
-    
-    // Create a map to count occurrences of each wordSenseId
-    const wordSenseIdCounts = {};
-    const duplicateIds = [];
-    
-    // First, find any duplicated IDs
-    allEntries.forEach(([key, value]) => {
-      // Only check items that have a wordSenseId and are marked as in flashcards
-      if (value && value.wordSenseId && value.inFlashcards) {
-        const id = value.wordSenseId;
-        if (!wordSenseIdCounts[id]) {
-          wordSenseIdCounts[id] = [];
-        }
-        // Store the full key and creation time for this ID
-        wordSenseIdCounts[id].push({
-          key: key,
-          createdAt: value.cardCreatedAt ? new Date(value.cardCreatedAt).getTime() : Date.now()
-        });
-      }
-    });
-    
-    // Check for any IDs with more than one entry
-    Object.entries(wordSenseIdCounts).forEach(([id, occurrences]) => {
-      if (occurrences.length > 1) {
-        console.log(`[DUPLICATE CHECK] Found ${occurrences.length} duplicates of ID: ${id}`);
-        
-        // Sort by creation time (oldest first)
-        occurrences.sort((a, b) => a.createdAt - b.createdAt);
-        
-        // Keep the oldest one, mark the rest for removal
-        const toKeep = occurrences[0].key;
-        const toRemove = occurrences.slice(1).map(o => o.key);
-        
-        console.log(`[DUPLICATE CHECK] Keeping ${toKeep}, removing ${toRemove.join(', ')}`);
-        duplicateIds.push(...toRemove);
-      }
-    });
-    
-    // If we found duplicates, remove them
-    if (duplicateIds.length > 0) {
-      // Create a new state object without the duplicates
-      const newState = { ...state };
-      
-      // Remove the duplicate flashcards
-      duplicateIds.forEach(id => {
-        // Check if the duplicate is in a word's allSenses list
-        Object.entries(newState).forEach(([key, value]) => {
-          if (value && value.allSenses && Array.isArray(value.allSenses)) {
-            // If this entry has an allSenses array that includes the ID we're removing,
-            // update the allSenses array
-            if (value.allSenses.includes(id)) {
-              newState[key] = {
-                ...value,
-                allSenses: value.allSenses.filter(sense => sense !== id)
-              };
-            }
-          }
-        });
-        
-        // Delete the duplicate
-        delete newState[id];
-      });
-      
-      console.log(`[DUPLICATE CHECK] Removed ${duplicateIds.length} duplicate entries`);
-      return newState;
-    }
-    
-    // If no duplicates were found, return the original state
-    return state;
-  };
-  
-  // Debug function to dump the current state of all flashcards
-  const logFlashcardState = () => {
-    console.log('---------- CURRENT FLASHCARD STATE ----------');
-    let flashcardCount = 0;
-    
-    // Count flashcards by wordSenseId
-    const wordSenseIds = new Set();
-    const wordCounts = {};
-    
-    Object.entries(wordDefinitions).forEach(([key, value]) => {
-      // Check if this is a flashcard entry
-      if (value && value.wordSenseId && value.inFlashcards) {
-        flashcardCount++;
-        wordSenseIds.add(value.wordSenseId);
-        
-        // Count by base word
-        const word = value.word || '';
-        if (!wordCounts[word]) {
-          wordCounts[word] = 0;
-        }
-        wordCounts[word]++;
-      }
-    });
-    
-    console.log(`Total flashcard entries: ${flashcardCount}`);
-    console.log(`Unique wordSenseIds: ${wordSenseIds.size}`);
-    console.log('Word counts:');
-    Object.entries(wordCounts).forEach(([word, count]) => {
-      console.log(`  ${word}: ${count} flashcards`);
-    });
-    console.log('---------------------------------------------');
-  };
-  
-  // Function to clean up any duplicate flashcards in the wordDefinitions state
-  const cleanupDuplicateFlashcards = () => {
-    console.log('CLEANUP: Running duplicate flashcard cleanup...');
-    
-    // First, identify all flashcard entries
-    const flashcardEntries = Object.entries(wordDefinitions)
-      .filter(([key, value]) => value && value.wordSenseId && value.inFlashcards)
-      .map(([key, value]) => ({
-        key,
-        wordSenseId: value.wordSenseId,
-        createdAt: value.cardCreatedAt ? new Date(value.cardCreatedAt).getTime() : Date.now(),
-        word: value.word
-      }));
-    
-    // Group flashcards by wordSenseId
-    const groupedFlashcards = {};
-    flashcardEntries.forEach(entry => {
-      if (!groupedFlashcards[entry.wordSenseId]) {
-        groupedFlashcards[entry.wordSenseId] = [];
-      }
-      groupedFlashcards[entry.wordSenseId].push(entry);
-    });
-    
-    // Find groups with more than one entry (duplicates)
-    const duplicateGroups = Object.entries(groupedFlashcards)
-      .filter(([wordSenseId, entries]) => entries.length > 1);
-    
-    // If we have duplicates, clean them up
-    if (duplicateGroups.length > 0) {
-      console.log(`CLEANUP: Found ${duplicateGroups.length} wordSenseIds with duplicates`);
-      
-      // Prepare a new state object with duplicates removed
-      const updatedState = { ...wordDefinitions };
-      duplicateGroups.forEach(([wordSenseId, entries]) => {
-        // Sort by creation date (oldest first)
-        entries.sort((a, b) => a.createdAt - b.createdAt);
-        
-        // Keep the oldest entry, remove the rest
-        const toKeep = entries[0];
-        const toRemove = entries.slice(1);
-        
-        console.log(`CLEANUP: For wordSenseId ${wordSenseId}, keeping ${toKeep.key}, removing:`, 
-                    toRemove.map(e => e.key).join(', '));
-        
-        // Remove the duplicate entries
-        toRemove.forEach(entry => {
-          // Before deleting, make sure to update any references in base word entries
-          const baseWord = entry.word;
-          if (updatedState[baseWord] && updatedState[baseWord].allSenses) {
-            // Update the allSenses array to not reference the deleted entry
-            updatedState[baseWord] = {
-              ...updatedState[baseWord],
-              allSenses: updatedState[baseWord].allSenses.filter(sense => sense !== entry.key)
-            };
-          }
-          
-          // Delete the duplicate entry
-          delete updatedState[entry.key];
-        });
-      });
-      
-      // Update the state with duplicates removed
-      setWordDefinitions(updatedState);
-      console.log('CLEANUP: Updated state with duplicates removed.');
-      return true; // Duplicates were found and removed
-    } else {
-      console.log('CLEANUP: No duplicates found.');
-      return false; // No duplicates found
-    }
-  };
-  
-  // Function to save flashcards and selected words to the backend
-  const saveProfileData = async (flashcards, words) => {
-    // Don't save anything if in non-saving mode
-    if (selectedProfile === 'non-saving') {
-      console.log('In non-saving mode - not saving data to backend');
-      return;
-    }
-    
-    try {
-      console.log(`Saving data for profile: ${selectedProfile}`);
-      
-      // Create the request body
-      const requestBody = {
-        flashcards: flashcards || wordDefinitions,
-        selectedWords: words || selectedWords
-      };
-      
-      // Send the updated data to the backend
-      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-      
-      const result = await response.json();
-      console.log(`Profile data saved successfully:`, result);
-
-      // Immediately fetch the data back from the backend and print it
-      try {
-        const fetchResponse = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
-        const fetchedData = await fetchResponse.json();
-        console.log(`[DEBUG] Data fetched back from backend for profile '${selectedProfile}':`, fetchedData);
-      } catch (fetchErr) {
-        console.error(`[DEBUG] Error fetching data after save for profile '${selectedProfile}':`, fetchErr);
-      }
-    } catch (error) {
-      console.error(`Error saving profile data:`, error);
-    }
-  };
-  
-  // Run cleanup on component mount to fix any existing duplicates
-  useEffect(() => {
-    console.log('[INITIALIZATION] Checking for and removing any duplicate flashcards...');
-    setTimeout(() => {
-      // Use setTimeout to ensure this runs after initial render
-      cleanupDuplicateFlashcards();
-      logFlashcardState();
-    }, 500);
-  }, []);
-
-  // Function to add word to dictionary when the + button is clicked
-  const handleAddWordToDictionary = async (word) => {
-    if (!word || typeof word !== 'string') {
-      console.error('Invalid word provided to handleAddWordToDictionary:', word);
-      return;
-    }
-
-    const wordLower = word.toLowerCase();
-    console.log(`===== ADDING "${word}" TO DICTIONARY... =====`);
-    
-    try {
-      // Log current state before adding
-      logFlashcardState();
-      
-      // Immediately update the popup to show the checkmark
-      setPopupInfo(prev => ({
-        ...prev,
-        wordAddedToDictionary: true
-      }));
-      
-      // Get the word data with definitions
-      const wordData = wordDefinitions[wordLower];
-      
-      if (!wordData) {
-        console.error('No definition data found for word:', word);
-        return;
-      }
-      
-      // Get the context sentence from the word data
-      const contextSentence = wordData.contextSentence || '';
-      
-      // Check if this specific sense of the word is already in the dictionary
-      if (doesWordSenseExist(word, contextSentence)) {
-        console.log(`This specific sense of "${word}" is already in the dictionary: "${contextSentence.substring(0, 30)}..."`);
-        // Update UI to show it's already added, but don't duplicate
-        setPopupInfo(prev => ({
-          ...prev, 
-          wordAddedToDictionary: true,
-          existingWordSense: true
-        }));
-        return;
-      }
-      
-      // Add the word instance to our tracking
-      if (popupInfo.segmentIndex !== -1 && popupInfo.wordIndex !== -1) {
-        const instanceKey = `${popupInfo.segmentIndex}:${popupInfo.wordIndex}:${wordLower}`;
-        
-        setSelectedWordInstances(prev => {
-          try {
-            // Check if this exact instance is already selected
-            if (!prev.some(instance => instance && instance.key === instanceKey)) {
-              return [...(prev || []), { 
-                key: instanceKey,
-                segmentIndex: popupInfo.segmentIndex,
-                wordIndex: popupInfo.wordIndex,
-                word: wordLower,
-                originalWord: word
-              }];
-            }
-            return prev || [];
-          } catch (error) {
-            console.error('Error updating selectedWordInstances:', error);
-            return prev || [];
-          }
-        });
-      }
-      
-      // Add the word to the selectedWords for backward compatibility
-      setSelectedWords(prev => {
-        try {
-          if (!prev.some(w => w && w.toLowerCase() === wordLower)) {
-            return [...(prev || []), word];
-          }
-          return prev || [];
-        } catch (error) {
-          console.error('Error updating selectedWords:', error);
-          return prev || [];
-        }
-      });
-
-      if (!contextSentence) {
-        console.error('No context sentence found for word:', word);
-        return;
-      }
-      
-      // Get dictionary definitions from the word data
-      const dictData = wordData.dictionaryDefinition;
-      
-      // We need to check if dictData exists and has valid content
-      if (!dictData) {
-        console.warn(`No dictionary data found for word: ${word}. Using disambiguated definition instead.`);
-        // Continue with fallback definitions...
-      }
-      
-      // Get all existing flashcard sense IDs
-      const existingFlashcardSenseIds = getAllFlashcardSenseIds();
-      
-      // Get the best definition based on what's available
-      const bestDefinition = wordData.disambiguatedDefinition || 
-                            (dictData && dictData.allDefinitions && dictData.allDefinitions.length > 0 ? 
-                              dictData.allDefinitions[0] : 
-                              (dictData && dictData.definitions && dictData.definitions.length > 0 ? 
-                                dictData.definitions[0] : 
-                                null));
-      
-      if (!bestDefinition) {
-        console.error(`No definition found for ${word} in context: ${contextSentence}`);
-        return;
-      }
-      
-      // Get the part of speech from the best available source
-      const partOfSpeech = bestDefinition.partOfSpeech || 
-                          (dictData && dictData.partOfSpeech) ||
-                          wordData.partOfSpeech ||
-                          'unknown';
-      
-      // Get the definition number from the API response or use a fallback
-      let definitionNumber = 1;
-      
-      // Special case for different senses of "charge"
-      const contextLower = contextSentence ? contextSentence.toLowerCase() : '';
-      
-      if (wordLower === 'charge') {
-        if (contextLower.includes('battle')) {
-          definitionNumber = 1; // attack sense
-        } else if (contextLower.includes('phone') || contextLower.includes('battery')) {
-          definitionNumber = 24; // electrical sense
-        } else if (contextLower.includes('murder')) {
-          definitionNumber = 5; // legal accusation sense
-        }
-      }
-      
-      // Generate word sense ID based on word and definition number (e.g., "abbey3")
-      const wordSenseId = `${wordLower}${definitionNumber}`;
-      
-      // Robust check: Prevent duplicate flashcards by checking current wordDefinitions state
-      if (
-        (existingFlashcardSenseIds.includes(wordSenseId)) ||
-        (wordDefinitions && wordDefinitions[wordSenseId] && wordDefinitions[wordSenseId].inFlashcards)
-      ) {
-        console.log(`This sense of "${word}" (ID: ${wordSenseId}) already exists in flashcards. No new card needed.`);
-        return;
-      }
-      
-      console.log(`Creating flashcard with ID: ${wordSenseId} for definition ${definitionNumber} of "${word}"`);
-      
-      const disambiguatedDefinition = bestDefinition;
-      
-      // Use placeholder image instead of generating one
-      const imageResponse = { url: 'https://placehold.co/300x200/1a1a2e/CCCCCC?text=Placeholder+Image' };
-      
-      setWordDefinitions(prev => {
-        try {
-          if (!prev) {
-            console.error('wordDefinitions state is undefined');
-            return {};
-          }
-          
-          // Double-check to prevent race conditions
-          if (prev[wordSenseId] && prev[wordSenseId].inFlashcards) {
-            console.warn(`[DUPLICATE-GUARD] Duplicate flashcard prevented for ${word} (ID: ${wordSenseId}).`);
-            return prev;
-          }
-          
-          // Log the current state for debugging
-          console.log(`[FLASHCARD CREATE] Current senses for ${wordLower}: ${prev[wordLower]?.allSenses?.join(', ') || 'none'}`);
-          
-          const senseKey = wordSenseId;
-          const existingWordData = prev[wordLower] || {};
-          const newSenses = [...new Set([...(existingWordData.allSenses || []), senseKey])];
-          
-          console.log(`[FLASHCARD CREATE] Adding new sense ${senseKey} to ${wordLower}. Total senses: ${newSenses.length}`);
-          
-          // Create updated state with the new flashcard
-          const updatedState = {
-            ...prev,
-            [wordLower]: {
-              ...existingWordData,
-              hasMultipleSenses: true,
-              allSenses: newSenses,
-            },
-            [senseKey]: {
-              word: wordLower,
-              imageUrl: imageResponse.url,
-              wordSenseId: wordSenseId,
-              contextSentence: contextSentence,
-              disambiguatedDefinition: disambiguatedDefinition,
-              // Store the best available definition as a flat property for UI reliability
-              definition: (disambiguatedDefinition && (disambiguatedDefinition.definition || disambiguatedDefinition.text)) ||
-                          wordData.definition ||
-                          (wordData.definitions && wordData.definitions[0] && wordData.definitions[0].text) ||
-                          '',
-              inFlashcards: true, // This is where we mark the card as in flashcards
-              cardCreatedAt: new Date().toISOString(),
-              partOfSpeech: partOfSpeech,
-              definitionNumber: definitionNumber,
-              // Include example sentences from API response if available
-              exampleSentencesRaw: wordData.exampleSentencesRaw || ''
-            }
-          };
-          
-          console.log(`[FLASHCARD CREATE] Successfully created flashcard with ID: ${wordSenseId}`);
-          return updatedState;
-        } catch (error) {
-          console.error('Error in setWordDefinitions callback:', error);
-          return prev || {}; // Always return a valid state
-        }
-      });
-      
-      // Run cleanup to ensure no duplicates after the state update (using setTimeout to ensure state is updated first)
-      setTimeout(() => {
-        try {
-          console.log('Running duplicate cleanup after adding flashcard...');
-          cleanupDuplicateFlashcards();
-          logFlashcardState();
-          
-          // Save the updated flashcards to the backend for the current profile
-          if (selectedProfile !== 'non-saving') {
-            // Pass the current flashcards and selected words to save
-            saveProfileData(wordDefinitions, selectedWords);
-            console.log(`Saved flashcards to profile: ${selectedProfile}`);
-          }
-        } catch (error) {
-          console.error('Error in post-add cleanup:', error);
-        }
-      }, 100);
-    } catch (error) {
-      console.error(`Error creating flashcard for ${word}:`, error);
-      // Try to recover by resetting the popup state
-      setPopupInfo(prev => ({
-        ...prev,
-        wordAddedToDictionary: false,
-        existingWordSense: false
-      }));
-    }
-  };
-
-  const handleInputChange = (lang, value) => {
-    setTextInputs(inputs => ({ ...inputs, [lang]: value }));
-  };
-
-  const handleSubmit = (lang) => {
-    if (onTextSubmit && typeof onTextSubmit === 'function') {
-      onTextSubmit(lang, textInputs[lang] || '');
-    }
-  };
-
-  useEffect(() => {
-    function updateSize() {
-      if (containerRef.current) {
-        setContainerSize({
-          width: window.innerWidth, // Use full viewport width for layout
-          height: containerRef.current.offsetHeight
-        });
-      }
-    }
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
-  }, []);
-
-  useEffect(() => {
-    if (englishRef.current) {
-      const end = englishRef.current.querySelector('.scroll-end');
-      if (end) end.scrollIntoView({ behavior: 'auto' });
-    }
-    Object.values(translationRefs.current).forEach(ref => {
-      if (ref && ref instanceof HTMLElement) {
-        const end = ref.querySelector('.scroll-end');
-        if (end) end.scrollIntoView({ behavior: 'auto' });
-      }
-    });
-  }, [englishSegments, translations]);
-
-  // Listen for font size change events from Controls
-  useEffect(() => {
-    const handler = (e) => {
-      setFontSize(f => {
-        const newSize = Math.max(10, Math.min(96, f + (e.detail || 0)));
-        const el = document.getElementById('font-size-display');
-        if (el) el.textContent = `${newSize}px`;
-        return newSize;
-      });
-    };
-    window.addEventListener('changeFontSize', handler);
-    // Set initial display
-    const el = document.getElementById('font-size-display');
-    if (el) el.textContent = `${fontSize}px`;
-    return () => window.removeEventListener('changeFontSize', handler);
-  }, [fontSize]);
-
-  // Update last persisted translations whenever translations change
-  useEffect(() => {
-    for (const lang of targetLanguages) {
-      const segs = translations[lang];
-      if (segs && segs.length > 0) {
-        lastPersistedTranslations.current[lang] = segs.map(s => s.text).join(' ');
-      }
-    }
-  }, [translations, targetLanguages]);
-
-  // Listen for font size change events from Controls
-  useEffect(() => {
-    const handler = (e) => {
-      setFontSize(f => {
-        const newSize = Math.max(10, Math.min(96, f + (e.detail || 0)));
-        const el = document.getElementById('font-size-display');
-        if (el) el.textContent = `${newSize}px`;
-        return newSize;
-      });
-    };
-    window.addEventListener('changeFontSize', handler);
-    // Set initial display
-    const el = document.getElementById('font-size-display');
-    if (el) el.textContent = `${fontSize}px`;
-    return () => window.removeEventListener('changeFontSize', handler);
-  }, [fontSize]);
-
-  // Update last persisted translations whenever translations change
-  useEffect(() => {
-    for (const lang of targetLanguages) {
-      const segs = translations[lang];
-      if (segs && segs.length > 0) {
-        lastPersistedTranslations.current[lang] = segs.map(s => s.text).join(' ');
-      }
-    }
-  }, [translations, targetLanguages]);
-
-  // Center the English box, and make it taller
-  // For single language, center translation box too
-  // English box min height
-  const ENGLISH_BOX_HEIGHT = 180;
-  // Responsive layout for 1-4 languages (fit inside container)
-  const GAP = 24;
-  const SIDE_MARGIN = 24;
-  const BOTTOM_MARGIN = 24;
-  const boxTop = 20; // vertical offset below English box
-  const langCount = targetLanguages.length;
-  let langBoxLayout = [];
-  const toolbar = document.querySelector('.controls');
-  let toolbarCenter = window.innerWidth / 2;
-  if (toolbar) {
-    const rect = toolbar.getBoundingClientRect();
-    toolbarCenter = rect.left + rect.width / 2;
-  }
-  if (langCount > 0 && langCount <= 4) {
-    const availableWidth = containerSize.width - SIDE_MARGIN * 2 - GAP * (langCount - 1);
-    const boxWidth = availableWidth / langCount;
-    const availableHeight = containerSize.height - ENGLISH_BOX_HEIGHT - boxTop - GAP - BOTTOM_MARGIN;
-    const boxHeight = availableHeight > 250 ? availableHeight : 250;
-    // Calculate the left offset so the boxes are centered with the toolbar
-    const totalBoxesWidth = langCount * boxWidth + (langCount - 1) * GAP;
-    const leftOffset = toolbarCenter - totalBoxesWidth / 2;
-    for (let idx = 0; idx < langCount; ++idx) {
-      langBoxLayout.push({
-        x: leftOffset + idx * (boxWidth + GAP),
-        y: ENGLISH_BOX_HEIGHT + boxTop,
-        w: boxWidth,
-        h: boxHeight,
-      });
-    }
-  }
-
-  // English box layout (centered in CSS, matching container)
-  let englishBoxInit = { x: 0, y: 0, w: 480, h: ENGLISH_BOX_HEIGHT };
-  const englishBoxWidth = containerSize.width > 600 ? 480 : Math.max(320, containerSize.width - 40);
-  const containerWidth = containerRef.current?.offsetWidth || containerSize.width;
-  englishBoxInit = {
-    x: (containerWidth - englishBoxWidth) / 2,
-    y: 0, // Use margin for vertical spacing
-    w: englishBoxWidth,
-    h: ENGLISH_BOX_HEIGHT,
-  };
-
-  const renderEnglishBox = () => {
-    const scheme = colorSchemes[0];
     return (
-      <div
-        style={{
-          width: '100%',
-          overflowY: 'auto',
-          background: '#181b2f',
-          color: '#fff',
-          borderTop: '6px solid #7c62ff',
-          borderRadius: 10,
-          boxShadow: '0 2px 12px 0 rgba(124, 98, 255, 0.14)',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-start',
-          alignItems: 'stretch',
-          padding: 0,
-          minHeight: 0,
-          flex: 1,
+      <WordDefinitionPopup
+        word={popupInfo.word}
+        definition={wordData}
+        dictDefinition={wordData}
+        position={popupInfo.position}
+        onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
+        onAddToDictionary={() => {
+          // Pass the context sentence to the add function
+          handleAddToDictionary(
+            popupInfo.word,
+            wordData?.definition || '',
+            wordData?.translation || '',
+            wordData?.partOfSpeech || '',
+            wordData?.definitionNumber || 1,
+            popupInfo.contextSentence,
+            popupInfo.segmentIndex,
+            popupInfo.wordIndex
+          );
         }}
-      >
-        <span style={{ letterSpacing: 0.5, textAlign: 'center', fontWeight: 800, fontSize: 20, margin: '18px 0 10px 0', color: '#b3b3e7', textTransform: 'uppercase', opacity: 0.92 }}>
-          {isTextMode ? 'English' : 'Transcript'}
-        </span>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 8, overflow: 'auto' }} ref={englishRef}>
-          {isTextMode ? (
-            <>
-              <textarea
-                value={textInputs['English'] ?? ''}
-                onChange={e => handleInputChange('English', e.target.value)}
-                placeholder={`Type English text here...`}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  flex: 1,
-                  fontSize: fontSize,
-                  borderRadius: 6,
-                  border: `1.5px solid ${scheme.accent}`,
-                  padding: 8,
-                  resize: 'none',
-                  background: scheme.bg,
-                  color: scheme.fg,
-                  boxSizing: 'border-box',
-                  minHeight: 80,
-                }}
-                onKeyDown={e => {
-                  if (isTextMode && e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit('English');
-                  }
-                }}
-              />
-              <button
-                style={{ marginTop: 10, alignSelf: 'center', background: scheme.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}
-                onClick={() => handleSubmit('English')}
-              >
-                Submit
-              </button>
-            </>
-          ) : (
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              <span style={{ fontWeight: 400, fontSize: fontSize }}>
-                {renderSegmentsWithClickableWords(
-                  englishSegments, 
-                  null, 
-                  selectedWords, 
-                  handleWordClick, 
-                  isWordInSelectedList,
-                  selectedWordInstances
-                )}
-              </span>
-              <div className="scroll-end" />
-            </div>
-          )}
-        </div>
-      </div>
+        isInDictionary={isThisInstanceInDictionary}
+      />
     );
   };
 
-  // --- Main render ---
-  // Use flex layout to fill the available vertical space
-  const transcriptVisible = showLiveTranscript || isTextMode;
-  const translationVisible = showTranslation;
-
-  // ...existing logic...
-
+  // Render the main component
   return (
     <div
       style={{
@@ -1251,22 +510,19 @@ const TranscriptionDisplay = ({
       }}
     >
       {/* Word Definition Popup */}
-      {popupInfo.visible && (
-        <WordDefinitionPopup 
-          word={popupInfo.word}
-          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
-          dictDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.dictionaryDefinition}
-          disambiguatedDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
-          position={popupInfo.position}
-          isInDictionary={wordDefinitions[popupInfo.word.toLowerCase()] ? doesWordSenseExist(popupInfo.word, wordDefinitions[popupInfo.word.toLowerCase()]?.contextSentence) : false}
-          onAddToDictionary={handleAddWordToDictionary}
-          loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
-          onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
-        />
-      )}
+      {renderWordDefinitionPopup()}
       {/* Transcript/English box always renders and updates first */}
       {transcriptVisible && (
-        <div style={{ width: translationVisible ? '100%' : '100%', flex: translationVisible ? '0 0 33.5%' : '1 1 100%', minHeight: 0, display: 'flex', flexDirection: 'column', transition: 'flex 0.3s, width 0.3s' }}>{renderEnglishBox()}</div>
+        <div style={{ 
+          width: translationVisible ? '100%' : '100%', 
+          flex: translationVisible ? '0 0 33.5%' : '1 1 100%', 
+          minHeight: 0, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          transition: 'flex 0.3s, width 0.3s' 
+        }}>
+          {renderEnglishBox()}
+        </div>
       )}
       {/* Language boxes fill the remaining space */}
       {translationVisible && (
@@ -1291,6 +547,7 @@ const TranscriptionDisplay = ({
             const segments = isStudentMode && lang === 'Spanish' 
               ? (translations['Spanish'] || translations[Object.keys(translations)[0]] || []) 
               : (translations[lang] || []);
+              
             return (
               <div
                 key={lang}
@@ -1319,13 +576,24 @@ const TranscriptionDisplay = ({
                   fontWeight: 800,
                   fontSize: 20,
                   margin: '18px 0 10px 0',
-                  color: scheme.accent + 'cc',
+                  color: `${scheme.accent}cc`,
                   textTransform: 'uppercase',
                   opacity: 0.92,
                 }}>
                   {isStudentMode ? 'Spanish' : lang}
                 </span>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 8, overflow: 'auto', minHeight: 0 }} ref={el => translationRefs.current[lang] = el}>
+                <div 
+                  style={{ 
+                    flex: 1, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    padding: 16, 
+                    gap: 8, 
+                    overflow: 'auto', 
+                    minHeight: 0 
+                  }} 
+                  ref={el => (translationRefs.current[lang] = el)}
+                >
                   {isTextMode ? (
                     <>
                       <textarea
@@ -1353,7 +621,18 @@ const TranscriptionDisplay = ({
                         }}
                       />
                       <button
-                        style={{ marginTop: 10, alignSelf: 'center', background: scheme.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}
+                        style={{ 
+                          marginTop: 10, 
+                          alignSelf: 'center', 
+                          background: scheme.accent, 
+                          color: '#fff', 
+                          border: 'none', 
+                          borderRadius: 6, 
+                          padding: '6px 18px', 
+                          fontWeight: 700, 
+                          fontSize: 16, 
+                          cursor: 'pointer' 
+                        }}
                         onClick={() => handleSubmit(lang)}
                       >
                         Submit
