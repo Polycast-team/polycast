@@ -1,0 +1,37 @@
+.dictionary-table-container {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+.dictionary-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #fff;
+  background-color: rgba(24, 27, 47, 0.7);
+  border-radius: 8px;
+}
+
+.dictionary-table th {
+  padding: 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(124, 98, 255, 0.3);
+  background-color: rgba(124, 98, 255, 0.2);
+}
+
+.dictionary-table td {
+  padding: 12px;
+  border-bottom: 1px solid rgba(124, 98, 255, 0.15);
+}
+
+.empty-dictionary-message {
+  text-align: center;
+  padding: 40px 20px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 600px;
+  color: #aaa;
+  font-size: 16px;
+  margin: 0 auto;
+}
