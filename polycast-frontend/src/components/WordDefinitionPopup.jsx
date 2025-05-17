@@ -143,7 +143,17 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                   </>
                 )}
                 {isWordInDictionary && (
-                  <div className="dict-added-indicator">✓</div>
+                  <div className="dict-added-indicator" style={{cursor: 'pointer'}}
+                    title="Remove from Dictionary"
+                    onClick={async () => {
+                      setLocalAdded(false);
+                      if (typeof onRemoveFromDictionary === 'function') {
+                        // Use wordSenseId if available, fallback to word
+                        const wordSenseId = definition?.wordSenseId || word;
+                        await onRemoveFromDictionary(wordSenseId);
+                      }
+                    }}
+                  >✓</div>
                 )}
               </div>
               {partOfSpeech && (

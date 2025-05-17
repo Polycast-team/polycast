@@ -90,18 +90,20 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                 {onRemoveWord && (
                   <td style={{ padding: 12 }}>
                     <button
-                      onClick={() => onRemoveWord(wordSenseId)}
-                      style={{
-                        padding: '6px 10px',
-                        backgroundColor: '#ff6b6b',
-                        border: 'none',
-                        borderRadius: 4,
-                        color: '#fff',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Remove
-                    </button>
+                        onClick={() => onRemoveWord(wordSenseId)}
+                        style={{
+                          padding: '6px 10px',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          borderRadius: 4,
+                          color: '#ff6b6b',
+                          cursor: 'pointer',
+                          fontSize: '1.2em'
+                        }}
+                        title="Delete this word from your dictionary"
+                      >
+                        🗑️
+                      </button>
                   </td>
                 )}
               </tr>
