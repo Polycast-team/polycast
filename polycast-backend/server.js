@@ -1044,41 +1044,69 @@ app.get('/api/profile/:profile/words', async (req, res) => {
             
             // Format data to match the expected structure
             const flashcards = {};
-            flashcardsResult.rows.forEach(card => {
-                // Create the base word entry if it doesn't exist
-                const baseWord = card.word.toLowerCase();
-                if (!flashcards[baseWord]) {
-                    flashcards[baseWord] = {
-                        word: baseWord,
-                        hasMultipleSenses: false,
-                        allSenses: []
-                    };
-                }
-                
-                // Add this sense to the allSenses array if not already there
-                if (!flashcards[baseWord].allSenses.includes(card.word_sense_id)) {
-                    flashcards[baseWord].allSenses.push(card.word_sense_id);
-                    // If there's more than one sense, mark it
-                    if (flashcards[baseWord].allSenses.length > 1) {
-                        flashcards[baseWord].hasMultipleSenses = true;
+            try {
+                // Process all flashcards with error handling for each card
+                for (const card of flashcardsResult.rows) {
+                    try {
+                        // Protect against null or invalid card data
+                        if (!card || !card.word_sense_id || !card.word) {
+                            console.log(`[Profile API] WARNING: Skipping invalid card data:`, card);
+                            continue;
+                        }
+                        
+                        // Create the base word entry if it doesn't exist
+                        const baseWord = card.word.toLowerCase();
+                        if (!flashcards[baseWord]) {
+                            flashcards[baseWord] = {
+                                word: baseWord,
+                                hasMultipleSenses: false,
+                                allSenses: []
+                            };
+                        }
+                        
+                        // Add this sense to the allSenses array if not already there
+                        if (!flashcards[baseWord].allSenses.includes(card.word_sense_id)) {
+                            flashcards[baseWord].allSenses.push(card.word_sense_id);
+                            // If there's more than one sense, mark it
+                            if (flashcards[baseWord].allSenses.length > 1) {
+                                flashcards[baseWord].hasMultipleSenses = true;
+                            }
+                        }
+                        
+                        // Add the specific sense entry
+                        flashcards[card.word_sense_id] = {
+                            word: card.word,
+                            wordSenseId: card.word_sense_id,
+                            definition: card.definition || '',
+                            translation: card.translation || '',
+                            partOfSpeech: card.part_of_speech || 'unknown',
+                            contextSentence: card.context || '', // Map to the expected frontend property name
+                            context: card.context || '',
+                            definitionNumber: card.definition_number || 1,
+                            example: card.example || '',
+                            exampleSentencesRaw: card.example || '', // Additional property for frontend compatibility
+                            inFlashcards: true // Always set this to true when coming from DB
+                        };
+                    } catch (cardError) {
+                        console.error(`[Profile API] Error processing flashcard: ${card?.word_sense_id || 'unknown'}`, cardError);
+                        // Continue processing other cards
                     }
                 }
                 
-                // Add the specific sense entry
-                flashcards[card.word_sense_id] = {
-                    word: card.word,
-                    wordSenseId: card.word_sense_id,
-                    definition: card.definition,
-                    translation: card.translation,
-                    partOfSpeech: card.part_of_speech,
-                    contextSentence: card.context, // Map to the expected frontend property name
-                    context: card.context,
-                    definitionNumber: card.definition_number,
-                    example: card.example,
-                    exampleSentencesRaw: card.example, // Additional property for frontend compatibility
-                    inFlashcards: true // Always set this to true when coming from DB
-                };
-            });
+                // Clean up any base words that might have invalid senses
+                Object.keys(flashcards).forEach(key => {
+                    const card = flashcards[key];
+                    if (card.allSenses) {
+                        // Filter out any sense IDs that don't actually exist as entries
+                        card.allSenses = card.allSenses.filter(senseId => !!flashcards[senseId]);
+                        // Update the hasMultipleSenses flag based on filtered senses
+                        card.hasMultipleSenses = card.allSenses.length > 1;
+                    }
+                });
+            } catch (dataProcessingError) {
+                console.error(`[Profile API] Error processing flashcard data:`, dataProcessingError);
+                // Continue with whatever flashcards were successfully processed
+            }
             
             const profileData = {
                 flashcards,
