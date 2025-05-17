@@ -28,8 +28,9 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
 
   if (!word) return null;
   
-  // Use either external or local state to determine if word is in dictionary
-  const isWordInDictionary = isInDictionary || localAdded;
+  // IMPORTANT: Only use the external state to determine if word is in dictionary
+  // This ensures words stay blue until the remove button is clicked
+  const isWordInDictionary = isInDictionary;
   
   // Ensure definition data exists and handle all possible dictionary response formats
   const partOfSpeech = definition?.partOfSpeech || 

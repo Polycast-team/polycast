@@ -237,14 +237,15 @@ const TranscriptionDisplay = ({
     // Format the context with the target word emphasized with asterisks for Gemini
     // (we'll use a case-insensitive replace to maintain the original casing of the word)
     if (contextSentence) {
-      const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      const regex = new RegExp(`\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\b`, 'i');
       contextSentence = contextSentence.replace(regex, (match) => `*${match}*`);
       console.log(`Context with emphasis: ${contextSentence}`);
     }
     
     // Check if word exists in wordDefinitions
     const existingWordData = wordDefinitions[wordLower];
-    const isAlreadyInDictionary = existingWordData ? doesWordSenseExist(word, contextSentence) : false;
+    // This determines if the word is actually in the dictionary (highlighted blue)
+    const isInDictionary = existingWordData ? doesWordSenseExist(word, contextSentence) : false;
     
     // Set initial popup state
     setPopupInfo({
@@ -256,7 +257,7 @@ const TranscriptionDisplay = ({
       },
       loading: true, // Set loading state while we fetch definitions
       contextSentence: contextSentence, // Store context for reference
-      wordAddedToDictionary: isAlreadyInDictionary // Set to true if already in dictionary
+      wordAddedToDictionary: isInDictionary // Set to true if already in dictionary
     });
     
     try {
@@ -1230,13 +1231,11 @@ const TranscriptionDisplay = ({
     >
       {/* Word Definition Popup */}
       {popupInfo.visible && (
-        <WordDefinitionPopup 
+        <WordDefinitionPopup
           word={popupInfo.word}
-          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
-          dictDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.dictionaryDefinition}
-          disambiguatedDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
+          definition={popupInfo.word ? wordDefinitions[popupInfo.word.toLowerCase()] : null}
           position={popupInfo.position}
-          isInDictionary={wordDefinitions[popupInfo.word.toLowerCase()] ? doesWordSenseExist(popupInfo.word, wordDefinitions[popupInfo.word.toLowerCase()]?.contextSentence) : false}
+          isInDictionary={isWordInSelectedList(popupInfo.word, popupInfo.contextSentence)}
           onAddToDictionary={handleAddWordToDictionary}
           onRemoveFromDictionary={handleRemoveWordFromDictionary}
           loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
