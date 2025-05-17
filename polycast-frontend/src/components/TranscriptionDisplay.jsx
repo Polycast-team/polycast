@@ -220,45 +220,6 @@ const TranscriptionDisplay = ({
   
   // Track selected word instances with their positions
   const [selectedWordInstances, setSelectedWordInstances] = useState([]);
-  
-  // Update selectedWordInstances when selectedWords changes (e.g., when loading a profile)
-  useEffect(() => {
-    console.log('Selected words changed:', selectedWords);
-    // When words are loaded from a profile, we don't have the exact positions,
-    // so we'll just highlight the first instance of each word
-    const newInstances = [];
-    
-    englishSegments.forEach((segment, segIdx) => {
-      if (!segment.text) return;
-      
-      // Tokenize the segment into words
-      const tokens = segment.text.match(/[\p{L}\p{M}\d']+|[.,!?;:]+|\s+/gu) || [];
-      let wordIndex = -1;
-      
-      tokens.forEach((token, tokenIdx) => {
-        // Only process actual words (not punctuation or spaces)
-        if (/^[\p{L}\p{M}\d']+$/u.test(token)) {
-          wordIndex++;
-          const wordLower = token.toLowerCase();
-          
-          // If this word is in selectedWords and we haven't added an instance of it yet
-          if (selectedWords.includes(wordLower) && 
-              !newInstances.some(inst => inst.word === wordLower)) {
-            newInstances.push({
-              key: `${segIdx}:${wordIndex}:${wordLower}`,
-              segmentIndex: segIdx,
-              wordIndex: wordIndex,
-              word: wordLower,
-              originalWord: token
-            });
-          }
-        }
-      });
-    });
-    
-    console.log('Updating selectedWordInstances:', newInstances);
-    setSelectedWordInstances(newInstances);
-  }, [selectedWords, englishSegments]);
 
   // Only shows the popup when a word is clicked, doesn't add the word to dictionary
   const handleWordClick = async (word, event, segmentIndex, wordIndex) => {
@@ -813,19 +774,17 @@ const TranscriptionDisplay = ({
     }, 500);
   }, []);
 
-  // Function to check if a specific word instance is already selected
-  const isWordInstanceSelected = (word, segmentIndex, wordIndex) => {
-    const wordLower = word.toLowerCase();
-    const instanceKey = `${segmentIndex}:${wordIndex}:${wordLower}`;
-    return selectedWordInstances.some(instance => instance.key === instanceKey);
-  };
-
   // Function to add word to dictionary when the + button is clicked
   const handleAddWordToDictionary = async (word) => {
+    if (!word || typeof word !== 'string') {
+      console.error('Invalid word provided to handleAddWordToDictionary:', word);
+      return;
+    }
+
+    const wordLower = word.toLowerCase();
+    console.log(`===== ADDING "${word}" TO DICTIONARY... =====`);
+    
     try {
-      const wordLower = word.toLowerCase();
-      console.log(`===== ADDING "${word}" TO DICTIONARY... =====`);
-      
       // Log current state before adding
       logFlashcardState();
       
@@ -863,35 +822,36 @@ const TranscriptionDisplay = ({
         const instanceKey = `${popupInfo.segmentIndex}:${popupInfo.wordIndex}:${wordLower}`;
         
         setSelectedWordInstances(prev => {
-          // Check if this exact instance is already selected
-          if (!prev.some(instance => instance.key === instanceKey)) {
-            const newInstances = [...prev, { 
-              key: instanceKey,
-              segmentIndex: popupInfo.segmentIndex,
-              wordIndex: popupInfo.wordIndex,
-              word: wordLower,
-              originalWord: word
-            }];
-            console.log('Added word instance:', { 
-              key: instanceKey,
-              word: wordLower,
-              segmentIndex: popupInfo.segmentIndex,
-              wordIndex: popupInfo.wordIndex,
-              allInstances: newInstances
-            });
-            return newInstances;
+          try {
+            // Check if this exact instance is already selected
+            if (!prev.some(instance => instance && instance.key === instanceKey)) {
+              return [...(prev || []), { 
+                key: instanceKey,
+                segmentIndex: popupInfo.segmentIndex,
+                wordIndex: popupInfo.wordIndex,
+                word: wordLower,
+                originalWord: word
+              }];
+            }
+            return prev || [];
+          } catch (error) {
+            console.error('Error updating selectedWordInstances:', error);
+            return prev || [];
           }
-          console.log('Word instance already selected:', instanceKey);
-          return prev;
         });
       }
       
       // Add the word to the selectedWords for backward compatibility
       setSelectedWords(prev => {
-        if (!prev.some(w => w.toLowerCase() === wordLower)) {
-          return [...prev, word];
+        try {
+          if (!prev.some(w => w && w.toLowerCase() === wordLower)) {
+            return [...(prev || []), word];
+          }
+          return prev || [];
+        } catch (error) {
+          console.error('Error updating selectedWords:', error);
+          return prev || [];
         }
-        return prev;
       });
 
       if (!contextSentence) {
@@ -966,71 +926,88 @@ const TranscriptionDisplay = ({
       const imageResponse = { url: 'https://placehold.co/300x200/1a1a2e/CCCCCC?text=Placeholder+Image' };
       
       setWordDefinitions(prev => {
-        // Double-check to prevent race conditions
-        if (prev[wordSenseId] && prev[wordSenseId].inFlashcards) {
-          console.warn(`[DUPLICATE-GUARD] Duplicate flashcard prevented for ${word} (ID: ${wordSenseId}).`);
-          return prev;
-        }
-        
-        // Log the current state for debugging
-        console.log(`[FLASHCARD CREATE] Current senses for ${wordLower}: ${prev[wordLower]?.allSenses?.join(', ') || 'none'}`);
-        
-        const senseKey = wordSenseId;
-        const existingWordData = prev[wordLower] || {};
-        const newSenses = [...new Set([...(existingWordData.allSenses || []), senseKey])];
-        
-        console.log(`[FLASHCARD CREATE] Adding new sense ${senseKey} to ${wordLower}. Total senses: ${newSenses.length}`);
-        
-        // Create updated state with the new flashcard
-        const updatedState = {
-          ...prev,
-          [wordLower]: {
-            ...existingWordData,
-            hasMultipleSenses: true,
-            allSenses: newSenses,
-            // DON'T set inFlashcards=true on the base word, only on the sense entries
-          },
-          [senseKey]: {
-            word: wordLower,
-            imageUrl: imageResponse.url,
-            wordSenseId: wordSenseId,
-            contextSentence: contextSentence,
-            disambiguatedDefinition: disambiguatedDefinition,
-            // Store the best available definition as a flat property for UI reliability
-            definition: (disambiguatedDefinition && (disambiguatedDefinition.definition || disambiguatedDefinition.text)) ||
-                        wordData.definition ||
-                        (wordData.definitions && wordData.definitions[0] && wordData.definitions[0].text) ||
-                        '',
-            inFlashcards: true, // This is where we mark the card as in flashcards
-            cardCreatedAt: new Date().toISOString(),
-            partOfSpeech: partOfSpeech,
-            definitionNumber: definitionNumber,
-            // Include example sentences from API response if available
-            exampleSentencesRaw: wordData.exampleSentencesRaw || ''
+        try {
+          if (!prev) {
+            console.error('wordDefinitions state is undefined');
+            return {};
           }
-        };
-        
-        console.log(`[FLASHCARD CREATE] Successfully created flashcard with ID: ${wordSenseId}`);
-        
-        // Return the updated state - we'll clean up duplicates after the state update
-        return updatedState;
+          
+          // Double-check to prevent race conditions
+          if (prev[wordSenseId] && prev[wordSenseId].inFlashcards) {
+            console.warn(`[DUPLICATE-GUARD] Duplicate flashcard prevented for ${word} (ID: ${wordSenseId}).`);
+            return prev;
+          }
+          
+          // Log the current state for debugging
+          console.log(`[FLASHCARD CREATE] Current senses for ${wordLower}: ${prev[wordLower]?.allSenses?.join(', ') || 'none'}`);
+          
+          const senseKey = wordSenseId;
+          const existingWordData = prev[wordLower] || {};
+          const newSenses = [...new Set([...(existingWordData.allSenses || []), senseKey])];
+          
+          console.log(`[FLASHCARD CREATE] Adding new sense ${senseKey} to ${wordLower}. Total senses: ${newSenses.length}`);
+          
+          // Create updated state with the new flashcard
+          const updatedState = {
+            ...prev,
+            [wordLower]: {
+              ...existingWordData,
+              hasMultipleSenses: true,
+              allSenses: newSenses,
+            },
+            [senseKey]: {
+              word: wordLower,
+              imageUrl: imageResponse.url,
+              wordSenseId: wordSenseId,
+              contextSentence: contextSentence,
+              disambiguatedDefinition: disambiguatedDefinition,
+              // Store the best available definition as a flat property for UI reliability
+              definition: (disambiguatedDefinition && (disambiguatedDefinition.definition || disambiguatedDefinition.text)) ||
+                          wordData.definition ||
+                          (wordData.definitions && wordData.definitions[0] && wordData.definitions[0].text) ||
+                          '',
+              inFlashcards: true, // This is where we mark the card as in flashcards
+              cardCreatedAt: new Date().toISOString(),
+              partOfSpeech: partOfSpeech,
+              definitionNumber: definitionNumber,
+              // Include example sentences from API response if available
+              exampleSentencesRaw: wordData.exampleSentencesRaw || ''
+            }
+          };
+          
+          console.log(`[FLASHCARD CREATE] Successfully created flashcard with ID: ${wordSenseId}`);
+          return updatedState;
+        } catch (error) {
+          console.error('Error in setWordDefinitions callback:', error);
+          return prev || {}; // Always return a valid state
+        }
       });
       
       // Run cleanup to ensure no duplicates after the state update (using setTimeout to ensure state is updated first)
       setTimeout(() => {
-        console.log('Running duplicate cleanup after adding flashcard...');
-        cleanupDuplicateFlashcards();
-        logFlashcardState();
-        
-        // Save the updated flashcards to the backend for the current profile
-        if (selectedProfile !== 'non-saving') {
-          // Pass the current flashcards and selected words to save
-          saveProfileData(wordDefinitions, selectedWords);
-          console.log(`Saved flashcards to profile: ${selectedProfile}`);
+        try {
+          console.log('Running duplicate cleanup after adding flashcard...');
+          cleanupDuplicateFlashcards();
+          logFlashcardState();
+          
+          // Save the updated flashcards to the backend for the current profile
+          if (selectedProfile !== 'non-saving') {
+            // Pass the current flashcards and selected words to save
+            saveProfileData(wordDefinitions, selectedWords);
+            console.log(`Saved flashcards to profile: ${selectedProfile}`);
+          }
+        } catch (error) {
+          console.error('Error in post-add cleanup:', error);
         }
       }, 100);
     } catch (error) {
       console.error(`Error creating flashcard for ${word}:`, error);
+      // Try to recover by resetting the popup state
+      setPopupInfo(prev => ({
+        ...prev,
+        wordAddedToDictionary: false,
+        existingWordSense: false
+      }));
     }
   };
 
