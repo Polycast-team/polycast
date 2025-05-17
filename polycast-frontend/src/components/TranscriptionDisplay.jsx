@@ -194,12 +194,23 @@ const TranscriptionDisplay = ({
     word: '',
     position: { x: 0, y: 0 }
   });
+  
+  // State to track words that should remain highlighted while in popup view
+  // This prevents words from losing highlighting when popup opens/definition loads
+  const [tempHighlightedWords, setTempHighlightedWords] = useState([]);
 
   // Only shows the popup when a word is clicked, doesn't add the word to dictionary
   const handleWordClick = async (word, event) => {
     if (!event) return;
     
     const wordLower = word.toLowerCase();
+    
+    // Add this word to our temporary highlighted words list
+    // This ensures it stays blue while the popup is open regardless of re-renders
+    const isAlreadyHighlighted = tempHighlightedWords.includes(wordLower);
+    if (!isAlreadyHighlighted) {
+      setTempHighlightedWords(prev => [...prev, wordLower]);
+    }
     
     // Calculate position for popup
     const rect = event.currentTarget.getBoundingClientRect();
@@ -237,15 +248,14 @@ const TranscriptionDisplay = ({
     // Format the context with the target word emphasized with asterisks for Gemini
     // (we'll use a case-insensitive replace to maintain the original casing of the word)
     if (contextSentence) {
-      const regex = new RegExp(`\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\b`, 'i');
+      const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
       contextSentence = contextSentence.replace(regex, (match) => `*${match}*`);
       console.log(`Context with emphasis: ${contextSentence}`);
     }
     
     // Check if word exists in wordDefinitions
     const existingWordData = wordDefinitions[wordLower];
-    // This determines if the word is actually in the dictionary (highlighted blue)
-    const isInDictionary = existingWordData ? doesWordSenseExist(word, contextSentence) : false;
+    const isAlreadyInDictionary = existingWordData ? doesWordSenseExist(word, contextSentence) : false;
     
     // Set initial popup state
     setPopupInfo({
@@ -257,7 +267,7 @@ const TranscriptionDisplay = ({
       },
       loading: true, // Set loading state while we fetch definitions
       contextSentence: contextSentence, // Store context for reference
-      wordAddedToDictionary: isInDictionary // Set to true if already in dictionary
+      wordAddedToDictionary: isAlreadyInDictionary // Set to true if already in dictionary
     });
     
     try {
@@ -360,6 +370,13 @@ const TranscriptionDisplay = ({
     if (!word || !contextSentence) return false;
     
     const wordLower = word.toLowerCase();
+    
+    // First, check if this word is in our temporary highlight list
+    // This ensures words stay highlighted while popup is open
+    if (tempHighlightedWords.includes(wordLower)) {
+      return true;
+    }
+    
     const wordData = wordDefinitions[wordLower];
     
     // Basic check (backward compatibility)
@@ -944,6 +961,9 @@ const TranscriptionDisplay = ({
       
       // Get all the sense IDs associated with this word
       const allSenses = wordDefinitions[wordLower]?.allSenses || [];
+
+      // Remove this word from the temporary highlight list so it loses blue highlighting
+      setTempHighlightedWords(prev => prev.filter(w => w !== wordLower));
       
       // Update the wordDefinitions state to COMPLETELY REMOVE entries
       setWordDefinitions(prev => {
@@ -977,13 +997,6 @@ const TranscriptionDisplay = ({
         visible: false,
         wordAddedToDictionary: false // Update this flag to reflect the removal
       }));
-      
-      // Trigger a UI refresh to update the word highlighting
-      // Using a small timeout to ensure state updates have been processed
-      setTimeout(() => {
-        // Using a dummy state update to force a re-render
-        setSelectedWords([...selectedWords]);
-      }, 50);
       
       // Also trigger saving to the backend
       if (selectedProfile !== 'non-saving') {
@@ -1231,15 +1244,23 @@ const TranscriptionDisplay = ({
     >
       {/* Word Definition Popup */}
       {popupInfo.visible && (
-        <WordDefinitionPopup
+        <WordDefinitionPopup 
           word={popupInfo.word}
-          definition={popupInfo.word ? wordDefinitions[popupInfo.word.toLowerCase()] : null}
+          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
+          dictDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.dictionaryDefinition}
+          disambiguatedDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
           position={popupInfo.position}
-          isInDictionary={isWordInSelectedList(popupInfo.word, popupInfo.contextSentence)}
+          isInDictionary={wordDefinitions[popupInfo.word.toLowerCase()] ? doesWordSenseExist(popupInfo.word, wordDefinitions[popupInfo.word.toLowerCase()]?.contextSentence) : false}
           onAddToDictionary={handleAddWordToDictionary}
           onRemoveFromDictionary={handleRemoveWordFromDictionary}
           loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
-          onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
+          onClose={() => {
+            // When popup is closed without adding/removing, clear the temporary highlight
+            const currentWord = popupInfo.word.toLowerCase();
+            setTempHighlightedWords(prev => prev.filter(w => w !== currentWord));
+            // Close the popup
+            setPopupInfo(prev => ({ ...prev, visible: false }));
+          }}
         />
       )}
       {/* Transcript/English box always renders and updates first */}
