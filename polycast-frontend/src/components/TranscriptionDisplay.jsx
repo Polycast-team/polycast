@@ -944,6 +944,9 @@ const TranscriptionDisplay = ({
       // Get all the sense IDs associated with this word
       const allSenses = wordDefinitions[wordLower]?.allSenses || [];
       
+      // Create a copy of selectedWords to ensure the UI re-renders after removal
+      const updatedSelectedWords = [...selectedWords];
+      
       // Update the wordDefinitions state to COMPLETELY REMOVE entries
       setWordDefinitions(prev => {
         const updated = { ...prev };
@@ -972,15 +975,23 @@ const TranscriptionDisplay = ({
         }));
         
         console.log(`[DICTIONARY] Completely removed ${wordLower} and ${removedEntries.length - 1} senses from flashcards.`);
+        
+        // Force UI update by saving state changes
+        setTimeout(() => {
+          // Update selectedWords to force re-render, even if we're just setting it to the same value
+          // This triggers the component to re-evaluate the word highlighting
+          setSelectedWords([...updatedSelectedWords]);
+        }, 10);
+        
         return updated;
       });
       
-      // Save the updated state to the backend
+      // Also trigger saving to the backend
       if (selectedProfile !== 'non-saving') {
         setTimeout(() => {
           saveProfileData();
           console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
-        }, 100);
+        }, 500);
       }
     } catch (error) {
       console.error(`Error removing word from dictionary: ${error}`);
