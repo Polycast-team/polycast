@@ -56,8 +56,11 @@ const renderHistoryStacked = (segments) => {
 };
 
 // Helper: render a segment with clickable words
-// Helper: render a segment with clickable words (instance-based highlighting)
-const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords, handleWordClick) => {
+const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords, handleWordClick, isWordInSelectedListFn) => {
+  // Default implementation if no function is provided
+  const checkWordInList = isWordInSelectedListFn || ((word) => {
+    return selectedWords.some(w => w.toLowerCase() === word.toLowerCase());
+  });
   if ((!segments || segments.length === 0) && lastPersisted) {
     return <span>{lastPersisted}</span>;
   }
@@ -67,26 +70,25 @@ const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords
   // Each segment on its own line
   return segments.map((segment, segIdx) => {
     // Tokenize: words (with apostrophes/accents), punctuation, and spaces
+    // This regex matches words, punctuation, and spaces
     const tokens = segment.text.match(/([\p{L}\p{M}\d']+|[.,!?;:]+|\s+)/gu) || [];
     return (
       <div key={segIdx} className={segment.isNew ? 'new-text' : ''} style={{ display: 'block', marginBottom: 2 }}>
-        {tokens.map((token, tokenIdx) => {
+        {tokens.map((token, i) => {
           // Only words (letters, numbers, apostrophes, accents) are clickable
           const isWord = /^[\p{L}\p{M}\d']+$/u.test(token);
-          // Highlight only if this exact instance is selected
-          const isSelected = isWord && selectedWords.some(sel => sel.segmentIndex === segIdx && sel.tokenIndex === tokenIdx);
           return (
             <span
-              key={tokenIdx}
-              onClick={isWord ? (e => {
-                e.stopPropagation();
-                handleWordClick(token, segIdx, tokenIdx, e);
+              key={i}
+              onClick={isWord ? (e => { 
+                e.stopPropagation(); 
+                handleWordClick(token, e); // Pass the event to get the position
               }) : undefined}
               style={{
                 cursor: isWord ? 'pointer' : 'default',
-                color: isSelected ? '#1976d2' : undefined,
-                background: isSelected ? 'rgba(25,118,210,0.07)' : undefined,
-                borderRadius: isSelected ? 3 : undefined,
+                color: isWord && checkWordInList(token, segment.text) ? '#1976d2' : undefined,
+                background: isWord && checkWordInList(token, segment.text) ? 'rgba(25,118,210,0.07)' : undefined,
+                borderRadius: isWord && checkWordInList(token, segment.text) ? 3 : undefined,
                 transition: 'color 0.2s',
                 userSelect: 'text',
               }}
@@ -124,21 +126,6 @@ function useWindowSize() {
 /**
  * Displays the received transcription and multiple translation texts in a split-screen style layout.
  */
-// Helper to normalize selectedWords to the expected format
-function normalizeSelectedWords(selectedWords) {
-  if (!Array.isArray(selectedWords)) return [];
-  if (
-    selectedWords.length > 0 &&
-    typeof selectedWords[0] === 'object' &&
-    'segmentIndex' in selectedWords[0] &&
-    'tokenIndex' in selectedWords[0]
-  ) {
-    return selectedWords;
-  }
-  // Otherwise, return empty array (or you could map strings to objects if you want to preserve old selections)
-  return [];
-}
-
 const TranscriptionDisplay = ({ 
   englishSegments, 
   targetLanguages, 
@@ -208,39 +195,25 @@ const TranscriptionDisplay = ({
     position: { x: 0, y: 0 }
   });
 
-  // Handles clicking a word: toggles selection for this instance and shows popup
-  const handleWordClick = (word, segmentIndex, tokenIndex, event) => {
+  // Only shows the popup when a word is clicked, doesn't add the word to dictionary
+  const handleWordClick = async (word, event) => {
     if (!event) return;
-    // Toggle this instance in selectedWords
-    setSelectedWords(prev => {
-      // Find if already selected
-      const idx = prev.findIndex(sel => sel.segmentIndex === segmentIndex && sel.tokenIndex === tokenIndex);
-      if (idx !== -1) {
-        // Remove it
-        return prev.filter((_, i) => i !== idx);
-      } else {
-        // Add it
-        return [...prev, { segmentIndex, tokenIndex, word }];
-      }
-    });
-    // Show popup at mouse position
-    setPopupInfo({
-      visible: true,
-      word,
-      position: { x: event.clientX, y: event.clientY }
-    });
-  };
-  
+    
+    const wordLower = word.toLowerCase();
+    
+    // Calculate position for popup
+    const rect = event.currentTarget.getBoundingClientRect();
+    
     // Position popup right next to the word
     const viewportWidth = window.innerWidth;
     const popupWidth = 380; // Match width from CSS
     
     // Calculate optimal position to avoid going off screen
-    const spaceOnRight = viewportWidth - event.clientX;
+    const spaceOnRight = viewportWidth - rect.right;
     const fitsOnRight = spaceOnRight >= popupWidth + 10;
     
     // Position to the right if there's room, otherwise to the left
-    const xPos = fitsOnRight ? event.clientX + 5 : event.clientX - popupWidth - 5;
+    const xPos = fitsOnRight ? rect.right + 5 : rect.left - popupWidth - 5;
     
     // Get the element that was clicked
     const clickedElement = event.currentTarget;
@@ -750,10 +723,6 @@ const TranscriptionDisplay = ({
         const fetchResponse = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
         const fetchedData = await fetchResponse.json();
         console.log(`[DEBUG] Data fetched back from backend for profile '${selectedProfile}':`, fetchedData);
-        // Normalize selectedWords before setting
-        if (fetchedData.selectedWords !== undefined && setSelectedWords) {
-          setSelectedWords(normalizeSelectedWords(fetchedData.selectedWords));
-        }
       } catch (fetchErr) {
         console.error(`[DEBUG] Error fetching data after save for profile '${selectedProfile}':`, fetchErr);
       }
@@ -951,8 +920,7 @@ const TranscriptionDisplay = ({
         
         // Save the updated flashcards to the backend for the current profile
         if (selectedProfile !== 'non-saving') {
-          // Pass the current flashcards and selected words to save
-          saveProfileData(wordDefinitions, selectedWords);
+          saveProfileData();
           console.log(`Saved flashcards to profile: ${selectedProfile}`);
         }
       }, 100);
