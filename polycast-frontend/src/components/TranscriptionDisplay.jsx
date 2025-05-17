@@ -194,23 +194,12 @@ const TranscriptionDisplay = ({
     word: '',
     position: { x: 0, y: 0 }
   });
-  
-  // State to track words that should remain highlighted while in popup view
-  // This prevents words from losing highlighting when popup opens/definition loads
-  const [tempHighlightedWords, setTempHighlightedWords] = useState([]);
 
   // Only shows the popup when a word is clicked, doesn't add the word to dictionary
   const handleWordClick = async (word, event) => {
     if (!event) return;
     
     const wordLower = word.toLowerCase();
-    
-    // Add this word to our temporary highlighted words list
-    // This ensures it stays blue while the popup is open regardless of re-renders
-    const isAlreadyHighlighted = tempHighlightedWords.includes(wordLower);
-    if (!isAlreadyHighlighted) {
-      setTempHighlightedWords(prev => [...prev, wordLower]);
-    }
     
     // Calculate position for popup
     const rect = event.currentTarget.getBoundingClientRect();
@@ -370,13 +359,6 @@ const TranscriptionDisplay = ({
     if (!word || !contextSentence) return false;
     
     const wordLower = word.toLowerCase();
-    
-    // First, check if this word is in our temporary highlight list
-    // This ensures words stay highlighted while popup is open
-    if (tempHighlightedWords.includes(wordLower)) {
-      return true;
-    }
-    
     const wordData = wordDefinitions[wordLower];
     
     // Basic check (backward compatibility)
@@ -961,9 +943,6 @@ const TranscriptionDisplay = ({
       
       // Get all the sense IDs associated with this word
       const allSenses = wordDefinitions[wordLower]?.allSenses || [];
-
-      // Remove this word from the temporary highlight list so it loses blue highlighting
-      setTempHighlightedWords(prev => prev.filter(w => w !== wordLower));
       
       // Update the wordDefinitions state to COMPLETELY REMOVE entries
       setWordDefinitions(prev => {
@@ -986,24 +965,22 @@ const TranscriptionDisplay = ({
           }
         });
         
-        console.log(`[DICTIONARY] Completely removed ${wordLower} and ${removedEntries.length - 1} senses from flashcards.`);
+        // Close the popup since we've removed the word
+        setPopupInfo(prevPopup => ({
+          ...prevPopup,
+          visible: false
+        }));
         
+        console.log(`[DICTIONARY] Completely removed ${wordLower} and ${removedEntries.length - 1} senses from flashcards.`);
         return updated;
       });
       
-      // Close the popup after removing the word
-      setPopupInfo(prevPopup => ({
-        ...prevPopup,
-        visible: false,
-        wordAddedToDictionary: false // Update this flag to reflect the removal
-      }));
-      
-      // Also trigger saving to the backend
+      // Save the updated state to the backend
       if (selectedProfile !== 'non-saving') {
         setTimeout(() => {
           saveProfileData();
           console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
-        }, 500);
+        }, 100);
       }
     } catch (error) {
       console.error(`Error removing word from dictionary: ${error}`);
@@ -1254,13 +1231,7 @@ const TranscriptionDisplay = ({
           onAddToDictionary={handleAddWordToDictionary}
           onRemoveFromDictionary={handleRemoveWordFromDictionary}
           loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
-          onClose={() => {
-            // When popup is closed without adding/removing, clear the temporary highlight
-            const currentWord = popupInfo.word.toLowerCase();
-            setTempHighlightedWords(prev => prev.filter(w => w !== currentWord));
-            // Close the popup
-            setPopupInfo(prev => ({ ...prev, visible: false }));
-          }}
+          onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
         />
       )}
       {/* Transcript/English box always renders and updates first */}
