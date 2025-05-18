@@ -143,7 +143,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
   }
 
   return (
-    <div className="dictionary-container">
+    <div className="dictionary-container" style={{ width: '800px', maxWidth: '100%', margin: '0 auto' }}>
       {/* Search bar */}
       <div className="dictionary-search">
         <input
@@ -178,34 +178,43 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                 <div className="word-metadata" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   {/* Frequency rating from 1-5 with color scale */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ 
-                      width: '15px', 
-                      height: '15px', 
-                      borderRadius: '50%', 
-                      backgroundColor: (() => {
-                        // Generate a consistent frequency rating between 1-5 based on word
-                        const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                        const rating = (sum % 5) + 1;
-                        
-                        // Color based on rating
-                        const colors = {
-                          1: '#ff4d4d', // Red
-                          2: '#ff944d', // Orange
-                          3: '#ffdd4d', // Yellow
-                          4: '#75d147', // Light green
-                          5: '#4ade80', // Green
-                        };
-                        
-                        return colors[rating];
-                      })(),
-                      display: 'inline-block',
-                    }} />
-                    <span style={{ color: '#a0a0b8', fontSize: '14px' }}>
-                      {(() => {
-                        const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                        return (sum % 5) + 1;
-                      })()} / 5
+                    <span style={{ color: '#a0a0b8', fontSize: '14px', marginRight: '5px' }}>
+                      Frequency:
                     </span>
+                    {(() => {
+                      // Generate a consistent frequency rating between 1-5 based on word
+                      const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                      const rating = (sum % 5) + 1;
+                      
+                      // Color based on rating
+                      const colors = {
+                        1: '#ff4d4d', // Red
+                        2: '#ff944d', // Orange
+                        3: '#ffdd4d', // Yellow
+                        4: '#75d147', // Light green
+                        5: '#4ade80', // Green
+                      };
+                      
+                      // Generate dots
+                      const dots = [];
+                      for (let i = 1; i <= 5; i++) {
+                        dots.push(
+                          <div 
+                            key={i}
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              backgroundColor: i <= rating ? colors[rating] : '#39394d',
+                              opacity: i <= rating ? 1 : 0.4,
+                              margin: '0 2px',
+                              display: 'inline-block'
+                            }}
+                          />
+                        );
+                      }
+                      return <div style={{ display: 'flex', alignItems: 'center' }}>{dots}</div>;
+                    })()}
                   </div>
                   <div className="expand-icon">
                     {isExpanded ? '▼' : '►'}
