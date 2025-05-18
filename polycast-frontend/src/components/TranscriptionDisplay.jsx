@@ -86,34 +86,9 @@ const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords
               }) : undefined}
               style={{
                 cursor: isWord ? 'pointer' : 'default',
-                color: isWord && (() => {
-                  const wordLower = token.toLowerCase();
-                  const wordData = wordDefinitions[wordLower];
-                  if (!wordData) return false;
-                  // Use the same logic as isAlreadyInDictionary in handleWordClick
-                  if (typeof doesWordSenseExist === 'function') {
-                    return doesWordSenseExist(token, segment.text);
-                  }
-                  return false;
-                })() ? '#1976d2' : undefined,
-                background: isWord && (() => {
-                  const wordLower = token.toLowerCase();
-                  const wordData = wordDefinitions[wordLower];
-                  if (!wordData) return false;
-                  if (typeof doesWordSenseExist === 'function') {
-                    return doesWordSenseExist(token, segment.text);
-                  }
-                  return false;
-                })() ? 'rgba(25,118,210,0.07)' : undefined,
-                borderRadius: isWord && (() => {
-                  const wordLower = token.toLowerCase();
-                  const wordData = wordDefinitions[wordLower];
-                  if (!wordData) return false;
-                  if (typeof doesWordSenseExist === 'function') {
-                    return doesWordSenseExist(token, segment.text);
-                  }
-                  return false;
-                })() ? 3 : undefined,
+                color: isWord && doesWordSenseExist(token, segment.text) ? '#1976d2' : undefined,
+                background: isWord && doesWordSenseExist(token, segment.text) ? 'rgba(25,118,210,0.07)' : undefined,
+                borderRadius: isWord && doesWordSenseExist(token, segment.text) ? 3 : undefined,
                 transition: 'color 0.2s',
                 userSelect: 'text',
               }}
