@@ -200,7 +200,9 @@ const TranscriptionDisplay = ({
     if (!event) return;
     
     // Log the selectedWords array whenever a word is clicked
-    console.log('📋 Current selectedWords array when clicking:', word, selectedWords);
+    console.log('🔴🔴🔴 SELECTED WORDS WHEN CLICKING', word, '🔴🔴🔴');
+    console.log('📋 SELECTED WORDS ARRAY:', JSON.stringify(selectedWords));
+    console.log('📋 SELECTED WORDS COUNT:', selectedWords.length);
     
     const wordLower = word.toLowerCase();
     
@@ -770,10 +772,18 @@ const TranscriptionDisplay = ({
       setSelectedWords(prev => {
         // We now allow multiple entries of the same word with different senses
         console.log(`Adding "${word}" to selected words list in context: "${contextSentence.substring(0, 30)}..."`);
+        console.log('🔵🔵🔵 SELECTED WORDS BEFORE ADDING', word, '🔵🔵🔵');
+        console.log('📋 SELECTED WORDS BEFORE:', JSON.stringify(prev));
+        
         // Still add to the list for backward compatibility
+        let updated = prev;
         if (!prev.some(w => w.toLowerCase() === wordLower)) {
-          return [...prev, word];
+          updated = [...prev, word];
+          console.log('🟢🟢🟢 SELECTED WORDS AFTER ADDING', word, '🟢🟢🟢');
+          console.log('📋 SELECTED WORDS AFTER:', JSON.stringify(updated));
+          return updated;
         }
+        console.log('⚠️ Word already in selectedWords, not adding again');
         return prev;
       });
 
@@ -969,12 +979,19 @@ const TranscriptionDisplay = ({
       
       // Only remove the word from selectedWords if this is the last sense of the word
       if (isLastSenseOfWord) {
+        console.log('🔴🔴🔴 SELECTED WORDS BEFORE REMOVING', wordLower, '🔴🔴🔴');
+        console.log('📋 SELECTED WORDS BEFORE REMOVAL:', JSON.stringify(selectedWords));
+        
         setSelectedWords(prev => {
-          return prev.filter(selectedWord => selectedWord.toLowerCase() !== wordLower);
+          const updated = prev.filter(selectedWord => selectedWord.toLowerCase() !== wordLower);
+          console.log('🔵🔵🔵 SELECTED WORDS AFTER REMOVING', wordLower, '🔵🔵🔵');
+          console.log('📋 SELECTED WORDS AFTER REMOVAL:', JSON.stringify(updated));
+          return updated;
         });
         console.log(`Removed '${wordLower}' from selectedWords as it was the last sense`); 
       } else {
         console.log(`Kept '${wordLower}' in selectedWords as other senses remain`);
+        console.log('🟢🟢🟢 SELECTED WORDS (UNCHANGED):', JSON.stringify(selectedWords));
       }
       
       // Save the updated state to the backend
