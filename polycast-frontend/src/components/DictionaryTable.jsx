@@ -150,6 +150,9 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
   const [sortMethod, setSortMethod] = useState('alphabetical'); // 'alphabetical', 'frequency-asc', 'frequency-desc'
   const [showFrequencyLegend, setShowFrequencyLegend] = useState(false);
   const [frequencyFilter, setFrequencyFilter] = useState([1, 5]); // Min and max frequency to show
+  const [selectedWordIndex, setSelectedWordIndex] = useState(-1); // For keyboard navigation
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const searchInputRef = React.useRef(null);
 
   // Group entries by word
   useEffect(() => {
@@ -229,7 +232,77 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
   // Handle search input change
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
+    setSelectedWordIndex(-1); // Reset selection when search changes
   };
+  
+  // Keyboard navigation handlers
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Only respond if we're not in an input field (except the search input)
+      const activeElement = document.activeElement;
+      const isInOtherInput = activeElement.tagName === 'INPUT' && activeElement !== searchInputRef.current;
+      
+      if (isInOtherInput || activeElement.tagName === 'TEXTAREA') {
+        return;
+      }
+      
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedWordIndex(prev => {
+            if (prev < sortedWords.length - 1) {
+              return prev + 1;
+            }
+            return prev;
+          });
+          break;
+          
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedWordIndex(prev => {
+            if (prev > 0) {
+              return prev - 1;
+            } else if (prev === -1 && sortedWords.length > 0) {
+              return 0;
+            }
+            return prev;
+          });
+          break;
+          
+        case 'Enter':
+        case ' ': // Space key
+          if (selectedWordIndex >= 0 && selectedWordIndex < sortedWords.length) {
+            e.preventDefault();
+            const selectedWord = sortedWords[selectedWordIndex];
+            toggleExpand(selectedWord);
+          }
+          break;
+          
+        case '/': // Shortcut to focus search
+          if (activeElement !== searchInputRef.current) {
+            e.preventDefault();
+            searchInputRef.current?.focus();
+          }
+          break;
+          
+        case 'Escape':
+          if (activeElement === searchInputRef.current) {
+            e.preventDefault();
+            searchInputRef.current.blur();
+            setSearchTerm('');
+          } else {
+            setSelectedWordIndex(-1);
+          }
+          break;
+          
+        default:
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sortedWords, selectedWordIndex, toggleExpand]);
   
   // Function to handle removing a definition
   const handleRemoveDefinition = (wordSenseId, word) => {
@@ -266,10 +339,11 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
       <div className="dictionary-search">
         <input
           type="text"
-          placeholder="Search words..."
+          placeholder="Search words... (Press '/' to focus)"
           value={searchTerm}
           onChange={handleSearchChange}
           className="dictionary-search-input"
+          ref={searchInputRef}
         />
         <div className="dictionary-count">
           {sortedWords.length} {sortedWords.length === 1 ? 'word' : 'words'}
@@ -299,7 +373,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
           </select>
         </div>
         
-        <div className="frequency-controls" style={{ display: 'flex', alignItems: 'center' }}>
+        <div className="frequency-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button 
             onClick={() => setShowFrequencyLegend(prev => !prev)}
             style={{
@@ -314,6 +388,57 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
           >
             Frequency Guide
           </button>
+          
+          <div className="keyboard-shortcuts" style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowKeyboardShortcuts(prev => !prev)}
+              style={{
+                backgroundColor: 'transparent',
+                border: '1px solid #39394d',
+                borderRadius: '4px',
+                padding: '6px 10px',
+                color: '#f5f5f5',
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <span style={{ fontSize: '16px' }}>⌨️</span> Keyboard Shortcuts
+            </button>
+            
+            {showKeyboardShortcuts && (
+              <div style={{
+                position: 'absolute',
+                right: 0,
+                top: '40px',
+                width: '300px',
+                backgroundColor: '#252533',
+                border: '1px solid #39394d',
+                borderRadius: '8px',
+                padding: '15px',
+                zIndex: 10,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                animation: 'fadeIn 0.2s ease-in-out'
+              }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#f5f5f5' }}>Keyboard Shortcuts</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 15px', fontSize: '14px' }}>
+                  <div style={{ color: '#4ade80', fontWeight: 'bold' }}>/</div>
+                  <div style={{ color: '#a0a0b8' }}>Focus search box</div>
+                  
+                  <div style={{ color: '#4ade80', fontWeight: 'bold' }}>↑ / ↓</div>
+                  <div style={{ color: '#a0a0b8' }}>Navigate between words</div>
+                  
+                  <div style={{ color: '#4ade80', fontWeight: 'bold' }}>Enter / Space</div>
+                  <div style={{ color: '#a0a0b8' }}>Expand/collapse selected word</div>
+                  
+                  <div style={{ color: '#4ade80', fontWeight: 'bold' }}>Escape</div>
+                  <div style={{ color: '#a0a0b8' }}>Clear selection or search</div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
@@ -326,13 +451,24 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
       
       {/* Word list */}
       <div className="dictionary-word-list">
-        {sortedWords.map(word => {
+        {sortedWords.map((word, index) => {
           const entries = groupedEntries[word];
           const isExpanded = !!expandedWords[word];
           const wordFrequency = getWordFrequency(word);
+          const isSelected = index === selectedWordIndex;
           
           return (
-            <div key={word} className="dictionary-word-item">
+            <div 
+              key={word} 
+              className="dictionary-word-item"
+              style={{
+                transition: 'all 0.2s ease',
+                transform: isExpanded ? 'scale(1.01)' : 'scale(1)',
+                boxShadow: isExpanded ? '0 4px 12px rgba(0, 0, 0, 0.2)' : '0 0 0 rgba(0, 0, 0, 0)',
+                border: isSelected ? '1px solid #4ade80' : '1px solid #39394d',
+                backgroundColor: isSelected ? 'rgba(74, 222, 128, 0.08)' : undefined,
+              }}
+            >
               {/* Word header - clickable to expand */}
               <div 
                 className={`dictionary-word-header ${isExpanded ? 'expanded' : ''}`}
@@ -340,7 +476,9 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
               >
                 <div className="dictionary-word-title">
                   {word.charAt(0).toUpperCase() + word.slice(1)}
-                  <span className="definition-count">{entries.length > 1 ? ` (${entries.length})` : ''}</span>
+                  <span className="definition-count">
+                    {entries.length > 1 ? ` ${entries.length} Definitions Found!` : ' 1 Definition Found!'}
+                  </span>
                 </div>
                 <div className="word-metadata" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   {/* Frequency rating from 1-5 with color scale */}
@@ -350,15 +488,31 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                     </span>
                     <FrequencyDots frequency={wordFrequency} />
                   </div>
-                  <div className="expand-icon">
-                    {isExpanded ? '▼' : '►'}
+                  <div className="expand-icon" style={{
+                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s ease',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path 
+                        d="M3 2L8 6L3 10" 
+                        stroke="#a0a0b8" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      />
+                    </svg>
                   </div>
                 </div>
               </div>
               
               {/* Expanded definitions */}
               {isExpanded && (
-                <div className="dictionary-definitions">
+                <div className="dictionary-definitions" style={{ paddingLeft: '20px', paddingRight: '10px' }}>
                   {entries.map(entry => {
                     // Get definition data
                     const partOfSpeech = entry.partOfSpeech || 
@@ -389,15 +543,32 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                                                    entry?.disambiguatedDefinition?.usageFrequency;
                               
                               if (usageFrequency) {
+                                // Get a text description of the frequency
+                                const frequencyText = {
+                                  1: 'Very Rare Usage',
+                                  2: 'Uncommon Usage',
+                                  3: 'Secondary Usage',
+                                  4: 'Common Usage',
+                                  5: 'Primary Usage'
+                                }[parseInt(usageFrequency, 10)] || '';
+                                
                                 return (
                                   <div className="usage-frequency" style={{ 
                                     display: 'flex',
                                     alignItems: 'center',
                                     marginLeft: '12px',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                                    padding: '4px 10px',
+                                    borderRadius: '12px',
                                     gap: '8px'
                                   }}>
-                                    <span style={{ color: '#a0a0b8', fontSize: '12px' }}>Usage:</span>
-                                    <FrequencyDots frequency={parseInt(usageFrequency, 10)} size={6} showValue={true} />
+                                    <span style={{ color: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>
+                                      Definition Frequency: 
+                                    </span>
+                                    <FrequencyDots frequency={parseInt(usageFrequency, 10)} size={8} showValue={false} />
+                                    <span style={{ color: '#a0a0b8', fontSize: '13px' }}>
+                                      {frequencyText}
+                                    </span>
                                   </div>
                                 );
                               }
@@ -418,8 +589,26 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                           )}
                         </div>
                         <div className="definition-text">
-                          <div className="definition-translation">{definition}</div>
-                          <div className="definition-example">"{example}"</div>
+                          <div className="definition-translation" style={{ 
+                            fontSize: '16px',
+                            lineHeight: '1.6',
+                            marginBottom: '10px',
+                            fontWeight: '500'
+                          }}>
+                            {definition}
+                          </div>
+                          <div className="definition-example" style={{ 
+                            fontStyle: 'italic',
+                            backgroundColor: 'rgba(74, 222, 128, 0.08)',
+                            padding: '10px 15px',
+                            borderRadius: '6px',
+                            borderLeft: '3px solid rgba(74, 222, 128, 0.5)',
+                            fontSize: '14px',
+                            lineHeight: '1.5',
+                            color: '#c4c4d4'
+                          }}>
+                            <span style={{ fontWeight: 'bold', color: '#a0a0b8' }}>Example:</span> "{example}"
+                          </div>
                         </div>
                       </div>
                     );

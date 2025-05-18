@@ -150,12 +150,12 @@ Your response must be in JSON format with these fields:
 {
   "translation": "Spanish translation of the word",
   "partOfSpeech": "The part of speech (noun, verb, adjective, etc.)",
-  "wordFrequency": "A number from 1 to 5 representing how common this word is in general English, where 1 = uncommon/rare, 2 = somewhat uncommon, 3 = moderately common, 4 = very common, 5 = extremely common (basic vocabulary)",
+  "wordFrequency": "A number from 1 to 5 representing how common this word is in general English vocabulary, with precise definitions: 1 = rare/specialized (known by fewer than 30% of native speakers), 2 = somewhat uncommon (known by 30-60% of native speakers), 3 = moderately common (known by 60-80% of native speakers), 4 = very common (known by 80-95% of native speakers), 5 = extremely common/basic vocabulary (known by >95% of native speakers). Please be realistic and accurate with your assessment.",
   "definitions": [
     {
       "text": "VERY SIMPLE and SHORT explanation in simple English (1-2 short sentences max). Use basic vocabulary a beginner would understand.",
       "example": "A simple example sentence in English that uses this word. Make the context very obvious.",
-      "usageFrequency": "A number from 1 to 5 representing how common this specific usage/sense of the word is, where 1 = uncommon/rare usage, 2 = somewhat uncommon usage, 3 = moderately common usage, 4 = very common usage, 5 = the most common usage of this word"
+      "usageFrequency": "A number from 1 to 5 representing how common this specific definition/sense of the word is compared to other meanings: 1 = very rare usage (less than 10% of uses), 2 = uncommon usage (10-25% of uses), 3 = secondary usage (25-40% of uses), 4 = common usage (40-60% of uses), 5 = primary/dominant usage (more than 60% of uses). Be realistic and adjust numbers so they make sense across all definitions of this word."
     },
     {
       "text": "If the word has another common meaning, provide a second SIMPLE and SHORT definition here.",
