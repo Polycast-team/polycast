@@ -934,39 +934,66 @@ const TranscriptionDisplay = ({
     }
   };
 
-  // Function to remove a word sense (by wordSenseId) from the dictionary/flashcards
-  const handleRemoveWordSenseFromDictionary = (wordSenseId) => {
+  // Function to remove a word from the dictionary/flashcards
+  const handleRemoveWordFromDictionary = (word) => {
     try {
-      if (!wordSenseId) {
-        console.warn(`[DICTIONARY] No wordSenseId provided for removal.`);
+      const wordLower = word.toLowerCase();
+      console.log(`[DICTIONARY] Removing word from dictionary: ${wordLower}`);
+      
+      // First, check if the word exists in our flashcards
+      if (!wordDefinitions[wordLower]) {
+        console.warn(`[DICTIONARY] Word ${wordLower} not found in flashcards.`);
         return;
       }
-      console.log(`[DICTIONARY] Removing word sense from dictionary: ${wordSenseId}`);
+      
+      // Get all the sense IDs associated with this word
+      const allSenses = wordDefinitions[wordLower]?.allSenses || [];
+      
+      // Update the wordDefinitions state to COMPLETELY REMOVE entries
       setWordDefinitions(prev => {
         const updated = { ...prev };
-        const entry = updated[wordSenseId];
-        if (!entry) {
-          console.warn(`[DICTIONARY] wordSenseId ${wordSenseId} not found in flashcards.`);
-          return prev;
+        
+        // Keep track of removed entries for logging
+        const removedEntries = [];
+        
+        // Completely remove the word entry and all its senses
+        if (updated[wordLower]) {
+          removedEntries.push(wordLower);
+          delete updated[wordLower];
         }
-        const baseWord = entry.word ? entry.word.toLowerCase() : null;
-        // Remove from allSenses of base word if needed
-        if (baseWord && updated[baseWord] && Array.isArray(updated[baseWord].allSenses)) {
-          updated[baseWord].allSenses = updated[baseWord].allSenses.filter(id => id !== wordSenseId);
-          // If allSenses is now empty, remove baseWord entry too
-          if (updated[baseWord].allSenses.length === 0) {
-            delete updated[baseWord];
+        
+        // Remove all sense entries
+        allSenses.forEach(senseId => {
+          if (updated[senseId]) {
+            removedEntries.push(senseId);
+            delete updated[senseId];
           }
-        }
-        delete updated[wordSenseId];
+        });
+        
+        console.log(`[DICTIONARY] Completely removed ${wordLower} and ${removedEntries.length - 1} senses from flashcards.`);
         return updated;
       });
-      setSelectedWords(prev => prev.filter(w => {
-        // Remove from selectedWords if no more flashcards for this word
-        const stillExists = Object.values(wordDefinitions).some(def => def.word && def.word.toLowerCase() === w.toLowerCase() && def.inFlashcards && def.wordSenseId !== wordSenseId);
-        return stillExists;
+      
+      // Remove from selectedWords if no more definitions exist for this word
+      setSelectedWords(prev => {
+        const remainingDefinitions = Object.values(wordDefinitions).some(
+          def => def.word?.toLowerCase() === wordLower && def.inFlashcards
+        );
+        
+        if (!remainingDefinitions) {
+          console.log(`[DICTIONARY] No more definitions for ${wordLower}, removing from selected words`);
+          return prev.filter(w => w.toLowerCase() !== wordLower);
+        }
+        return prev;
+      });
+      
+      // Close the popup since we've removed the word
+      setPopupInfo(prevPopup => ({
+        ...prevPopup,
+        visible: false
       }));
-      setPopupInfo(prevPopup => ({ ...prevPopup, visible: false }));
+      
+      // Save the updated state to the backend
       if (selectedProfile !== 'non-saving') {
         setTimeout(() => {
           saveProfileData();
@@ -974,19 +1001,9 @@ const TranscriptionDisplay = ({
         }, 100);
       }
     } catch (error) {
-      console.error(`Error removing word sense from dictionary: ${error}`);
+      console.error(`Error removing word from dictionary: ${error}`);
     }
   };
-
-  // Deprecated: Remove this after all usages are updated
-  const handleRemoveWordFromDictionary = (word) => {
-    console.warn('handleRemoveWordFromDictionary is deprecated. Use handleRemoveWordSenseFromDictionary instead.');
-    // Try to remove all senses for this word for backward compatibility
-    const wordLower = word.toLowerCase();
-    const allSenses = wordDefinitions[wordLower]?.allSenses || [];
-    allSenses.forEach(senseId => handleRemoveWordSenseFromDictionary(senseId));
-    handleRemoveWordSenseFromDictionary(wordLower);
-  }
 
   // Effect to clean up highlighted words that are no longer in the dictionary
   useEffect(() => {
@@ -1269,12 +1286,7 @@ const TranscriptionDisplay = ({
           position={popupInfo.position}
           onClose={() => setPopupInfo({ ...popupInfo, visible: false })}
           onAddToDictionary={handleAddWordToDictionary}
-          onRemoveFromDictionary={(wordOrId) => {
-            // Try to use wordSenseId from the current definition
-            const def = wordDefinitions[popupInfo.word?.toLowerCase()];
-            const wordSenseId = def?.wordSenseId || popupInfo.word?.toLowerCase();
-            handleRemoveWordSenseFromDictionary(wordSenseId);
-          }}
+          onRemoveFromDictionary={handleRemoveWordFromDictionary}
           isInDictionary={popupInfo.wordAddedToDictionary}
           loading={popupInfo.loading}
         />
