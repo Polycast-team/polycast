@@ -987,6 +987,27 @@ const TranscriptionDisplay = ({
     }
   };
 
+  // Effect to clean up highlighted words that are no longer in the dictionary
+  useEffect(() => {
+    // Create a Set of all words that are in the dictionary (case-insensitive)
+    const dictionaryWords = new Set(
+      Object.entries(wordDefinitions)
+        .filter(([_, entry]) => entry.word) // Make sure it's a word entry, not a sense entry
+        .map(([word]) => word.toLowerCase())
+    );
+    
+    // Filter out any highlighted words that aren't in the dictionary
+    const wordsToKeep = selectedWords.filter(word => 
+      dictionaryWords.has(word.toLowerCase())
+    );
+    
+    // If we removed any words, update the state
+    if (wordsToKeep.length !== selectedWords.length) {
+      console.log(`[HIGHLIGHT] Cleaning up ${selectedWords.length - wordsToKeep.length} words that are no longer in the dictionary`);
+      setSelectedWords(wordsToKeep);
+    }
+  }, [wordDefinitions, selectedWords, setSelectedWords]);
+
   const handleInputChange = (lang, value) => {
     setTextInputs(inputs => ({ ...inputs, [lang]: value }));
   };
