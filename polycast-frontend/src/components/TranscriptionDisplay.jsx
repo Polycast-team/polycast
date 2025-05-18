@@ -58,8 +58,11 @@ const renderHistoryStacked = (segments) => {
 // Helper: render a segment with clickable words
 const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords, handleWordClick, isWordInSelectedListFn) => {
   // Default implementation if no function is provided
+  // Helper: strip punctuation for robust matching
+  const stripPunctuation = (str) => str.replace(/[.,!?;:()"'\[\]{}]/g, '').toLowerCase();
   const checkWordInList = isWordInSelectedListFn || ((word) => {
-    return selectedWords.some(w => w.toLowerCase() === word.toLowerCase());
+    const cleanToken = stripPunctuation(word);
+    return selectedWords.some(w => stripPunctuation(w) === cleanToken);
   });
   if ((!segments || segments.length === 0) && lastPersisted) {
     return <span>{lastPersisted}</span>;
