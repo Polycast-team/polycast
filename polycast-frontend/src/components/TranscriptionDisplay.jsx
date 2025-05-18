@@ -86,9 +86,9 @@ const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords
               }) : undefined}
               style={{
                 cursor: isWord ? 'pointer' : 'default',
-                color: isWord && checkWordInList(token, segment.text) ? '#1976d2' : undefined,
-                background: isWord && checkWordInList(token, segment.text) ? 'rgba(25,118,210,0.07)' : undefined,
-                borderRadius: isWord && checkWordInList(token, segment.text) ? 3 : undefined,
+                color: isWord && doesWordSenseExist && doesWordSenseExist(token, segment.text) ? '#1976d2' : undefined,
+                background: isWord && doesWordSenseExist && doesWordSenseExist(token, segment.text) ? 'rgba(25,118,210,0.07)' : undefined,
+                borderRadius: isWord && doesWordSenseExist && doesWordSenseExist(token, segment.text) ? 3 : undefined,
                 transition: 'color 0.2s',
                 userSelect: 'text',
               }}
