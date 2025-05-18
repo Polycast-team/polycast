@@ -714,15 +714,19 @@ function App({ targetLanguages, onReset, roomSetup }) {
                 
                 const wordLower = wordEntry.word.toLowerCase();
                 
-                // Find all sense entries for this word
-                const wordSenseEntries = Object.entries(wordDefinitions)
+                // Only remove the specific wordSenseId that was clicked
+                const senseIdsToRemove = [wordSenseId];
+                console.log(`Removing only the specific sense: ${wordSenseId}`);
+                
+                // Check if this is the last sense for this word
+                const otherSensesForSameWord = Object.entries(wordDefinitions)
                   .filter(([key, entry]) => 
                     entry && entry.word && entry.word.toLowerCase() === wordLower &&
-                    entry.wordSenseId && entry.inFlashcards);
+                    entry.wordSenseId && entry.wordSenseId !== wordSenseId &&
+                    entry.inFlashcards);
                 
-                // Get array of sense IDs to remove
-                const senseIdsToRemove = wordSenseEntries.map(([key, entry]) => entry.wordSenseId);
-                console.log(`Found ${senseIdsToRemove.length} sense entries to remove for word: ${wordLower}`);
+                const isLastSenseOfWord = otherSensesForSameWord.length === 0;
+                console.log(`This ${isLastSenseOfWord ? 'is' : 'is not'} the last sense of the word '${wordLower}'`);
                 
                 // Remove from wordDefinitions
                 setWordDefinitions(prev => {
@@ -739,17 +743,22 @@ function App({ targetLanguages, onReset, roomSetup }) {
                   return updated;
                 });
                 
-                // Also remove the word from selectedWords
-                setSelectedWords(prev => {
-                  return prev.filter(selectedWord => selectedWord.toLowerCase() !== wordLower);
-                });
+                // Only remove the word from selectedWords if this is the last sense of the word
+                let updatedSelectedWords = [...selectedWords];
+                if (isLastSenseOfWord) {
+                  setSelectedWords(prev => {
+                    return prev.filter(selectedWord => selectedWord.toLowerCase() !== wordLower);
+                  });
+                  updatedSelectedWords = selectedWords.filter(w => w.toLowerCase() !== wordLower);
+                  console.log(`Removed '${wordLower}' from selectedWords as it was the last sense`); 
+                } else {
+                  console.log(`Kept '${wordLower}' in selectedWords as other senses remain`);
+                }
                 
                 // Save the updated state to the backend
                 if (selectedProfile !== 'non-saving') {
                   setTimeout(async () => {
                     try {
-                      // Need to update the selectedWords in the state that's sent
-                      const updatedSelectedWords = selectedWords.filter(w => w.toLowerCase() !== wordLower);
                       
                       // Save the updated flashcards to the backend
                       const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {

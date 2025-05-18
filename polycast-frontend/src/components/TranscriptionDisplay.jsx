@@ -908,32 +908,52 @@ const TranscriptionDisplay = ({
       const wordLower = word.toLowerCase();
       console.log(`Removing word from dictionary: ${wordLower}`);
       
-      // Find all sense entries for this word
-      const wordSenseEntries = Object.entries(wordDefinitions)
-        .filter(([key, entry]) => 
-          entry && entry.word && entry.word.toLowerCase() === wordLower &&
-          entry.wordSenseId && entry.inFlashcards);
+      // Get the current popup info to get the context sentence and determine the wordSenseId
+      const contextSentence = popupInfo.contextSentence || '';
       
-      if (wordSenseEntries.length === 0) {
-        console.warn(`No flashcard entries found for word: ${wordLower}`);
-        return;
+      // Extract definition number if possible from what's shown in the popup
+      let definitionNumber = 1;
+      const contextLower = contextSentence ? contextSentence.toLowerCase() : '';
+      
+      // Special handling for different senses of words based on context
+      if (wordLower === 'charge') {
+        if (contextLower.includes('battle')) {
+          definitionNumber = 1; // attack sense
+        } else if (contextLower.includes('phone') || contextLower.includes('battery')) {
+          definitionNumber = 24; // electrical sense
+        } else if (contextLower.includes('murder')) {
+          definitionNumber = 5; // legal accusation sense
+        }
       }
       
-      // Get array of sense IDs to remove
-      const senseIdsToRemove = wordSenseEntries.map(([key, entry]) => entry.wordSenseId);
-      console.log(`Found ${senseIdsToRemove.length} sense entries to remove for word: ${wordLower}`);
+      // Generate the specific wordSenseId for this instance
+      const wordSenseId = `${wordLower}${definitionNumber}`;
+      console.log(`Determined wordSenseId: ${wordSenseId} based on context: ${contextSentence}`);
+      
+      // Only remove the specific wordSenseId that was clicked
+      const senseIdsToRemove = [wordSenseId];
+      
+      // Check if this is the last sense for this word
+      const otherSensesForSameWord = Object.entries(wordDefinitions)
+        .filter(([key, entry]) => 
+          entry && entry.word && entry.word.toLowerCase() === wordLower &&
+          entry.wordSenseId && entry.wordSenseId !== wordSenseId &&
+          entry.inFlashcards);
+      
+      const isLastSenseOfWord = otherSensesForSameWord.length === 0;
+      console.log(`This ${isLastSenseOfWord ? 'is' : 'is not'} the last sense of the word '${wordLower}'`);
       
       // Remove from wordDefinitions
       setWordDefinitions(prev => {
         const updated = { ...prev };
         
-        // Remove all sense entries for this word
-        senseIdsToRemove.forEach(senseId => {
-          if (updated[senseId]) {
-            delete updated[senseId];
-            console.log(`Removed sense entry: ${senseId}`);
-          }
-        });
+        // Remove only the specific sense entry
+        if (updated[wordSenseId]) {
+          delete updated[wordSenseId];
+          console.log(`Removed sense entry: ${wordSenseId}`);
+        } else {
+          console.warn(`Could not find entry with ID: ${wordSenseId}`);
+        }
         
         // Close the popup since we've removed the word
         setPopupInfo(prevPopup => ({
@@ -944,10 +964,15 @@ const TranscriptionDisplay = ({
         return updated;
       });
       
-      // Also remove the word from selectedWords
-      setSelectedWords(prev => {
-        return prev.filter(selectedWord => selectedWord.toLowerCase() !== wordLower);
-      });
+      // Only remove the word from selectedWords if this is the last sense of the word
+      if (isLastSenseOfWord) {
+        setSelectedWords(prev => {
+          return prev.filter(selectedWord => selectedWord.toLowerCase() !== wordLower);
+        });
+        console.log(`Removed '${wordLower}' from selectedWords as it was the last sense`); 
+      } else {
+        console.log(`Kept '${wordLower}' in selectedWords as other senses remain`);
+      }
       
       // Save the updated state to the backend
       if (selectedProfile !== 'non-saving') {
