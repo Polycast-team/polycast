@@ -157,6 +157,13 @@
   margin-bottom: 8px;
 }
 
+.definition-header-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .part-of-speech {
   background-color: #39394d;
   color: #d6d6e7;

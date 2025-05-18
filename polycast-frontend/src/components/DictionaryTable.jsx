@@ -60,10 +60,96 @@ FrequencyIndicator.propTypes = {
   word: PropTypes.string.isRequired
 };
 
+// Frequency dot indicator component for reuse
+const FrequencyDots = ({ frequency, showValue = false, size = 8, gap = 2 }) => {
+  // Color based on rating
+  const colors = {
+    1: '#ff4d4d', // Red (uncommon)
+    2: '#ff944d', // Orange 
+    3: '#ffdd4d', // Yellow
+    4: '#75d147', // Light green
+    5: '#4ade80', // Green (common)
+  };
+  
+  // Generate dots
+  const dots = [];
+  for (let i = 1; i <= 5; i++) {
+    dots.push(
+      <div 
+        key={i}
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          borderRadius: '50%',
+          backgroundColor: i <= frequency ? colors[frequency] : '#39394d',
+          opacity: i <= frequency ? 1 : 0.4,
+          margin: `0 ${gap}px`,
+          display: 'inline-block'
+        }}
+      />
+    );
+  }
+  
+  return (
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      {dots}
+      {showValue && <span style={{ color: '#a0a0b8', fontSize: '12px', marginLeft: '6px' }}>{frequency}/5</span>}
+    </div>
+  );
+};
+
+FrequencyDots.propTypes = {
+  frequency: PropTypes.number.isRequired,
+  showValue: PropTypes.bool,
+  size: PropTypes.number,
+  gap: PropTypes.number
+};
+
+// Legend component for frequency explanation
+const FrequencyLegend = () => {
+  return (
+    <div className="frequency-legend" style={{
+      marginTop: '10px',
+      padding: '10px',
+      borderRadius: '8px',
+      backgroundColor: '#252533',
+      fontSize: '12px',
+      color: '#a0a0b8'
+    }}>
+      <div style={{ marginBottom: '5px', fontWeight: 'bold' }}>Frequency Guide:</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ff4d4d' }} />
+          <span>1: Rare</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ff944d' }} />
+          <span>2: Uncommon</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ffdd4d' }} />
+          <span>3: Moderate</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#75d147' }} />
+          <span>4: Common</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#4ade80' }} />
+          <span>5: Very Common</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedWords, setExpandedWords] = useState({});
   const [groupedEntries, setGroupedEntries] = useState({});
+  const [sortMethod, setSortMethod] = useState('alphabetical'); // 'alphabetical', 'frequency-asc', 'frequency-desc'
+  const [showFrequencyLegend, setShowFrequencyLegend] = useState(false);
+  const [frequencyFilter, setFrequencyFilter] = useState([1, 5]); // Min and max frequency to show
 
   // Group entries by word
   useEffect(() => {
@@ -95,10 +181,42 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
     setGroupedEntries(grouped);
   }, [wordDefinitions]);
   
-  // Filter words based on search term
+  // Get word frequency function
+  const getWordFrequency = (word) => {
+    const entries = groupedEntries[word] || [];
+    const firstEntry = entries[0] || {};
+    const frequency = firstEntry?.disambiguatedDefinition?.wordFrequency || null;
+    
+    if (!frequency) {
+      // Generate a consistent frequency rating if none available
+      const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      return (sum % 5) + 1;
+    }
+    
+    return parseInt(frequency, 10);
+  };
+  
+  // Filter words based on search term and frequency filter
   const filteredWords = Object.keys(groupedEntries)
-    .filter(word => word.includes(searchTerm.toLowerCase()))
-    .sort((a, b) => a.localeCompare(b));
+    .filter(word => {
+      const wordFrequency = getWordFrequency(word);
+      return word.includes(searchTerm.toLowerCase()) && 
+             wordFrequency >= frequencyFilter[0] && 
+             wordFrequency <= frequencyFilter[1];
+    });
+    
+  // Sort filtered words based on selected sort method
+  const sortedWords = [...filteredWords].sort((a, b) => {
+    switch (sortMethod) {
+      case 'frequency-asc':
+        return getWordFrequency(a) - getWordFrequency(b);
+      case 'frequency-desc':
+        return getWordFrequency(b) - getWordFrequency(a);
+      case 'alphabetical':
+      default:
+        return a.localeCompare(b);
+    }
+  });
   
   // Toggle word expansion
   const toggleExpand = (word) => {
@@ -154,15 +272,64 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
           className="dictionary-search-input"
         />
         <div className="dictionary-count">
-          {filteredWords.length} {filteredWords.length === 1 ? 'word' : 'words'}
+          {sortedWords.length} {sortedWords.length === 1 ? 'word' : 'words'}
         </div>
       </div>
       
+      {/* Controls */}
+      <div className="dictionary-controls" style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="sort-controls">
+          <label style={{ color: '#a0a0b8', fontSize: '14px', marginRight: '8px' }}>Sort by:</label>
+          <select 
+            value={sortMethod} 
+            onChange={(e) => setSortMethod(e.target.value)}
+            style={{
+              backgroundColor: '#252533',
+              color: '#f5f5f5',
+              border: '1px solid #39394d',
+              borderRadius: '4px',
+              padding: '6px 10px',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="alphabetical">Alphabetical (A-Z)</option>
+            <option value="frequency-desc">Most Common First</option>
+            <option value="frequency-asc">Least Common First</option>
+          </select>
+        </div>
+        
+        <div className="frequency-controls" style={{ display: 'flex', alignItems: 'center' }}>
+          <button 
+            onClick={() => setShowFrequencyLegend(prev => !prev)}
+            style={{
+              backgroundColor: showFrequencyLegend ? '#39394d' : 'transparent',
+              border: '1px solid #39394d',
+              borderRadius: '4px',
+              padding: '6px 10px',
+              color: '#f5f5f5',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            Frequency Guide
+          </button>
+        </div>
+      </div>
+      
+      {/* Frequency legend (optional) */}
+      {showFrequencyLegend && (
+        <div style={{ padding: '0 16px' }}>
+          <FrequencyLegend />
+        </div>
+      )}
+      
       {/* Word list */}
       <div className="dictionary-word-list">
-        {filteredWords.map(word => {
+        {sortedWords.map(word => {
           const entries = groupedEntries[word];
           const isExpanded = !!expandedWords[word];
+          const wordFrequency = getWordFrequency(word);
           
           return (
             <div key={word} className="dictionary-word-item">
@@ -181,40 +348,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                     <span style={{ color: '#a0a0b8', fontSize: '14px', marginRight: '5px' }}>
                       Frequency:
                     </span>
-                    {(() => {
-                      // Generate a consistent frequency rating between 1-5 based on word
-                      const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                      const rating = (sum % 5) + 1;
-                      
-                      // Color based on rating
-                      const colors = {
-                        1: '#ff4d4d', // Red
-                        2: '#ff944d', // Orange
-                        3: '#ffdd4d', // Yellow
-                        4: '#75d147', // Light green
-                        5: '#4ade80', // Green
-                      };
-                      
-                      // Generate dots
-                      const dots = [];
-                      for (let i = 1; i <= 5; i++) {
-                        dots.push(
-                          <div 
-                            key={i}
-                            style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              backgroundColor: i <= rating ? colors[rating] : '#39394d',
-                              opacity: i <= rating ? 1 : 0.4,
-                              margin: '0 2px',
-                              display: 'inline-block'
-                            }}
-                          />
-                        );
-                      }
-                      return <div style={{ display: 'flex', alignItems: 'center' }}>{dots}</div>;
-                    })()}
+                    <FrequencyDots frequency={wordFrequency} />
                   </div>
                   <div className="expand-icon">
                     {isExpanded ? '▼' : '►'}
@@ -247,7 +381,29 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                     return (
                       <div className="definition-item" key={wordSenseId}>
                         <div className="definition-header">
-                          <div className="part-of-speech">{partOfSpeech}</div>
+                          <div className="definition-header-left">
+                            <div className="part-of-speech">{partOfSpeech}</div>
+                            {/* Usage frequency for this specific definition */}
+                            {(() => {
+                              const usageFrequency = entry?.disambiguatedDefinition?.definitions?.[0]?.usageFrequency || 
+                                                   entry?.disambiguatedDefinition?.usageFrequency;
+                              
+                              if (usageFrequency) {
+                                return (
+                                  <div className="usage-frequency" style={{ 
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    marginLeft: '12px',
+                                    gap: '8px'
+                                  }}>
+                                    <span style={{ color: '#a0a0b8', fontSize: '12px' }}>Usage:</span>
+                                    <FrequencyDots frequency={parseInt(usageFrequency, 10)} size={6} showValue={true} />
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                           {onRemoveWord && (
                             <button
                               onClick={(e) => {

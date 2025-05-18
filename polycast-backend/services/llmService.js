@@ -150,19 +150,22 @@ Your response must be in JSON format with these fields:
 {
   "translation": "Spanish translation of the word",
   "partOfSpeech": "The part of speech (noun, verb, adjective, etc.)",
-  "frequencyRating": "A number from 1 to 5 representing how common this word is in everyday English, where 1 = extremely common (basic vocabulary), 2 = very common, 3 = moderately common, 4 = somewhat uncommon, 5 = rare or specialized",
+  "wordFrequency": "A number from 1 to 5 representing how common this word is in general English, where 1 = uncommon/rare, 2 = somewhat uncommon, 3 = moderately common, 4 = very common, 5 = extremely common (basic vocabulary)",
   "definitions": [
     {
       "text": "VERY SIMPLE and SHORT explanation in simple English (1-2 short sentences max). Use basic vocabulary a beginner would understand.",
-      "example": "A simple example sentence in English that uses this word. Make the context very obvious."
+      "example": "A simple example sentence in English that uses this word. Make the context very obvious.",
+      "usageFrequency": "A number from 1 to 5 representing how common this specific usage/sense of the word is, where 1 = uncommon/rare usage, 2 = somewhat uncommon usage, 3 = moderately common usage, 4 = very common usage, 5 = the most common usage of this word"
     },
     {
       "text": "If the word has another common meaning, provide a second SIMPLE and SHORT definition here.",
-      "example": "An example sentence for this second meaning."
+      "example": "An example sentence for this second meaning.",
+      "usageFrequency": "A number from 1 to 5 representing how common this specific usage is"
     },
     {
       "text": "If the word has a third common meaning, provide a third SIMPLE and SHORT definition here.",
-      "example": "An example sentence for this third meaning."
+      "example": "An example sentence for this third meaning.",
+      "usageFrequency": "A number from 1 to 5 representing how common this specific usage is"
     }
   ]
 }
