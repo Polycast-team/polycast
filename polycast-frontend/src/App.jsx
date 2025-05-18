@@ -75,6 +75,8 @@ function App({ targetLanguages, onReset, roomSetup }) {
       // Update selectedWords with all unique words from flashcards
       const allHighlightedWords = Array.from(uniqueWords);
       setSelectedWords(allHighlightedWords);
+      // Print the actual selectedWords array for verification
+      console.log('[DEBUG] selectedWords:', allHighlightedWords);
       
       // Log the updated state for verification
       console.log(`Updated wordDefinitions with ${Object.keys(data.flashcards || {}).length} flashcards`);
