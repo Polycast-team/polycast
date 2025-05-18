@@ -689,6 +689,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
               try {
                 // Create a new copy of the state
                 const newWordDefinitions = { ...wordDefinitions };
+                let baseWordToUnhighlight = null;
                 
                 // Check if this specific wordSenseId exists
                 if (newWordDefinitions[wordSenseId]) {
@@ -716,6 +717,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
                     } else {
                       // No more senses for this word, remove the base word entry too
                       delete newWordDefinitions[baseWord];
+                      baseWordToUnhighlight = baseWord;
                       console.log(`Removed base word ${baseWord} (no remaining senses)`);
                     }
                   } else {
@@ -729,6 +731,12 @@ function App({ targetLanguages, onReset, roomSetup }) {
                   // Update the state
                   console.log(`Setting wordDefinitions with ${Object.keys(newWordDefinitions).length} entries`);
                   setWordDefinitions(newWordDefinitions);
+                  
+                  // Also remove from selectedWords if the base word is now gone
+                  if (baseWordToUnhighlight) {
+                    setSelectedWords(prev => prev.filter(w => w.toLowerCase() !== baseWordToUnhighlight));
+                    console.log(`Un-highlighted word: ${baseWordToUnhighlight}`);
+                  }
                   
                   // Save the updated state to the backend
                   if (selectedProfile !== 'non-saving') {
