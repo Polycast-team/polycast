@@ -1064,25 +1064,32 @@ app.get('/api/profile/:profile/words', async (req, res) => {
                             };
                         }
                         
+                        // Create the proper word sense ID by combining word and definition number
+                        // This ensures consistency with how the frontend creates IDs
+                        const definitionNumber = card.definition_number || 1;
+                        const properWordSenseId = `${card.word.toLowerCase()}${definitionNumber}`;
+                        
                         // Add this sense to the allSenses array if not already there
-                        if (!flashcards[baseWord].allSenses.includes(card.word_sense_id)) {
-                            flashcards[baseWord].allSenses.push(card.word_sense_id);
+                        if (!flashcards[baseWord].allSenses.includes(properWordSenseId)) {
+                            flashcards[baseWord].allSenses.push(properWordSenseId);
                             // If there's more than one sense, mark it
                             if (flashcards[baseWord].allSenses.length > 1) {
                                 flashcards[baseWord].hasMultipleSenses = true;
                             }
                         }
                         
-                        // Add the specific sense entry
-                        flashcards[card.word_sense_id] = {
+                        console.log(`[Profile API] Creating flashcard entry with ID: ${properWordSenseId} (from DB ID: ${card.word_sense_id})`); 
+                        
+                        // Add the specific sense entry with the correct ID format
+                        flashcards[properWordSenseId] = {
                             word: card.word,
-                            wordSenseId: card.word_sense_id,
+                            wordSenseId: properWordSenseId, // Use the properly formatted ID
                             definition: card.definition || '',
                             translation: card.translation || '',
                             partOfSpeech: card.part_of_speech || 'unknown',
                             contextSentence: card.context || '', // Map to the expected frontend property name
                             context: card.context || '',
-                            definitionNumber: card.definition_number || 1,
+                            definitionNumber: definitionNumber,
                             example: card.example || '',
                             exampleSentencesRaw: card.example || '', // Additional property for frontend compatibility
                             inFlashcards: true // Always set this to true when coming from DB
