@@ -799,11 +799,10 @@ const TranscriptionDisplay = ({
         return;
       }
       
-      // Add the word to the selectedWords right away to update UI
+      // ALWAYS add the word to selectedWords to ensure it gets highlighted
       setSelectedWords(prev => {
-        // We now allow multiple entries of the same word with different senses
-        console.log(`Adding "${word}" to selected words list in context: "${contextSentence.substring(0, 30)}..."`);
-        // Still add to the list for backward compatibility
+        console.log(`Adding "${word}" to selected words list for highlighting`);
+        // Make sure the word is in the selectedWords list for highlighting
         if (!prev.some(w => w.toLowerCase() === wordLower)) {
           return [...prev, word];
         }
@@ -1001,18 +1000,32 @@ const TranscriptionDisplay = ({
         return updated;
       });
       
-      // Remove from selectedWords if no more definitions exist for this word
-      setSelectedWords(prev => {
-        const remainingDefinitions = Object.values(wordDefinitions).some(
+      // Always remove from selectedWords - we'll re-add it later if needed
+      // This ensures the highlighting is immediately updated
+      console.log(`[DICTIONARY] Removing ${wordLower} from selected words temporarily`);
+      setSelectedWords(prev => prev.filter(w => w.toLowerCase() !== wordLower));
+      
+      // After a short delay, check if there are any remaining definitions for this word
+      // If so, add the word back to selectedWords
+      setTimeout(() => {
+        const updatedWordDefinitions = { ...wordDefinitions };
+        // Check if word still exists in any flashcard entries after our removal
+        const remainingDefinitions = Object.values(updatedWordDefinitions).some(
           def => def.word?.toLowerCase() === wordLower && def.inFlashcards
         );
         
-        if (!remainingDefinitions) {
-          console.log(`[DICTIONARY] No more definitions for ${wordLower}, removing from selected words`);
-          return prev.filter(w => w.toLowerCase() !== wordLower);
+        if (remainingDefinitions) {
+          console.log(`[DICTIONARY] Found remaining definitions for ${wordLower}, re-adding to selected words for highlighting`);
+          setSelectedWords(prev => {
+            if (!prev.some(w => w.toLowerCase() === wordLower)) {
+              return [...prev, word];
+            }
+            return prev;
+          });
+        } else {
+          console.log(`[DICTIONARY] No more definitions for ${wordLower}, keeping it removed from selected words`);
         }
-        return prev;
-      });
+      }, 200);
       
       // Close the popup since we've removed the word
       setPopupInfo(prevPopup => ({
