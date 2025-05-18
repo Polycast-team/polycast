@@ -57,7 +57,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
   // Construct the WebSocket URL for Render backend, including room information
   const wsBaseUrl = `wss://polycast-server.onrender.com`;
   const socketUrl = `${wsBaseUrl}/?targetLangs=${languagesQueryParam}&roomCode=${roomSetup.roomCode}&isHost=${roomSetup.isHost}`;
-  // console.log("Constructed WebSocket URL:", socketUrl); // (removed for cleaner console)
+  console.log("Constructed WebSocket URL:", socketUrl);
 
   const [messageHistory, setMessageHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -265,7 +265,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
   
   const { sendMessage, lastMessage, readyState } = useWebSocket(socketUrl, {
     onOpen: () => {
-      // console.log('WebSocket connection opened with URL:', socketUrl); // (removed for cleaner console)
+      console.log('WebSocket connection opened with URL:', socketUrl);
       // Reset reconnection attempts on successful connection
       setReconnectAttempts(0);
       
@@ -275,7 +275,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
       setTranslations(initialTranslations);
     },
     onClose: () => {
-      // console.log('WebSocket connection closed'); // (removed for cleaner console)
+      console.log('WebSocket connection closed');
     },
     onError: (event) => {
       console.error('WebSocket error:', event);
@@ -285,16 +285,16 @@ function App({ targetLanguages, onReset, roomSetup }) {
     shouldReconnect: (closeEvent) => {
       // Don't reconnect if we know the room is invalid
       if (invalidRoom) {
-        // console.log('Not reconnecting because room was rejected'); // (removed for cleaner console)
+        console.log('Not reconnecting because room was rejected');
         return false;
       }
       
       const shouldReconnect = reconnectAttempts < maxReconnectAttempts;
       if (shouldReconnect) {
         setReconnectAttempts(prev => prev + 1);
-        // console.log(`WebSocket reconnect attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`); // (removed for cleaner console)
+        console.log(`WebSocket reconnect attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
       } else if (reconnectAttempts >= maxReconnectAttempts) {
-        // console.log(`WebSocket reconnection stopped after ${maxReconnectAttempts} attempts`); // (removed for cleaner console)
+        console.log(`WebSocket reconnection stopped after ${maxReconnectAttempts} attempts`);
       }
       return shouldReconnect;
     },
@@ -689,7 +689,6 @@ function App({ targetLanguages, onReset, roomSetup }) {
               try {
                 // Create a new copy of the state
                 const newWordDefinitions = { ...wordDefinitions };
-                let baseWordToUnhighlight = null;
                 
                 // Check if this specific wordSenseId exists
                 if (newWordDefinitions[wordSenseId]) {
@@ -717,7 +716,6 @@ function App({ targetLanguages, onReset, roomSetup }) {
                     } else {
                       // No more senses for this word, remove the base word entry too
                       delete newWordDefinitions[baseWord];
-                      baseWordToUnhighlight = baseWord;
                       console.log(`Removed base word ${baseWord} (no remaining senses)`);
                     }
                   } else {
@@ -731,12 +729,6 @@ function App({ targetLanguages, onReset, roomSetup }) {
                   // Update the state
                   console.log(`Setting wordDefinitions with ${Object.keys(newWordDefinitions).length} entries`);
                   setWordDefinitions(newWordDefinitions);
-                  
-                  // Also remove from selectedWords if the base word is now gone
-                  if (baseWordToUnhighlight) {
-                    setSelectedWords(prev => prev.filter(w => w.toLowerCase() !== baseWordToUnhighlight));
-                    console.log(`Un-highlighted word: ${baseWordToUnhighlight}`);
-                  }
                   
                   // Save the updated state to the backend
                   if (selectedProfile !== 'non-saving') {
@@ -758,14 +750,6 @@ function App({ targetLanguages, onReset, roomSetup }) {
                         }
                         
                         console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
-                        // Fetch and print backend contents for this profile
-                        const getResp = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
-                        if (getResp.ok) {
-                          const backendData = await getResp.json();
-                          console.log(`[BACKEND] Current contents for profile '${selectedProfile}':`, backendData);
-                        } else {
-                          console.warn(`[BACKEND] Failed to fetch current contents for profile '${selectedProfile}'`);
-                        }
                       } catch (error) {
                         console.error(`Error saving profile data: ${error.message}`);
                       }

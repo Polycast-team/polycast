@@ -65,72 +65,52 @@ useEffect(() => {
   
   // Clean up duplicate flashcards when component mounts
   useEffect(() => {
-    const seenIds = new Set();
+    // Create a map to count occurrences of each word
     const wordCounts = {};
+    const seenIds = new Set();
     const duplicates = [];
-    const wordSenseIds = new Set();
-    let totalFlashcards = 0;
     
     console.log('[FLASHCARDS] Checking for duplicate flashcards on mount...');
     
-    // First, let's analyze our raw data
+    // Find flashcards with the same word
     Object.entries(wordDefinitions).forEach(([key, value]) => {
-      if (value && value.inFlashcards) {
-        // Only count actual flashcard entries (those with inFlashcards=true)
-        totalFlashcards++;
+      if (value && value.wordSenseId && value.inFlashcards) {
+        const id = value.wordSenseId;
         
-        if (value.wordSenseId) {
-          wordSenseIds.add(value.wordSenseId);
+        // If we've seen this ID before, it's a duplicate
+        if (seenIds.has(id)) {
+          console.log(`[FLASHCARDS] Found duplicate ID: ${id}`);
+          duplicates.push(id);
+        } else {
+          seenIds.add(id);
           
-          // Also track by word to detect multiple senses of the same word
-          const word = value.word?.toLowerCase(); // Get base word
-          if (word) {
-            if (!wordCounts[word]) {
-              wordCounts[word] = [];
-            }
-            
-            // Store the entry for reporting
-            wordCounts[word].push({
-              id: value.wordSenseId,
-              definitionNumber: value.wordSenseId.replace(word, '') || 'unknown',
-              definition: value.definition || value.disambiguatedDefinition?.definition || 'No definition',
-              partOfSpeech: value.partOfSpeech || 'unknown'
-            });
+          // Also track by word to detect potential word duplicates
+          const word = value.word;
+          if (!wordCounts[word]) {
+            wordCounts[word] = [];
           }
-          
-          // If we've seen this EXACT ID before, it's a duplicate
-          if (seenIds.has(value.wordSenseId)) {
-            console.log(`[FLASHCARDS] Found TRUE duplicate ID: ${value.wordSenseId}`);
-            duplicates.push(value.wordSenseId);
-          } else {
-            seenIds.add(value.wordSenseId);
-          }
+          wordCounts[word].push({
+            id: key,
+            data: value,
+            createdAt: value.cardCreatedAt ? new Date(value.cardCreatedAt).getTime() : Date.now()
+          });
         }
       }
     });
     
-    // Log summary statistics
-    console.log(`Total flashcard entries: ${totalFlashcards}`);
-    console.log(`Unique wordSenseIds: ${wordSenseIds.size}`);
-    
     // Log our findings
     if (duplicates.length > 0) {
-      console.log(`[FLASHCARDS] Found ${duplicates.length} EXACT duplicate wordSenseIds that need cleanup`);
-      duplicates.forEach(id => console.log(`  - Duplicate: ${id}`));
+      console.log(`[FLASHCARDS] Found ${duplicates.length} duplicate IDs that need cleanup`);
     } else {
-      console.log('[FLASHCARDS] No exact duplicate wordSenseIds found - this is good!');
+      console.log('[FLASHCARDS] No duplicate IDs found');
     }
     
-    // Report word counts
-    console.log('Word counts:');
+    // Only log words with multiple instances for debugging
     Object.entries(wordCounts).forEach(([word, instances]) => {
-      console.log(`  ${word}: ${instances.length} flashcards`);
-      
-      // List all senses of words with multiple definitions
       if (instances.length > 1) {
-        console.log(`  [MULTIPLE SENSES of '${word}']:`);
+        console.log(`[FLASHCARDS] Word '${word}' has ${instances.length} different senses:`);
         instances.forEach(instance => {
-          console.log(`    - ${instance.id} (def #${instance.definitionNumber}): ${instance.definition} (${instance.partOfSpeech})`);
+          console.log(`  - ${instance.id}: ${instance.data.disambiguatedDefinition?.definition || 'No definition'} (${instance.data.partOfSpeech || 'unknown'})`); 
         });
       }
     });
