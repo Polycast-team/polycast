@@ -1255,6 +1255,10 @@ app.post('/api/profile/:profile/words', async (req, res) => {
                 card.word = baseWord;
             }
             
+            // CRITICAL: Ensure the wordSenseId is preserved exactly as received from frontend
+            // This ensures unique IDs like "charge1" and "charge24" are preserved
+            card.wordSenseId = wordSenseId; // Force the exact wordSenseId to be used
+            
             // Basic validation to prevent null card values
             if (!card) {
                 console.error(`[Profile API] Invalid flashcard data for ${wordSenseId}: card is null/undefined`);
