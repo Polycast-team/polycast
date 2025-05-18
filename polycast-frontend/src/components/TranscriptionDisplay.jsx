@@ -374,13 +374,18 @@ const TranscriptionDisplay = ({
       currentPoS = wordData.dictionaryDefinition.partOfSpeech;
     }
     
-    // With our new storage format, check if this word has multiple senses
-    if (wordData.hasMultipleSenses && wordData.allSenses) {
-      // Check each stored sense for this word
-      for (const senseKey of wordData.allSenses) {
-        const sense = wordDefinitions[senseKey];
-        if (!sense || !sense.inFlashcards) continue;
-        
+    // Check all entries for this word with proper word sense IDs
+    const matchingSenseIds = Object.entries(wordDefinitions)
+      .filter(([key, entry]) => 
+        entry && 
+        entry.word && 
+        entry.word.toLowerCase() === wordLower && 
+        entry.inFlashcards &&
+        entry.wordSenseId)
+      .map(([key, entry]) => entry);
+      
+    if (matchingSenseIds.length > 0) {
+      for (const sense of matchingSenseIds) {
         // Check if contexts are similar - this matches by sentence contexts
         const contextMatch = sense.contextSentence && 
                            contextSentence && 
@@ -392,6 +397,7 @@ const TranscriptionDisplay = ({
           return true;
         }
       }
+      // Only return false if we found word matches but no context matches
       return false;
     }
     
@@ -444,7 +450,7 @@ const TranscriptionDisplay = ({
     let definitionNumber = 1;
     const contextLower = contextSentence ? contextSentence.toLowerCase() : '';
     
-    // Special handling for different senses of "charge"
+    // Special handling for different senses of words based on context
     if (wordLower === 'charge') {
       if (contextLower.includes('battle')) {
         definitionNumber = 1; // attack sense
@@ -455,52 +461,30 @@ const TranscriptionDisplay = ({
       }
     }
     
-    // Generate the wordSenseId this word would get
+    // Generate a proper word sense ID
     const wordSenseId = `${wordLower}${definitionNumber}`;
-    console.log(`[DUPLICATE CHECK] This word would get wordSenseId: ${wordSenseId}`);
     
-    // 1. Direct check: Is this exact wordSenseId already in the flashcards?
-    if (wordDefinitions[wordSenseId] && wordDefinitions[wordSenseId].inFlashcards) {
-      console.log(`[DUPLICATE CHECK] Found exact match: ${wordSenseId} is already in flashcards`);
+    // 1. Direct check - is there an entry with this exact sense ID?
+    const directMatch = wordDefinitions[wordSenseId];
+    if (directMatch && directMatch.inFlashcards) {
+      console.log(`[DUPLICATE CHECK] Direct match: ${wordSenseId} already exists as a flashcard`);
       return true;
     }
     
-    // Get the current word data
-    const currentWordData = wordDefinitions[wordLower];
-    if (!currentWordData) return false;
-    
-    // 2. Check the base word entry's allSenses array
-    if (currentWordData.hasMultipleSenses && currentWordData.allSenses) {
-      // Does the base word entry contain this sense ID in its allSenses array?
-      if (currentWordData.allSenses.includes(wordSenseId)) {
-        const senseEntry = wordDefinitions[wordSenseId];
-        // Confirm this entry actually exists and is marked as being in flashcards
-        if (senseEntry && senseEntry.inFlashcards) {
-          console.log(`[DUPLICATE CHECK] Found in allSenses array: ${wordSenseId} is already in flashcards`);
-          return true;
-        }
-      }
-    }
-    
-    // 3. Check all existing flashcards for this word to see if there's a similar word sense
+    // 2. Check all existing flashcards for this word to see if there's a similar word sense
     const existingFlashcards = Object.entries(wordDefinitions)
       .filter(([key, value]) => 
-        value && value.word === wordLower && 
+        value && value.word && value.word.toLowerCase() === wordLower && 
         value.inFlashcards && 
         value.contextSentence);
     
-    console.log(`[DUPLICATE CHECK] Found ${existingFlashcards.length} existing flashcards for word: ${wordLower}`);
-    
-    for (const [key, existingCard] of existingFlashcards) {
-      console.log(`[DUPLICATE CHECK] Checking existing card: ${key}`);
-      
-      // Compare context sentences for similarity
-      if (existingCard.contextSentence && contextSentence) {
-        const existingContext = existingCard.contextSentence.toLowerCase();
-        if (existingContext === contextLower) {
-          console.log(`[DUPLICATE CHECK] Found exact context match`);
-          return true;
-        }
+    // Check if any existing flashcard has a very similar context
+    for (const [key, card] of existingFlashcards) {
+      if (card.contextSentence && 
+         (card.contextSentence.includes(contextSentence) || 
+          contextSentence.includes(card.contextSentence))) {
+        console.log(`[DUPLICATE CHECK] Similar context found: ${card.wordSenseId} has similar context`);
+        return true;
       }
     }
     
@@ -868,24 +852,13 @@ const TranscriptionDisplay = ({
           return prev;
         }
         
-        // Log the current state for debugging
-        console.log(`[FLASHCARD CREATE] Current senses for ${wordLower}: ${prev[wordLower]?.allSenses?.join(', ') || 'none'}`);
-        
+        // No need to track all senses in a base word entry anymore
         const senseKey = wordSenseId;
-        const existingWordData = prev[wordLower] || {};
-        const newSenses = [...new Set([...(existingWordData.allSenses || []), senseKey])];
+        console.log(`[FLASHCARD CREATE] Adding new sense ${senseKey} for word ${wordLower}`);
         
-        console.log(`[FLASHCARD CREATE] Adding new sense ${senseKey} to ${wordLower}. Total senses: ${newSenses.length}`);
-        
-        // Create updated state with the new flashcard
+        // Create updated state with just the new flashcard entry
         const updatedState = {
           ...prev,
-          [wordLower]: {
-            ...existingWordData,
-            hasMultipleSenses: true,
-            allSenses: newSenses,
-            // DON'T set inFlashcards=true on the base word, only on the sense entries
-          },
           [senseKey]: {
             word: wordLower,
             imageUrl: imageResponse.url,

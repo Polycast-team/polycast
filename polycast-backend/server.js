@@ -1054,29 +1054,10 @@ app.get('/api/profile/:profile/words', async (req, res) => {
                             continue;
                         }
                         
-                        // Create the base word entry if it doesn't exist
-                        const baseWord = card.word.toLowerCase();
-                        if (!flashcards[baseWord]) {
-                            flashcards[baseWord] = {
-                                word: baseWord,
-                                hasMultipleSenses: false,
-                                allSenses: []
-                            };
-                        }
-                        
                         // Create the proper word sense ID by combining word and definition number
                         // This ensures consistency with how the frontend creates IDs
                         const definitionNumber = card.definition_number || 1;
                         const properWordSenseId = `${card.word.toLowerCase()}${definitionNumber}`;
-                        
-                        // Add this sense to the allSenses array if not already there
-                        if (!flashcards[baseWord].allSenses.includes(properWordSenseId)) {
-                            flashcards[baseWord].allSenses.push(properWordSenseId);
-                            // If there's more than one sense, mark it
-                            if (flashcards[baseWord].allSenses.length > 1) {
-                                flashcards[baseWord].hasMultipleSenses = true;
-                            }
-                        }
                         
                         console.log(`[Profile API] Creating flashcard entry with ID: ${properWordSenseId} (from DB ID: ${card.word_sense_id})`); 
                         
@@ -1100,14 +1081,13 @@ app.get('/api/profile/:profile/words', async (req, res) => {
                     }
                 }
                 
-                // Clean up any base words that might have invalid senses
+                // Remove any potential legacy base word entries that aren't actual flashcards
+                // Only keep entries that have a wordSenseId property
                 Object.keys(flashcards).forEach(key => {
                     const card = flashcards[key];
-                    if (card.allSenses) {
-                        // Filter out any sense IDs that don't actually exist as entries
-                        card.allSenses = card.allSenses.filter(senseId => !!flashcards[senseId]);
-                        // Update the hasMultipleSenses flag based on filtered senses
-                        card.hasMultipleSenses = card.allSenses.length > 1;
+                    if (!card.wordSenseId) {
+                        console.log(`[Profile API] Removing legacy base word entry: ${key}`);
+                        delete flashcards[key];
                     }
                 });
             } catch (dataProcessingError) {
