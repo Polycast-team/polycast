@@ -1280,9 +1280,9 @@ const TranscriptionDisplay = ({
       {popupInfo.visible && (
         <WordDefinitionPopup
           word={popupInfo.word}
-          definition={popupInfo.definition}
-          dictDefinition={popupInfo.dictDefinition}
-          disambiguatedDefinition={popupInfo.disambiguatedDefinition}
+          definition={wordDefinitions[popupInfo.word?.toLowerCase()]}
+          dictDefinition={wordDefinitions[popupInfo.word?.toLowerCase()]?.dictionaryDefinition}
+          disambiguatedDefinition={wordDefinitions[popupInfo.word?.toLowerCase()]?.disambiguatedDefinition}
           position={popupInfo.position}
           onClose={() => setPopupInfo({ ...popupInfo, visible: false })}
           onAddToDictionary={handleAddWordToDictionary}
