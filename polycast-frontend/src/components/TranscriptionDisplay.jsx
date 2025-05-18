@@ -946,89 +946,52 @@ const TranscriptionDisplay = ({
         return;
       }
       
-      // Get the context sentence for this word if available
-      const contextSentence = wordDefinitions[wordLower]?.contextSentence || '';
+      // Get all the sense IDs associated with this word
+      const allSenses = wordDefinitions[wordLower]?.allSenses || [];
       
-      // Find the specific word sense ID to remove
-      let wordSenseId = '';
-      
-      // Try to find the specific sense ID for this word in this context
-      if (wordDefinitions[wordLower]?.allSenses) {
-        // Find the sense ID that matches our context
-        const matchingSense = Object.entries(wordDefinitions)
-          .find(([id, def]) => 
-            def.word?.toLowerCase() === wordLower && 
-            def.contextSentence === contextSentence &&
-            def.inFlashcards
-          );
-        
-        if (matchingSense) {
-          wordSenseId = matchingSense[0];
-          console.log(`[DICTIONARY] Found specific sense to remove: ${wordSenseId}`);
-        }
-      }
-      
-      // Update the wordDefinitions state to remove the word or specific sense
+      // Update the wordDefinitions state to COMPLETELY REMOVE entries
       setWordDefinitions(prev => {
         const updated = { ...prev };
         
-        if (wordSenseId) {
-          // Remove the specific sense
-          delete updated[wordSenseId];
-          console.log(`[DICTIONARY] Removed specific sense: ${wordSenseId}`);
-          
-          // Update the allSenses array in the main word entry
-          if (updated[wordLower]?.allSenses) {
-            updated[wordLower] = {
-              ...updated[wordLower],
-              allSenses: updated[wordLower].allSenses.filter(id => id !== wordSenseId)
-            };
-            
-            // If no more senses left, remove the main word entry too
-            if (updated[wordLower].allSenses.length === 0) {
-              delete updated[wordLower];
-              console.log(`[DICTIONARY] No more senses left, removing main entry for: ${wordLower}`);
-            }
-          }
-        } else {
-          // Fallback: Remove the entire word and all its senses
-          const allSenses = updated[wordLower]?.allSenses || [];
-          
-          // Remove the main word entry
+        // Keep track of removed entries for logging
+        const removedEntries = [];
+        
+        // Completely remove the word entry and all its senses
+        if (updated[wordLower]) {
+          removedEntries.push(wordLower);
           delete updated[wordLower];
-          
-          // Remove all sense entries
-          allSenses.forEach(senseId => {
-            delete updated[senseId];
-          });
-          
-          console.log(`[DICTIONARY] Removed all senses for: ${wordLower}`);
         }
         
+        // Remove all sense entries
+        allSenses.forEach(senseId => {
+          if (updated[senseId]) {
+            removedEntries.push(senseId);
+            delete updated[senseId];
+          }
+        });
+        
+        console.log(`[DICTIONARY] Completely removed ${wordLower} and ${removedEntries.length - 1} senses from flashcards.`);
         return updated;
       });
       
-      // Update selectedWords to remove the word if it's no longer in the dictionary
+      // Remove from selectedWords if no more definitions exist for this word
       setSelectedWords(prev => {
-        // Check if there are any remaining definitions for this word
-        const hasRemainingDefinitions = Object.values(wordDefinitions).some(
+        const remainingDefinitions = Object.values(wordDefinitions).some(
           def => def.word?.toLowerCase() === wordLower && def.inFlashcards
         );
         
-        if (!hasRemainingDefinitions) {
+        if (!remainingDefinitions) {
           console.log(`[DICTIONARY] No more definitions for ${wordLower}, removing from selected words`);
           return prev.filter(w => w.toLowerCase() !== wordLower);
         }
         return prev;
       });
       
-      // Close the popup if it's open for this word
-      setPopupInfo(prevPopup => {
-        if (prevPopup.word.toLowerCase() === wordLower) {
-          return { ...prevPopup, visible: false };
-        }
-        return prevPopup;
-      });
+      // Close the popup since we've removed the word
+      setPopupInfo(prevPopup => ({
+        ...prevPopup,
+        visible: false
+      }));
       
       // Save the updated state to the backend
       if (selectedProfile !== 'non-saving') {
@@ -1315,17 +1278,17 @@ const TranscriptionDisplay = ({
     >
       {/* Word Definition Popup */}
       {popupInfo.visible && (
-        <WordDefinitionPopup 
+        <WordDefinitionPopup
           word={popupInfo.word}
-          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
-          dictDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.dictionaryDefinition}
-          disambiguatedDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
+          definition={popupInfo.definition}
+          dictDefinition={popupInfo.dictDefinition}
+          disambiguatedDefinition={popupInfo.disambiguatedDefinition}
           position={popupInfo.position}
-          isInDictionary={wordDefinitions[popupInfo.word.toLowerCase()] ? doesWordSenseExist(popupInfo.word, wordDefinitions[popupInfo.word.toLowerCase()]?.contextSentence) : false}
+          onClose={() => setPopupInfo({ ...popupInfo, visible: false })}
           onAddToDictionary={handleAddWordToDictionary}
           onRemoveFromDictionary={handleRemoveWordFromDictionary}
-          loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
-          onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
+          isInDictionary={popupInfo.wordAddedToDictionary}
+          loading={popupInfo.loading}
         />
       )}
       {/* Transcript/English box always renders and updates first */}
