@@ -266,77 +266,91 @@ const TranscriptionDisplay = ({
     });
     
     try {
-      // Step 1: Fetch Gemini definition with context
-      const apiUrl = `https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}?context=${encodeURIComponent(contextSentence)}`;
-      console.log(`Fetching definition for "${word}" with context, from: ${apiUrl}`);
-      
-      const geminiFetch = fetch(apiUrl)
-        .then(res => res.json())
-        .then(data => {
-          console.log(`Received definition for "${word}":`, data);
-          return data;
-        })
-        .catch(err => {
-          console.error(`Error fetching definition for ${word}:`, err);
-          return null;
-        });
-      
-      // Step 2: Fetch dictionary definition from JSON files
-      const firstLetter = word.charAt(0).toLowerCase();
-      const dictUrl = `https://polycast-server.onrender.com/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?context=${encodeURIComponent(contextSentence)}`;
-      
-      console.log(`Fetching dictionary definition for "${word}" from: ${dictUrl}`);
-      
-      const dictFetch = fetch(dictUrl)
-        .then(res => res.json())
-        .then(dictData => {
-          console.log(`Received dictionary definition for "${word}":`, dictData);
-          return dictData;
-        })
-        .catch(err => {
-          console.error(`Error fetching dictionary definition for ${word}:`, err);
-          return null;
-        });
-      
-      // Wait for both fetches to complete
-      const [geminiData, dictData] = await Promise.all([geminiFetch, dictFetch]);
-      
-      // Step 3: If we have multiple definitions, disambiguate using Gemini
+      // Check if we already have a definition for this word in our state
+      // If the same word appeared in a different context, we might have the definition but not in this context
+      let geminiData = null;
+      let dictData = null;
       let disambiguatedDefinition = null;
       
-      if (dictData && dictData.allDefinitions && dictData.allDefinitions.length > 1) {
-        // Use the disambiguation API to find the correct sense
-        try {
-          console.log(`Disambiguating definition for "${word}" in context: "${contextSentence}"`);
-          
-          const disambiguationResponse = await fetch('https://polycast-server.onrender.com/api/disambiguate-word', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              word: word,
-              contextSentence: contextSentence,
-              definitions: dictData.allDefinitions
-            })
-          }).then(res => res.json());
-          
-          console.log(`Disambiguation result:`, disambiguationResponse);
-          disambiguatedDefinition = disambiguationResponse.disambiguatedDefinition;
-        } catch (error) {
-          console.error(`Error disambiguating definition for ${word}:`, error);
-          // Fall back to first definition if disambiguation fails
+      // Only make API calls if we need to
+      if (!existingWordData || !existingWordData.dictionaryDefinition) {
+        // Step 1: Fetch Gemini definition with context
+        const apiUrl = `https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}?context=${encodeURIComponent(contextSentence)}`;
+        console.log(`Fetching definition for "${word}" with context, from: ${apiUrl}`);
+        
+        const geminiFetch = fetch(apiUrl)
+          .then(res => res.json())
+          .then(data => {
+            console.log(`Received definition for "${word}":`, data);
+            return data;
+          })
+          .catch(err => {
+            console.error(`Error fetching definition for ${word}:`, err);
+            return null;
+          });
+        
+        // Step 2: Fetch dictionary definition from JSON files
+        const firstLetter = word.charAt(0).toLowerCase();
+        const dictUrl = `https://polycast-server.onrender.com/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?context=${encodeURIComponent(contextSentence)}`;
+        
+        console.log(`Fetching dictionary definition for "${word}" from: ${dictUrl}`);
+        
+        const dictFetch = fetch(dictUrl)
+          .then(res => res.json())
+          .then(data => {
+            console.log(`Received dictionary definition for "${word}":`, data);
+            return data;
+          })
+          .catch(err => {
+            console.error(`Error fetching dictionary definition for ${word}:`, err);
+            return null;
+          });
+        
+        // Wait for both fetches to complete
+        [geminiData, dictData] = await Promise.all([geminiFetch, dictFetch]);
+        
+        // Step 3: If we have multiple definitions, disambiguate using Gemini
+        if (dictData && dictData.allDefinitions && dictData.allDefinitions.length > 1) {
+          // Use the disambiguation API to find the correct sense
+          try {
+            console.log(`Disambiguating definition for "${word}" in context: "${contextSentence}"`);
+            
+            const disambiguationResponse = await fetch('https://polycast-server.onrender.com/api/disambiguate-word', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                word: word,
+                contextSentence: contextSentence,
+                definitions: dictData.allDefinitions
+              })
+            }).then(res => res.json());
+            
+            console.log(`Disambiguation result:`, disambiguationResponse);
+            disambiguatedDefinition = disambiguationResponse.disambiguatedDefinition;
+          } catch (error) {
+            console.error(`Error disambiguating definition for ${word}:`, error);
+            // Fall back to first definition if disambiguation fails
+            disambiguatedDefinition = dictData.allDefinitions[0];
+          }
+        } else if (dictData && dictData.allDefinitions && dictData.allDefinitions.length === 1) {
+          // Only one definition, no need to disambiguate
           disambiguatedDefinition = dictData.allDefinitions[0];
         }
-      } else if (dictData && dictData.allDefinitions && dictData.allDefinitions.length === 1) {
-        // Only one definition, no need to disambiguate
-        disambiguatedDefinition = dictData.allDefinitions[0];
+      } else {
+        // Use existing data from state
+        console.log(`Using existing definition for "${word}" from wordDefinitions`);
+        geminiData = existingWordData;
+        dictData = existingWordData.dictionaryDefinition;
+        disambiguatedDefinition = existingWordData.disambiguatedDefinition;
       }
       
       // Update the wordDefinitions state with all the data
       setWordDefinitions(prev => ({
         ...prev,
         [wordLower]: {
+          ...prev[wordLower],
           ...geminiData, // Gemini API definition
           dictionaryDefinition: dictData, // Full dictionary data
           disambiguatedDefinition: disambiguatedDefinition, // The most relevant definition
@@ -867,68 +881,80 @@ const TranscriptionDisplay = ({
       // Use placeholder image instead of generating one
       const imageResponse = { url: 'https://placehold.co/300x200/1a1a2e/CCCCCC?text=Placeholder+Image' };
       
-      setWordDefinitions(prev => {
-        // Double-check to prevent race conditions
-        if (prev[wordSenseId] && prev[wordSenseId].inFlashcards) {
-          console.warn(`[DUPLICATE-GUARD] Duplicate flashcard prevented for ${word} (ID: ${wordSenseId}).`);
-          return prev;
+      // CHANGED APPROACH: First create a temporary flashcard in state
+      const tempFlashcard = {
+        [wordLower]: {
+          ...wordData,
+          hasMultipleSenses: true,
+          allSenses: [...(wordData.allSenses || []), wordSenseId],
+        },
+        [wordSenseId]: {
+          word: wordLower,
+          imageUrl: imageResponse.url,
+          wordSenseId: wordSenseId,
+          contextSentence: contextSentence,
+          disambiguatedDefinition: disambiguatedDefinition,
+          definition: (disambiguatedDefinition && (disambiguatedDefinition.definition || disambiguatedDefinition.text)) ||
+                      wordData.definition ||
+                      (wordData.definitions && wordData.definitions[0] && wordData.definitions[0].text) ||
+                      '',
+          inFlashcards: true,
+          cardCreatedAt: new Date().toISOString(),
+          partOfSpeech: partOfSpeech,
+          definitionNumber: definitionNumber,
+          exampleSentencesRaw: wordData.exampleSentencesRaw || ''
         }
-        
-        // Log the current state for debugging
-        console.log(`[FLASHCARD CREATE] Current senses for ${wordLower}: ${prev[wordLower]?.allSenses?.join(', ') || 'none'}`);
-        
-        const senseKey = wordSenseId;
-        const existingWordData = prev[wordLower] || {};
-        const newSenses = [...new Set([...(existingWordData.allSenses || []), senseKey])];
-        
-        console.log(`[FLASHCARD CREATE] Adding new sense ${senseKey} to ${wordLower}. Total senses: ${newSenses.length}`);
-        
-        // Create updated state with the new flashcard
-        const updatedState = {
-          ...prev,
-          [wordLower]: {
-            ...existingWordData,
-            hasMultipleSenses: true,
-            allSenses: newSenses,
-            // DON'T set inFlashcards=true on the base word, only on the sense entries
-          },
-          [senseKey]: {
-            word: wordLower,
-            imageUrl: imageResponse.url,
-            wordSenseId: wordSenseId,
-            contextSentence: contextSentence,
-            disambiguatedDefinition: disambiguatedDefinition,
-            // Store the best available definition as a flat property for UI reliability
-            definition: (disambiguatedDefinition && (disambiguatedDefinition.definition || disambiguatedDefinition.text)) ||
-                        wordData.definition ||
-                        (wordData.definitions && wordData.definitions[0] && wordData.definitions[0].text) ||
-                        '',
-            inFlashcards: true, // This is where we mark the card as in flashcards
-            cardCreatedAt: new Date().toISOString(),
-            partOfSpeech: partOfSpeech,
-            definitionNumber: definitionNumber,
-            // Include example sentences from API response if available
-            exampleSentencesRaw: wordData.exampleSentencesRaw || ''
-          }
-        };
-        
-        console.log(`[FLASHCARD CREATE] Successfully created flashcard with ID: ${wordSenseId}`);
-        
-        // Return the updated state - we'll clean up duplicates after the state update
-        return updatedState;
-      });
+      };
       
-      // Run cleanup to ensure no duplicates after the state update (using setTimeout to ensure state is updated first)
+      // NEW APPROACH STEP 1: First save to backend
+      if (selectedProfile !== 'non-saving') {
+        try {
+          console.log(`STEP 1: Saving new flashcard data to backend for profile: ${selectedProfile}`);
+          
+          // Create a temporary merged state to send to backend
+          const mergedState = {
+            ...wordDefinitions,
+            ...tempFlashcard
+          };
+          
+          // Save to backend first
+          await saveProfileData(mergedState, selectedWords);
+          
+          console.log(`STEP 2: Data saved to backend, now fetching back to create flashcard from backend data`);
+          
+          // Fetch back from backend to ensure we're using what's in the database
+          const fetchResponse = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
+          const fetchedData = await fetchResponse.json();
+          
+          // Use the fetched data to update our state
+          setWordDefinitions(fetchedData.flashcards || {});
+          setSelectedWords(fetchedData.selectedWords || []);
+          
+          console.log(`STEP 3: Successfully updated flashcards from backend data`);
+        } catch (error) {
+          console.error(`Error saving/fetching flashcard data: ${error}`);
+          
+          // Fall back to local update if backend fails
+          console.log(`Falling back to local state update due to backend error`);
+          setWordDefinitions(prev => ({
+            ...prev,
+            ...tempFlashcard
+          }));
+        }
+      } else {
+        // In non-saving mode, just update local state
+        console.log(`Non-saving mode: updating flashcard in local state only`);
+        setWordDefinitions(prev => ({
+          ...prev,
+          ...tempFlashcard
+        }));
+      }
+      
+      // Run cleanup to ensure no duplicates after the state update
       setTimeout(() => {
         console.log('Running duplicate cleanup after adding flashcard...');
         cleanupDuplicateFlashcards();
         logFlashcardState();
-        
-        // Save the updated flashcards to the backend for the current profile
-        if (selectedProfile !== 'non-saving') {
-          saveProfileData();
-          console.log(`Saved flashcards to profile: ${selectedProfile}`);
-        }
       }, 100);
     } catch (error) {
       console.error(`Error creating flashcard for ${word}:`, error);
