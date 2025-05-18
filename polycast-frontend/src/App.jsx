@@ -57,7 +57,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
   // Construct the WebSocket URL for Render backend, including room information
   const wsBaseUrl = `wss://polycast-server.onrender.com`;
   const socketUrl = `${wsBaseUrl}/?targetLangs=${languagesQueryParam}&roomCode=${roomSetup.roomCode}&isHost=${roomSetup.isHost}`;
-  console.log("Constructed WebSocket URL:", socketUrl);
+  // console.log("Constructed WebSocket URL:", socketUrl); // (removed for cleaner console)
 
   const [messageHistory, setMessageHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -265,7 +265,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
   
   const { sendMessage, lastMessage, readyState } = useWebSocket(socketUrl, {
     onOpen: () => {
-      console.log('WebSocket connection opened with URL:', socketUrl);
+      // console.log('WebSocket connection opened with URL:', socketUrl); // (removed for cleaner console)
       // Reset reconnection attempts on successful connection
       setReconnectAttempts(0);
       
@@ -275,7 +275,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
       setTranslations(initialTranslations);
     },
     onClose: () => {
-      console.log('WebSocket connection closed');
+      // console.log('WebSocket connection closed'); // (removed for cleaner console)
     },
     onError: (event) => {
       console.error('WebSocket error:', event);
@@ -285,16 +285,16 @@ function App({ targetLanguages, onReset, roomSetup }) {
     shouldReconnect: (closeEvent) => {
       // Don't reconnect if we know the room is invalid
       if (invalidRoom) {
-        console.log('Not reconnecting because room was rejected');
+        // console.log('Not reconnecting because room was rejected'); // (removed for cleaner console)
         return false;
       }
       
       const shouldReconnect = reconnectAttempts < maxReconnectAttempts;
       if (shouldReconnect) {
         setReconnectAttempts(prev => prev + 1);
-        console.log(`WebSocket reconnect attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+        // console.log(`WebSocket reconnect attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`); // (removed for cleaner console)
       } else if (reconnectAttempts >= maxReconnectAttempts) {
-        console.log(`WebSocket reconnection stopped after ${maxReconnectAttempts} attempts`);
+        // console.log(`WebSocket reconnection stopped after ${maxReconnectAttempts} attempts`); // (removed for cleaner console)
       }
       return shouldReconnect;
     },
@@ -758,6 +758,14 @@ function App({ targetLanguages, onReset, roomSetup }) {
                         }
                         
                         console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
+                        // Fetch and print backend contents for this profile
+                        const getResp = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
+                        if (getResp.ok) {
+                          const backendData = await getResp.json();
+                          console.log(`[BACKEND] Current contents for profile '${selectedProfile}':`, backendData);
+                        } else {
+                          console.warn(`[BACKEND] Failed to fetch current contents for profile '${selectedProfile}'`);
+                        }
                       } catch (error) {
                         console.error(`Error saving profile data: ${error.message}`);
                       }
