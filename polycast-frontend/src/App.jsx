@@ -36,51 +36,11 @@ function App({ targetLanguages, onReset, roomSetup }) {
       
       // Update state with the received data
       setWordDefinitions(data.flashcards || {});
-      
-      // Extract all unique words from flashcards to ensure they're highlighted
-      const uniqueWords = new Set();
-      
-      // Add words from the received selectedWords array
-      (data.selectedWords || []).forEach(word => uniqueWords.add(word));
-      
-      // Extract words from all flashcards with inFlashcards=true
-      if (data.flashcards) {
-        // Log the flashcards data to see what's stored there
-        console.log('[DEBUG] Flashcards data:', data.flashcards);
-        
-        Object.values(data.flashcards).forEach(entry => {
-          // Only include entries that are actual words and are in flashcards
-          if (entry.word && entry.inFlashcards) {
-            // Extract just the base word without any part of speech
-            // The word might be stored as "word" or "word (part-of-speech)"
-            const baseWord = entry.word.split(' (')[0].trim();
-            console.log(`[DEBUG] Extracted base word "${baseWord}" from "${entry.word}"`); 
-            uniqueWords.add(baseWord);
-          }
-          
-          // Also check sense entries that point to this word
-          if (entry.allSenses && Array.isArray(entry.allSenses)) {
-            entry.allSenses.forEach(senseId => {
-              if (data.flashcards[senseId]?.inFlashcards && entry.word) {
-                // Extract just the base word without any part of speech
-                const baseWord = entry.word.split(' (')[0].trim();
-                console.log(`[DEBUG] Extracted base word from sense "${baseWord}" from "${entry.word}"`); 
-                uniqueWords.add(baseWord);
-              }
-            });
-          }
-        });
-      }
-      
-      // Update selectedWords with all unique words from flashcards
-      const allHighlightedWords = Array.from(uniqueWords);
-      setSelectedWords(allHighlightedWords);
-      // Print the actual selectedWords array for verification
-      console.log('[DEBUG] selectedWords:', allHighlightedWords);
+      setSelectedWords(data.selectedWords || []);
       
       // Log the updated state for verification
       console.log(`Updated wordDefinitions with ${Object.keys(data.flashcards || {}).length} flashcards`);
-      console.log(`Updated selectedWords with ${allHighlightedWords.length} words (extracted from flashcards)`); 
+      console.log(`Updated selectedWords with ${(data.selectedWords || []).length} words`);
     } catch (error) {
       console.error(`Error fetching profile data for ${profile}:`, error);
     }

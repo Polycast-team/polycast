@@ -146,11 +146,9 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                   <div 
                     className="dict-added-indicator dict-remove-btn"
                     onClick={() => {
-                      // Call handler with EXACT SAME parameters as dictionary mode
+                      // Call handler to remove from dictionary
                       setLocalAdded(false);
-                      // Pass wordSenseId and word, matching dictionary mode's trash can
-                      const wordSenseId = definition?.wordSenseId || `${word.toLowerCase()}1`;
-                      onRemoveFromDictionary && onRemoveFromDictionary(wordSenseId, word);
+                      onRemoveFromDictionary && onRemoveFromDictionary(word);
                     }}
                     onMouseEnter={() => setShowTooltip(true)}
                     onMouseLeave={() => setShowTooltip(false)}

@@ -199,12 +199,9 @@ useEffect(() => {
       if (isCorrect) {
         newInterval = oldInterval + 1;
       } else {
-        newInterval = oldInterval - 1;
+        newInterval = oldInterval > 1 ? oldInterval - 1 : 1;
       }
-      newInterval = Math.max(1, newInterval);
-      console.log(`[FLASHCARDS] Marked card as ${isCorrect ? 'correct' : 'incorrect'}: "${baseWord}" (Sense ID: ${currentSenseId}) | Old interval: ${oldInterval} | New interval: ${newInterval}`);
       return { ...prev, [currentSenseId]: newInterval };
-
     });
     setTimeout(() => {
       setIsFlipped(false);
