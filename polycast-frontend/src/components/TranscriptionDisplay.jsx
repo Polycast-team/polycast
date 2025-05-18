@@ -436,85 +436,92 @@ const TranscriptionDisplay = ({
     return [1];
   };
   
-  const doesWordSenseExist = (word, contextSentence) => {
+  // Function to check if word exists in dictionary (improved version)
+  const isWordInDictionary = (word, contextSentence) => {
     const wordLower = word.toLowerCase();
-    console.log(`[DUPLICATE CHECK] Checking if '${wordLower}' already exists in dictionary...`);
     
-    // First, determine the word sense ID this word would have
-    let definitionNumber = 1;
+    // Fallback for legacy format: check all entries for matching contexts
+    for (const entry of Object.values(wordDefinitions)) {
+      if (entry.contextSentence && 
+          entry.contextSentence.toLowerCase().includes(wordLower) &&
+          contextSentence && contextSentence.includes(entry.contextSentence) &&
+          entry.inFlashcards === true) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+  
+  // Get all existing flashcard sense IDs
+  const getAllFlashcardSenseIds = () => {
+    return Object.values(wordDefinitions)
+      .filter(def => def.wordSenseId && def.inFlashcards)
+      .map(def => def.wordSenseId);
+  };
+  
+  // Function to determine the best sense number based on context
+  const determineSenseNumber = (word, contextSentence) => {
+    const wordLower = word.toLowerCase();
     const contextLower = contextSentence ? contextSentence.toLowerCase() : '';
+    let senseNumber = 1; // Default sense number
     
     // Special handling for different senses of "charge"
     if (wordLower === 'charge') {
       if (contextLower.includes('battle')) {
-        definitionNumber = 1; // attack sense
+        senseNumber = 1; // attack sense
       } else if (contextLower.includes('phone') || contextLower.includes('battery')) {
-        definitionNumber = 24; // electrical sense
+        senseNumber = 24; // electrical sense
       } else if (contextLower.includes('murder')) {
-        definitionNumber = 5; // legal accusation sense
+        senseNumber = 5; // legal accusation sense
       }
     }
     
-    // Generate the wordSenseId this word would get
-    const wordSenseId = `${wordLower}${definitionNumber}`;
-    console.log(`[DUPLICATE CHECK] This word would get wordSenseId: ${wordSenseId}`);
-    
-    // 1. Direct check: Is this exact wordSenseId already in the flashcards?
-    if (wordDefinitions[wordSenseId] && wordDefinitions[wordSenseId].inFlashcards) {
-      console.log(`[DUPLICATE CHECK] Found exact match: ${wordSenseId} is already in flashcards`);
+    return senseNumber;
+  };
+      
+  // Generate the wordSenseId this word would get
+  const wordSenseId = `${wordLower}${definitionNumber}`;
+  console.log(`[DUPLICATE CHECK] This word would get wordSenseId: ${wordSenseId}`);
+      
+  // 1. Direct check: Is this exact wordSenseId already in the flashcards?
+  if (wordDefinitions[wordSenseId] && wordDefinitions[wordSenseId].inFlashcards) {
+    console.log(`[DUPLICATE CHECK] Found exact match: ${wordSenseId} is already in flashcards`);
+    return true;
+  }
+      
+  // 2. Check for exact context match with the same word and definition number
+  if (contextSentence) {
+    // Find any entries with the same wordSenseId pattern (regardless of being in base word entry)
+    const matchingSenseEntries = Object.entries(wordDefinitions)
+      .filter(([key, value]) => 
+        key === wordSenseId && // Match the exact sense ID
+        value && 
+        value.inFlashcards);
+          
+    // If we found the exact same sense ID with the same context, it's a duplicate
+    if (matchingSenseEntries.length > 0) {
+      console.log(`[DUPLICATE CHECK] Found exact sense ID match: ${wordSenseId}`);
       return true;
     }
-    
-    // Get the current word data
-    const currentWordData = wordDefinitions[wordLower];
-    if (!currentWordData) return false;
-    
-    // 2. Check the base word entry's allSenses array
-    if (currentWordData.hasMultipleSenses && currentWordData.allSenses) {
-      // Does the base word entry contain this sense ID in its allSenses array?
-      if (currentWordData.allSenses.includes(wordSenseId)) {
-        const senseEntry = wordDefinitions[wordSenseId];
-        // Confirm this entry actually exists and is marked as being in flashcards
-        if (senseEntry && senseEntry.inFlashcards) {
-          console.log(`[DUPLICATE CHECK] Found in allSenses array: ${wordSenseId} is already in flashcards`);
-          return true;
-        }
-      }
-    }
-    
-    // 3. Check all existing flashcards for this word to see if there's a similar word sense
-    const existingFlashcards = Object.entries(wordDefinitions)
+          
+    // Also check context matching entries for this specific word+senseId
+    const contextMatchEntries = Object.entries(wordDefinitions)
       .filter(([key, value]) => 
-        value && value.word === wordLower && 
+        value && 
+        value.word.toLowerCase() === wordLower &&
         value.inFlashcards && 
-        value.contextSentence);
-    
-    console.log(`[DUPLICATE CHECK] Found ${existingFlashcards.length} existing flashcards for word: ${wordLower}`);
-    
-    for (const [key, existingCard] of existingFlashcards) {
-      console.log(`[DUPLICATE CHECK] Checking existing card: ${key}`);
+        value.contextSentence &&
+        key === wordSenseId); // Only check the specific sense ID we're trying to add
       
-      // Compare context sentences for similarity
-      if (existingCard.contextSentence && contextSentence) {
-        const existingContext = existingCard.contextSentence.toLowerCase();
-        if (existingContext === contextLower) {
-          console.log(`[DUPLICATE CHECK] Found exact context match`);
-          return true;
-        }
+    for (const [key, existingCard] of contextMatchEntries) {
+      const existingContext = existingCard.contextSentence.toLowerCase();
+      if (existingContext === contextLower) {
+        console.log(`[DUPLICATE CHECK] No duplicate found for '${wordSenseId}' - OK to add as new card`);
+        return false;
       }
     }
-    
-    console.log(`[DUPLICATE CHECK] No duplicate found for '${wordLower}' - OK to add as new card`);
-    return false;
-  };
-  
-  // Function to check for and remove any duplicate flashcards with the same ID
-  const findAndRemoveDuplicateFlashcards = (state, baseWord) => {
-    console.log(`[DUPLICATE CHECK] Checking for duplicate flashcard IDs for ${baseWord}...`);
-    
-    // Get all the entries in the state object
-    const allEntries = Object.entries(state);
-    
+  }
     // Create a map to count occurrences of each wordSenseId
     const wordSenseIdCounts = {};
     const duplicateIds = [];
@@ -731,6 +738,58 @@ const TranscriptionDisplay = ({
     }
   };
   
+  // Function to check if a specific sense of a word exists in the dictionary
+  const doesWordSenseExist = (word, contextSentence) => {
+    const wordLower = word.toLowerCase();
+    
+    // Determine the specific sense ID based on context
+    let senseNumber = 1;
+    const contextLower = contextSentence ? contextSentence.toLowerCase() : '';
+    
+    // Special cases for word senses like "charge"
+    if (wordLower === 'charge') {
+      if (contextLower.includes('battle')) {
+        senseNumber = 1; // attack sense
+      } else if (contextLower.includes('phone') || contextLower.includes('battery')) {
+        senseNumber = 24; // electrical sense
+      } else if (contextLower.includes('murder')) {
+        senseNumber = 5; // legal accusation sense
+      }
+    }
+    
+    // Create the specific sense ID for this word and context
+    const wordSenseId = `${wordLower}${senseNumber}`;
+    console.log(`[SENSE CHECK] Checking for specific word sense ID: ${wordSenseId}`);
+    
+    // Check if this exact sense ID exists in flashcards
+    if (wordDefinitions[wordSenseId] && wordDefinitions[wordSenseId].inFlashcards) {
+      console.log(`[SENSE CHECK] Found matching sense ID: ${wordSenseId}`);
+      return true;
+    }
+    
+    // If no exact sense ID match, compare contexts for the same word
+    if (contextSentence) {
+      const matchingContextEntries = Object.entries(wordDefinitions)
+        .filter(([key, value]) => 
+          value && 
+          value.word && 
+          value.word.toLowerCase() === wordLower && 
+          value.inFlashcards && 
+          value.contextSentence);
+      
+      for (const [key, existingCard] of matchingContextEntries) {
+        if (existingCard.contextSentence && 
+            existingCard.contextSentence.toLowerCase() === contextLower) {
+          console.log(`[SENSE CHECK] Found matching context: ${key}`);
+          return true;
+        }
+      }
+    }
+    
+    console.log(`[SENSE CHECK] No matching sense found for: ${wordSenseId}`);
+    return false;
+  };
+  
   // Run cleanup on component mount to fix any existing duplicates
   useEffect(() => {
     console.log('[INITIALIZATION] Checking for and removing any duplicate flashcards...');
@@ -767,9 +826,15 @@ const TranscriptionDisplay = ({
       // Get the context sentence from the word data
       const contextSentence = wordData.contextSentence || '';
       
-      // Check if this specific sense of the word is already in the dictionary
-      if (doesWordSenseExist(word, contextSentence)) {
-        console.log(`This specific sense of "${word}" is already in the dictionary: "${contextSentence.substring(0, 30)}..."`);
+      // Determine the specific sense number for this word based on context
+      const senseNumber = determineSenseNumber(word, contextSentence);
+      // Create the exact word sense ID that would be used
+      const specificWordSenseId = `${wordLower}${senseNumber}`;
+      console.log(`[WORD SENSE] Would use sense ID: ${specificWordSenseId} in context: "${contextSentence.substring(0, 30)}..."`);
+      
+      // Check if this exact word sense ID already exists in flashcards
+      if (wordDefinitions[specificWordSenseId] && wordDefinitions[specificWordSenseId].inFlashcards) {
+        console.log(`[WORD SENSE] This exact sense (${specificWordSenseId}) is already in the dictionary`);
         // Update UI to show it's already added, but don't duplicate
         setPopupInfo(prev => ({
           ...prev, 
