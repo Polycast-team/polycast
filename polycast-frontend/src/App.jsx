@@ -743,13 +743,24 @@ function App({ targetLanguages, onReset, roomSetup }) {
                     console.log(`Will save to profile: ${selectedProfile}`);
                     setTimeout(async () => {
                       try {
-                        // Save using the updated definitions
+                        // Prepare flashcards for saving: only include actual flashcard entries
+                        // keyed by their wordSenseId.
+                        const flashcardsToSave = {};
+                        Object.values(newWordDefinitions).forEach(entry => {
+                          if (entry && entry.inFlashcards === true && entry.wordSenseId) {
+                            // Ensure the entry itself also has the correct wordSenseId if it wasn't already the key
+                            flashcardsToSave[entry.wordSenseId] = { ...entry, wordSenseId: entry.wordSenseId };
+                          }
+                        });
+
+                        console.log(`Will save to profile: ${selectedProfile}`, { flashcards: flashcardsToSave, selectedWords });
+                        
                         const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ 
-                            flashcards: newWordDefinitions,
-                            selectedWords 
+                          body: JSON.stringify({
+                            flashcards: flashcardsToSave, // Send the filtered and correctly structured object
+                            selectedWords
                           })
                         });
                         
