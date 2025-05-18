@@ -683,10 +683,74 @@ function App({ targetLanguages, onReset, roomSetup }) {
       <div className="display-container">
         {appMode === 'dictionary' ? (
           <DictionaryTable 
-            selectedWords={selectedWords}
-            englishSegments={englishSegments}
             wordDefinitions={wordDefinitions}
-            setWordDefinitions={setWordDefinitions}
+            onRemoveWord={(wordSenseId, word) => {
+              console.log(`Removing word from dictionary: ${word} (${wordSenseId})`);
+              try {
+                // Find the base word entry
+                const baseWordKey = Object.keys(wordDefinitions).find(key => {
+                  const entry = wordDefinitions[key];
+                  return entry.allSenses && entry.allSenses.includes(wordSenseId);
+                });
+                
+                if (!baseWordKey) {
+                  console.warn(`Could not find base word for sense ID: ${wordSenseId}`);
+                  return;
+                }
+                
+                // Get all the sense IDs associated with this word
+                const allSenses = wordDefinitions[baseWordKey]?.allSenses || [];
+                
+                // Update the wordDefinitions state to COMPLETELY REMOVE entries
+                setWordDefinitions(prev => {
+                  const updated = { ...prev };
+                  
+                  // Keep track of removed entries for logging
+                  const removedEntries = [];
+                  
+                  // Completely remove the word entry
+                  if (updated[baseWordKey]) {
+                    removedEntries.push(baseWordKey);
+                    delete updated[baseWordKey];
+                  }
+                  
+                  // Remove all sense entries
+                  allSenses.forEach(senseId => {
+                    if (updated[senseId]) {
+                      removedEntries.push(senseId);
+                      delete updated[senseId];
+                    }
+                  });
+                  
+                  console.log(`[DICTIONARY] Completely removed ${baseWordKey} and ${removedEntries.length - 1} senses from flashcards.`);
+                  return updated;
+                });
+                
+                // Save the updated state to the backend
+                if (selectedProfile !== 'non-saving') {
+                  setTimeout(async () => {
+                    try {
+                      // Save the updated flashcards to the backend
+                      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ flashcards: wordDefinitions, selectedWords })
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error(`Server responded with status: ${response.status}`);
+                      }
+                      
+                      console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
+                    } catch (error) {
+                      console.error(`Error saving profile data: ${error.message}`);
+                    }
+                  }, 100);
+                }
+              } catch (error) {
+                console.error(`Error removing word from dictionary: ${error}`);
+              }
+            }}
           />
         ) : appMode === 'flashcard' ? (
           <FlashcardMode 

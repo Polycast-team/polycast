@@ -86,21 +86,36 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                   {example}
                 </td>
 
-                {/* Remove button (optional) */}
+                {/* Trash can button (optional) */}
                 {onRemoveWord && (
-                  <td style={{ padding: 12 }}>
+                  <td style={{ padding: 12, textAlign: 'center' }}>
                     <button
-                      onClick={() => onRemoveWord(wordSenseId)}
+                      onClick={() => onRemoveWord(wordSenseId, word)}
+                      title={`Remove ${word} from dictionary`}
                       style={{
-                        padding: '6px 10px',
-                        backgroundColor: '#ff6b6b',
+                        width: '32px',
+                        height: '32px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'transparent',
                         border: 'none',
-                        borderRadius: 4,
-                        color: '#fff',
+                        borderRadius: '50%',
+                        color: '#ff6b6b',
                         cursor: 'pointer',
+                        fontSize: '18px',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 107, 107, 0.1)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
-                      Remove
+                      🗑️
                     </button>
                   </td>
                 )}
