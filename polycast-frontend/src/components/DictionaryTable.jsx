@@ -2,6 +2,54 @@ import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import './DictionaryTable.css';
 
+// Component to display word frequency rating (1-5)
+const FrequencyIndicator = ({ word }) => {
+  // In a real app, this would come from actual frequency data
+  // For now, we'll generate a random but consistent rating based on the word
+  const getWordFrequency = (word) => {
+    // Generate a consistent frequency rating between 1-5 based on word
+    const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return (sum % 5) + 1; // Rating from 1 to 5
+  };
+
+  const frequency = getWordFrequency(word);
+  
+  // Determine color based on frequency (5=green, 1=red)
+  const getColorForFrequency = (freq) => {
+    const colors = {
+      1: '#ff4d4d', // Red
+      2: '#ff944d', // Orange
+      3: '#ffdd4d', // Yellow
+      4: '#75d147', // Light green
+      5: '#4ade80', // Green
+    };
+    return colors[freq] || colors[3]; // Default to yellow if invalid
+  };
+
+  // Generate the dots for the rating
+  const renderFrequencyDots = (rating) => {
+    const dots = [];
+    for (let i = 1; i <= 5; i++) {
+      dots.push(
+        <div 
+          key={i}
+          className={`frequency-dot ${i <= rating ? 'active' : 'inactive'}`}
+          style={{ backgroundColor: i <= rating ? getColorForFrequency(rating) : '#39394d' }}
+        />
+      );
+    }
+    return dots;
+  };
+
+  return (
+    <div className="frequency-indicator" title={`Frequency rating: ${frequency}/5`}>
+      <div className="frequency-dots">
+        {renderFrequencyDots(frequency)}
+      </div>
+    </div>
+  );
+};
+
 const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedWords, setExpandedWords] = useState({});
@@ -117,8 +165,12 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                   {word.charAt(0).toUpperCase() + word.slice(1)}
                   <span className="definition-count">{entries.length > 1 ? ` (${entries.length})` : ''}</span>
                 </div>
-                <div className="expand-icon">
-                  {isExpanded ? '▼' : '►'}
+                <div className="word-metadata">
+                  {/* Frequency rating from 1-5 with color scale */}
+                  <FrequencyIndicator word={word} />
+                  <div className="expand-icon">
+                    {isExpanded ? '▼' : '►'}
+                  </div>
                 </div>
               </div>
               
