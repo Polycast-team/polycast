@@ -86,9 +86,9 @@ const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords
               }) : undefined}
               style={{
                 cursor: isWord ? 'pointer' : 'default',
-                color: isWord && doesWordSenseExist(token, segment.text) ? '#1976d2' : undefined,
-                background: isWord && doesWordSenseExist(token, segment.text) ? 'rgba(25,118,210,0.07)' : undefined,
-                borderRadius: isWord && doesWordSenseExist(token, segment.text) ? 3 : undefined,
+                color: isWord && checkWordInList(token, segment.text) ? '#1976d2' : undefined,
+                background: isWord && checkWordInList(token, segment.text) ? 'rgba(25,118,210,0.07)' : undefined,
+                borderRadius: isWord && checkWordInList(token, segment.text) ? 3 : undefined,
                 transition: 'color 0.2s',
                 userSelect: 'text',
               }}
@@ -246,7 +246,8 @@ const TranscriptionDisplay = ({
     const existingWordData = wordDefinitions[wordLower];
     const isAlreadyInDictionary = existingWordData ? doesWordSenseExist(word, contextSentence) : false;
     
-    // Only add to selectedWords if not already there and it's in the dictionary
+    // First update selectedWords to include this word if it's in the dictionary
+    // This ensures the word stays highlighted when the popup opens
     if (isAlreadyInDictionary && !selectedWords.some(w => w.toLowerCase() === wordLower)) {
       setSelectedWords(prev => [...prev, word]);
     }
