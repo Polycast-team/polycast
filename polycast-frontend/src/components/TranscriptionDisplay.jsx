@@ -246,6 +246,11 @@ const TranscriptionDisplay = ({
     const existingWordData = wordDefinitions[wordLower];
     const isAlreadyInDictionary = existingWordData ? doesWordSenseExist(word, contextSentence) : false;
     
+    // Only add to selectedWords if not already there and it's in the dictionary
+    if (isAlreadyInDictionary && !selectedWords.some(w => w.toLowerCase() === wordLower)) {
+      setSelectedWords(prev => [...prev, word]);
+    }
+    
     // Set initial popup state
     setPopupInfo({
       visible: true,
@@ -933,11 +938,11 @@ const TranscriptionDisplay = ({
   const handleRemoveWordFromDictionary = (word) => {
     try {
       const wordLower = word.toLowerCase();
-      console.log(`Removing word from dictionary: ${wordLower}`);
+      console.log(`[DICTIONARY] Removing word from dictionary: ${wordLower}`);
       
       // First, check if the word exists in our flashcards
       if (!wordDefinitions[wordLower]) {
-        console.warn(`Word ${wordLower} not found in flashcards.`);
+        console.warn(`[DICTIONARY] Word ${wordLower} not found in flashcards.`);
         return;
       }
       
@@ -965,21 +970,34 @@ const TranscriptionDisplay = ({
           }
         });
         
-        // Close the popup since we've removed the word
-        setPopupInfo(prevPopup => ({
-          ...prevPopup,
-          visible: false
-        }));
-        
         console.log(`[DICTIONARY] Completely removed ${wordLower} and ${removedEntries.length - 1} senses from flashcards.`);
         return updated;
       });
+      
+      // Remove from selectedWords if no more definitions exist for this word
+      setSelectedWords(prev => {
+        const remainingDefinitions = Object.values(wordDefinitions).some(
+          def => def.word?.toLowerCase() === wordLower && def.inFlashcards
+        );
+        
+        if (!remainingDefinitions) {
+          console.log(`[DICTIONARY] No more definitions for ${wordLower}, removing from selected words`);
+          return prev.filter(w => w.toLowerCase() !== wordLower);
+        }
+        return prev;
+      });
+      
+      // Close the popup since we've removed the word
+      setPopupInfo(prevPopup => ({
+        ...prevPopup,
+        visible: false
+      }));
       
       // Save the updated state to the backend
       if (selectedProfile !== 'non-saving') {
         setTimeout(() => {
           saveProfileData();
-          console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
+          console.log(`[DICTIONARY] Saved updated flashcards to profile: ${selectedProfile}`);
         }, 100);
       }
     } catch (error) {
@@ -990,11 +1008,26 @@ const TranscriptionDisplay = ({
   // Effect to clean up highlighted words that are no longer in the dictionary
   useEffect(() => {
     // Create a Set of all words that are in the dictionary (case-insensitive)
-    const dictionaryWords = new Set(
-      Object.entries(wordDefinitions)
-        .filter(([_, entry]) => entry.word) // Make sure it's a word entry, not a sense entry
-        .map(([word]) => word.toLowerCase())
-    );
+    // including both base words and their senses
+    const dictionaryWords = new Set();
+    
+    // Add all base words
+    Object.entries(wordDefinitions).forEach(([key, entry]) => {
+      if (entry.word) { // This is a word entry
+        dictionaryWords.add(entry.word.toLowerCase());
+      }
+    });
+    
+    // Add all word senses from the allSenses arrays
+    Object.values(wordDefinitions).forEach(entry => {
+      if (entry.allSenses && Array.isArray(entry.allSenses)) {
+        entry.allSenses.forEach(senseId => {
+          if (wordDefinitions[senseId]?.inFlashcards) {
+            dictionaryWords.add(entry.word?.toLowerCase());
+          }
+        });
+      }
+    });
     
     // Filter out any highlighted words that aren't in the dictionary
     const wordsToKeep = selectedWords.filter(word => 
@@ -1004,6 +1037,9 @@ const TranscriptionDisplay = ({
     // If we removed any words, update the state
     if (wordsToKeep.length !== selectedWords.length) {
       console.log(`[HIGHLIGHT] Cleaning up ${selectedWords.length - wordsToKeep.length} words that are no longer in the dictionary`);
+      console.log(`[HIGHLIGHT] Removed words:`, 
+        selectedWords.filter(word => !dictionaryWords.has(word.toLowerCase()))
+      );
       setSelectedWords(wordsToKeep);
     }
   }, [wordDefinitions, selectedWords, setSelectedWords]);
