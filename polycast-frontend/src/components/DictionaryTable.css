@@ -101,9 +101,38 @@
   font-weight: normal;
 }
 
+/* Word metadata section (right side of header) */
+.word-metadata {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .expand-icon {
   color: #a0a0b8;
   transition: all 0.2s ease;
+}
+
+/* Frequency indicator styles */
+.frequency-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.frequency-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.frequency-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.frequency-dot.inactive {
+  opacity: 0.4;
 }
 
 /* Definitions Area */

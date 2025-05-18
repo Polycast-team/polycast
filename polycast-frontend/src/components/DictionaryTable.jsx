@@ -34,7 +34,13 @@ const FrequencyIndicator = ({ word }) => {
         <div 
           key={i}
           className={`frequency-dot ${i <= rating ? 'active' : 'inactive'}`}
-          style={{ backgroundColor: i <= rating ? getColorForFrequency(rating) : '#39394d' }}
+          style={{ 
+            backgroundColor: i <= rating ? getColorForFrequency(rating) : '#39394d',
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            display: 'inline-block'
+          }}
         />
       );
     }
@@ -43,11 +49,15 @@ const FrequencyIndicator = ({ word }) => {
 
   return (
     <div className="frequency-indicator" title={`Frequency rating: ${frequency}/5`}>
-      <div className="frequency-dots">
+      <div className="frequency-dots" style={{ display: 'flex', gap: '3px' }}>
         {renderFrequencyDots(frequency)}
       </div>
     </div>
   );
+};
+
+FrequencyIndicator.propTypes = {
+  word: PropTypes.string.isRequired
 };
 
 const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
@@ -165,9 +175,38 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                   {word.charAt(0).toUpperCase() + word.slice(1)}
                   <span className="definition-count">{entries.length > 1 ? ` (${entries.length})` : ''}</span>
                 </div>
-                <div className="word-metadata">
+                <div className="word-metadata" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   {/* Frequency rating from 1-5 with color scale */}
-                  <FrequencyIndicator word={word} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ 
+                      width: '15px', 
+                      height: '15px', 
+                      borderRadius: '50%', 
+                      backgroundColor: (() => {
+                        // Generate a consistent frequency rating between 1-5 based on word
+                        const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                        const rating = (sum % 5) + 1;
+                        
+                        // Color based on rating
+                        const colors = {
+                          1: '#ff4d4d', // Red
+                          2: '#ff944d', // Orange
+                          3: '#ffdd4d', // Yellow
+                          4: '#75d147', // Light green
+                          5: '#4ade80', // Green
+                        };
+                        
+                        return colors[rating];
+                      })(),
+                      display: 'inline-block',
+                    }} />
+                    <span style={{ color: '#a0a0b8', fontSize: '14px' }}>
+                      {(() => {
+                        const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                        return (sum % 5) + 1;
+                      })()} / 5
+                    </span>
+                  </div>
                   <div className="expand-icon">
                     {isExpanded ? '▼' : '►'}
                   </div>
