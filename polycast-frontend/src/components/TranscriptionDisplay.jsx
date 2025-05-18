@@ -59,7 +59,9 @@ const renderHistoryStacked = (segments) => {
 const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords, handleWordClick, isWordInSelectedListFn) => {
   // Default implementation if no function is provided
   const checkWordInList = isWordInSelectedListFn || ((word) => {
-    return selectedWords.some(w => w.toLowerCase() === word.toLowerCase());
+    const result = selectedWords.some(w => w.toLowerCase() === word.toLowerCase());
+    console.log(`Default checker: Word "${word}" ${result ? 'IS' : 'is NOT'} in selectedWords`);
+    return result;
   });
   if ((!segments || segments.length === 0) && lastPersisted) {
     return <span>{lastPersisted}</span>;
@@ -86,9 +88,9 @@ const renderSegmentsWithClickableWords = (segments, lastPersisted, selectedWords
               }) : undefined}
               style={{
                 cursor: isWord ? 'pointer' : 'default',
-                color: isWord && checkWordInList(token, segment.text) ? '#1976d2' : undefined,
-                background: isWord && checkWordInList(token, segment.text) ? 'rgba(25,118,210,0.07)' : undefined,
-                borderRadius: isWord && checkWordInList(token, segment.text) ? 3 : undefined,
+                color: isWord && checkWordInList(token) ? '#1976d2' : undefined,
+                background: isWord && checkWordInList(token) ? 'rgba(25,118,210,0.07)' : undefined,
+                borderRadius: isWord && checkWordInList(token) ? 3 : undefined,
                 transition: 'color 0.2s',
                 userSelect: 'text',
               }}
@@ -359,64 +361,23 @@ const TranscriptionDisplay = ({
     }
   };
   
-  // Function to check if a word in a specific context is in the selected words list
-  const isWordInSelectedList = (word, contextSentence) => {
-    if (!word || !contextSentence) return false;
+  // Function to check if a word is in the selectedWords list - simplified to directly check the array
+  const isWordInSelectedList = (word) => {
+    if (!word) return false;
     
     const wordLower = word.toLowerCase();
-    const wordData = wordDefinitions[wordLower];
     
-    // Basic check (backward compatibility)
-    if (!wordData) return selectedWords.some(w => w.toLowerCase() === wordLower);
+    // Simply check if the word is in the selectedWords array
+    const isInSelectedWords = selectedWords.some(w => w.toLowerCase() === wordLower);
     
-    // Get the part of speech from the contextual word if possible
-    let currentPoS = null;
-    
-    // Try to determine part of speech from the context
-    if (wordData.disambiguatedDefinition) {
-      currentPoS = wordData.disambiguatedDefinition.partOfSpeech;
-    } else if (wordData.dictionaryDefinition && wordData.dictionaryDefinition.partOfSpeech) {
-      currentPoS = wordData.dictionaryDefinition.partOfSpeech;
+    // Add debug logging when checking words
+    if (isInSelectedWords) {
+      console.log(`✅ Word "${word}" IS in selectedWords array`, wordLower);
+    } else {
+      console.log(`❌ Word "${word}" is NOT in selectedWords array`, wordLower);
     }
     
-    // Check all entries for this word with proper word sense IDs
-    const matchingSenseIds = Object.entries(wordDefinitions)
-      .filter(([key, entry]) => 
-        entry && 
-        entry.word && 
-        entry.word.toLowerCase() === wordLower && 
-        entry.inFlashcards &&
-        entry.wordSenseId)
-      .map(([key, entry]) => entry);
-      
-    if (matchingSenseIds.length > 0) {
-      for (const sense of matchingSenseIds) {
-        // Check if contexts are similar - this matches by sentence contexts
-        const contextMatch = sense.contextSentence && 
-                           contextSentence && 
-                           (contextSentence.includes(sense.contextSentence) || 
-                            sense.contextSentence.includes(contextSentence));
-                            
-        // If contexts match or parts of speech match for this specific case
-        if (contextMatch || (currentPoS && sense.partOfSpeech === currentPoS)) {
-          return true;
-        }
-      }
-      // Only return false if we found word matches but no context matches
-      return false;
-    }
-    
-    // Fallback for legacy format: check all entries for matching contexts
-    for (const entry of Object.values(wordDefinitions)) {
-      if (entry.contextSentence && 
-          entry.contextSentence.toLowerCase().includes(wordLower) &&
-          contextSentence.includes(entry.contextSentence) &&
-          entry.inFlashcards === true) {
-        return true;
-      }
-    }
-    
-    return false;
+    return isInSelectedWords;
   };
   
   // Get all existing flashcard sense IDs
