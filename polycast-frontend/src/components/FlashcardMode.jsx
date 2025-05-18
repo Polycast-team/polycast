@@ -199,9 +199,11 @@ useEffect(() => {
       if (isCorrect) {
         newInterval = oldInterval + 1;
       } else {
-        newInterval = oldInterval > 1 ? oldInterval - 1 : 1;
+        newInterval = oldInterval - 1;
       }
+      newInterval = Math.max(1, newInterval);
       return { ...prev, [currentSenseId]: newInterval };
+
     });
     setTimeout(() => {
       setIsFlipped(false);
