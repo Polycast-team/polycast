@@ -436,27 +436,117 @@ const TranscriptionDisplay = ({
     return [1];
   };
   
-  // Only block adding if the exact wordSenseId exists and is inFlashcards
   const doesWordSenseExist = (word, contextSentence) => {
     const wordLower = word.toLowerCase();
+    console.log(`[DUPLICATE CHECK] Checking if '${wordLower}' already exists in dictionary...`);
+    
+    // First, determine the word sense ID this word would have
     let definitionNumber = 1;
     const contextLower = contextSentence ? contextSentence.toLowerCase() : '';
-    // (Keep your context-to-definitionNumber logic here)
+    
+    // Special handling for different senses of "charge"
     if (wordLower === 'charge') {
       if (contextLower.includes('battle')) {
-        definitionNumber = 1;
+        definitionNumber = 1; // attack sense
       } else if (contextLower.includes('phone') || contextLower.includes('battery')) {
-        definitionNumber = 24;
+        definitionNumber = 24; // electrical sense
       } else if (contextLower.includes('murder')) {
-        definitionNumber = 5;
+        definitionNumber = 5; // legal accusation sense
       }
     }
+    
+    // Generate the wordSenseId this word would get
     const wordSenseId = `${wordLower}${definitionNumber}`;
+    console.log(`[DUPLICATE CHECK] This word would get wordSenseId: ${wordSenseId}`);
+    
+    // 1. Direct check: Is this exact wordSenseId already in the flashcards?
     if (wordDefinitions[wordSenseId] && wordDefinitions[wordSenseId].inFlashcards) {
       console.log(`[DUPLICATE CHECK] Found exact match: ${wordSenseId} is already in flashcards`);
       return true;
     }
-    // Only block true duplicates; allow different senses/contexts
+    
+    // Get the current word data
+    const currentWordData = wordDefinitions[wordLower];
+    if (!currentWordData) return false;
+    
+    // 2. Check the base word entry's allSenses array
+    if (currentWordData.hasMultipleSenses && currentWordData.allSenses) {
+      // Does the base word entry contain this sense ID in its allSenses array?
+      if (currentWordData.allSenses.includes(wordSenseId)) {
+        const senseEntry = wordDefinitions[wordSenseId];
+        // Confirm this entry actually exists and is marked as being in flashcards
+        if (senseEntry && senseEntry.inFlashcards) {
+          console.log(`[DUPLICATE CHECK] Found in allSenses array: ${wordSenseId} is already in flashcards`);
+          return true;
+        }
+      }
+    }
+    
+    // 3. Check all existing flashcards for this word to see if there's a similar word sense
+    const existingFlashcards = Object.entries(wordDefinitions)
+      .filter(([key, value]) => 
+        value && value.word === wordLower && 
+        value.inFlashcards && 
+        value.contextSentence);
+    
+    console.log(`[DUPLICATE CHECK] Found ${existingFlashcards.length} existing flashcards for word: ${wordLower}`);
+    
+    for (const [key, existingCard] of existingFlashcards) {
+      console.log(`[DUPLICATE CHECK] Checking existing card: ${key}`);
+      
+      // Compare context sentences for similarity
+      if (existingCard.contextSentence && contextSentence) {
+        const existingContext = existingCard.contextSentence.toLowerCase();
+        if (existingContext === contextLower) {
+          console.log(`[DUPLICATE CHECK] Found exact context match`);
+          return true;
+        }
+      }
+    }
+    
+    console.log(`[DUPLICATE CHECK] No duplicate found for '${wordLower}' - OK to add as new card`);
+    return false;
+  };
+  
+  // Function to check for and remove any duplicate flashcards with the same ID
+  const findAndRemoveDuplicateFlashcards = (state, baseWord) => {
+    console.log(`[DUPLICATE CHECK] Checking for duplicate flashcard IDs for ${baseWord}...`);
+    
+    // Get all the entries in the state object
+    const allEntries = Object.entries(state);
+    
+    // Create a map to count occurrences of each wordSenseId
+    const wordSenseIdCounts = {};
+    const duplicateIds = [];
+    
+    // First, find any duplicated IDs
+    allEntries.forEach(([key, value]) => {
+      // Only check items that have a wordSenseId and are marked as in flashcards
+      if (value && value.wordSenseId && value.inFlashcards) {
+        const id = value.wordSenseId;
+        if (!wordSenseIdCounts[id]) {
+          wordSenseIdCounts[id] = [];
+        }
+        // Store the full key and creation time for this ID
+        wordSenseIdCounts[id].push({
+          key: key,
+          createdAt: value.cardCreatedAt ? new Date(value.cardCreatedAt).getTime() : Date.now()
+        });
+      }
+    });
+    
+    // Check for any IDs with more than one entry
+    Object.entries(wordSenseIdCounts).forEach(([id, occurrences]) => {
+      if (occurrences.length > 1) {
+        console.log(`[DUPLICATE CHECK] Found ${occurrences.length} duplicates of ID: ${id}`);
+        
+        // Sort by creation time (oldest first)
+        occurrences.sort((a, b) => a.createdAt - b.createdAt);
+        
+        // Keep the oldest one, mark the rest for removal
+        const toKeep = occurrences[0].key;
+        const toRemove = occurrences.slice(1).map(o => o.key);
+        
         console.log(`[DUPLICATE CHECK] Keeping ${toKeep}, removing ${toRemove.join(', ')}`);
         duplicateIds.push(...toRemove);
       }
@@ -468,6 +558,33 @@ const TranscriptionDisplay = ({
       const newState = { ...state };
       
       // Remove the duplicate flashcards
+      duplicateIds.forEach(id => {
+        // Check if the duplicate is in a word's allSenses list
+        Object.entries(newState).forEach(([key, value]) => {
+          if (value && value.allSenses && Array.isArray(value.allSenses)) {
+            // If this entry has an allSenses array that includes the ID we're removing,
+            // update the allSenses array
+            if (value.allSenses.includes(id)) {
+              newState[key] = {
+                ...value,
+                allSenses: value.allSenses.filter(sense => sense !== id)
+              };
+            }
+          }
+        });
+        
+        // Delete the duplicate
+        delete newState[id];
+      });
+      
+      console.log(`[DUPLICATE CHECK] Removed ${duplicateIds.length} duplicate entries`);
+      return newState;
+    }
+    
+    // If no duplicates were found, return the original state
+    return state;
+  };
+  
   // Debug function to dump the current state of all flashcards
   const logFlashcardState = () => {
     console.log('---------- CURRENT FLASHCARD STATE ----------');
