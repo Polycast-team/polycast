@@ -800,11 +800,15 @@ const TranscriptionDisplay = ({
       }
       
       // ALWAYS add the word to selectedWords to ensure it gets highlighted
+      // Make sure we're using just the base word without part of speech
+      const baseWord = word.split(' (')[0].trim();
+      const baseWordLower = baseWord.toLowerCase();
+      
       setSelectedWords(prev => {
-        console.log(`Adding "${word}" to selected words list for highlighting`);
-        // Make sure the word is in the selectedWords list for highlighting
-        if (!prev.some(w => w.toLowerCase() === wordLower)) {
-          return [...prev, word];
+        console.log(`Adding base word "${baseWord}" to selected words list for highlighting`);
+        // Make sure the base word is in the selectedWords list for highlighting
+        if (!prev.some(w => w.toLowerCase() === baseWordLower)) {
+          return [...prev, baseWord];
         }
         return prev;
       });
@@ -1000,30 +1004,37 @@ const TranscriptionDisplay = ({
         return updated;
       });
       
+      // Extract the base word (without part of speech) for consistent highlighting
+      const baseWord = word.split(' (')[0].trim();
+      const baseWordLower = baseWord.toLowerCase();
+      
       // Always remove from selectedWords - we'll re-add it later if needed
       // This ensures the highlighting is immediately updated
-      console.log(`[DICTIONARY] Removing ${wordLower} from selected words temporarily`);
-      setSelectedWords(prev => prev.filter(w => w.toLowerCase() !== wordLower));
+      console.log(`[DICTIONARY] Removing base word "${baseWord}" from selected words temporarily`);
+      setSelectedWords(prev => prev.filter(w => w.toLowerCase() !== baseWordLower));
       
       // After a short delay, check if there are any remaining definitions for this word
       // If so, add the word back to selectedWords
       setTimeout(() => {
         const updatedWordDefinitions = { ...wordDefinitions };
-        // Check if word still exists in any flashcard entries after our removal
-        const remainingDefinitions = Object.values(updatedWordDefinitions).some(
-          def => def.word?.toLowerCase() === wordLower && def.inFlashcards
-        );
+        // Check if any version of this word still exists in flashcard entries after our removal
+        const remainingDefinitions = Object.values(updatedWordDefinitions).some(def => {
+          if (!def.word || !def.inFlashcards) return false;
+          // Extract the base word from any dictionary entry
+          const entryBaseWord = def.word.split(' (')[0].trim().toLowerCase();
+          return entryBaseWord === baseWordLower;
+        });
         
         if (remainingDefinitions) {
-          console.log(`[DICTIONARY] Found remaining definitions for ${wordLower}, re-adding to selected words for highlighting`);
+          console.log(`[DICTIONARY] Found remaining definitions for "${baseWord}", re-adding to selected words for highlighting`);
           setSelectedWords(prev => {
-            if (!prev.some(w => w.toLowerCase() === wordLower)) {
-              return [...prev, word];
+            if (!prev.some(w => w.toLowerCase() === baseWordLower)) {
+              return [...prev, baseWord];
             }
             return prev;
           });
         } else {
-          console.log(`[DICTIONARY] No more definitions for ${wordLower}, keeping it removed from selected words`);
+          console.log(`[DICTIONARY] No more definitions for "${baseWord}", keeping it removed from selected words`);
         }
       }, 200);
       

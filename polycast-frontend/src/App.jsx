@@ -45,17 +45,27 @@ function App({ targetLanguages, onReset, roomSetup }) {
       
       // Extract words from all flashcards with inFlashcards=true
       if (data.flashcards) {
+        // Log the flashcards data to see what's stored there
+        console.log('[DEBUG] Flashcards data:', data.flashcards);
+        
         Object.values(data.flashcards).forEach(entry => {
           // Only include entries that are actual words and are in flashcards
           if (entry.word && entry.inFlashcards) {
-            uniqueWords.add(entry.word);
+            // Extract just the base word without any part of speech
+            // The word might be stored as "word" or "word (part-of-speech)"
+            const baseWord = entry.word.split(' (')[0].trim();
+            console.log(`[DEBUG] Extracted base word "${baseWord}" from "${entry.word}"`); 
+            uniqueWords.add(baseWord);
           }
           
           // Also check sense entries that point to this word
           if (entry.allSenses && Array.isArray(entry.allSenses)) {
             entry.allSenses.forEach(senseId => {
               if (data.flashcards[senseId]?.inFlashcards && entry.word) {
-                uniqueWords.add(entry.word);
+                // Extract just the base word without any part of speech
+                const baseWord = entry.word.split(' (')[0].trim();
+                console.log(`[DEBUG] Extracted base word from sense "${baseWord}" from "${entry.word}"`); 
+                uniqueWords.add(baseWord);
               }
             });
           }
