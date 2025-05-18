@@ -685,81 +685,70 @@ function App({ targetLanguages, onReset, roomSetup }) {
           <DictionaryTable 
             wordDefinitions={wordDefinitions}
             onRemoveWord={(wordSenseId, word) => {
-              console.log(`Removing specific definition: ${wordSenseId}`);
+              console.log(`Removing word from dictionary: ${word} (${wordSenseId})`);
               try {
-                // Create a new copy of the state
-                const newWordDefinitions = { ...wordDefinitions };
+                // Find the base word entry
+                const baseWordKey = Object.keys(wordDefinitions).find(key => {
+                  const entry = wordDefinitions[key];
+                  return entry.allSenses && entry.allSenses.includes(wordSenseId);
+                });
                 
-                // Check if this specific wordSenseId exists
-                if (newWordDefinitions[wordSenseId]) {
-                  // Get the base word from this definition
-                  const baseWord = newWordDefinitions[wordSenseId].word.toLowerCase();
-                  console.log(`Found sense ID ${wordSenseId} for word: ${baseWord}`);
+                if (!baseWordKey) {
+                  console.warn(`Could not find base word for sense ID: ${wordSenseId}`);
+                  return;
+                }
+                
+                // Get all the sense IDs associated with this word
+                const allSenses = wordDefinitions[baseWordKey]?.allSenses || [];
+                
+                // Update the wordDefinitions state to COMPLETELY REMOVE entries
+                setWordDefinitions(prev => {
+                  const updated = { ...prev };
                   
-                  // Check if we have a base word entry with allSenses array
-                  if (newWordDefinitions[baseWord] && Array.isArray(newWordDefinitions[baseWord].allSenses)) {
-                    // Update the base word's allSenses array to remove this specific sense
-                    const newAllSenses = newWordDefinitions[baseWord].allSenses.filter(
-                      senseId => senseId !== wordSenseId
-                    );
-                    
-                    console.log(`Filtering: ${newWordDefinitions[baseWord].allSenses.length} senses -> ${newAllSenses.length} senses`);
-                    
-                    if (newAllSenses.length > 0) {
-                      // Keep the base word entry but update its allSenses array
-                      newWordDefinitions[baseWord] = {
-                        ...newWordDefinitions[baseWord],
-                        allSenses: newAllSenses,
-                        hasMultipleSenses: newAllSenses.length > 1
-                      };
-                      console.log(`Kept base word ${baseWord} with ${newAllSenses.length} remaining senses`);
-                    } else {
-                      // No more senses for this word, remove the base word entry too
-                      delete newWordDefinitions[baseWord];
-                      console.log(`Removed base word ${baseWord} (no remaining senses)`);
+                  // Keep track of removed entries for logging
+                  const removedEntries = [];
+                  
+                  // Completely remove the word entry
+                  if (updated[baseWordKey]) {
+                    removedEntries.push(baseWordKey);
+                    delete updated[baseWordKey];
+                  }
+                  
+                  // Remove all sense entries
+                  allSenses.forEach(senseId => {
+                    if (updated[senseId]) {
+                      removedEntries.push(senseId);
+                      delete updated[senseId];
                     }
-                  } else {
-                    console.log(`No base word entry found for ${baseWord}, only removing sense ID`);
-                  }
+                  });
                   
-                  // Remove just this specific sense definition
-                  delete newWordDefinitions[wordSenseId];
-                  console.log(`Removed specific definition: ${wordSenseId}`);
-                  
-                  // Update the state
-                  console.log(`Setting wordDefinitions with ${Object.keys(newWordDefinitions).length} entries`);
-                  setWordDefinitions(newWordDefinitions);
-                  
-                  // Save the updated state to the backend
-                  if (selectedProfile !== 'non-saving') {
-                    console.log(`Will save to profile: ${selectedProfile}`);
-                    setTimeout(async () => {
-                      try {
-                        // Save using the updated definitions
-                        const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ 
-                            flashcards: newWordDefinitions,
-                            selectedWords 
-                          })
-                        });
-                        
-                        if (!response.ok) {
-                          throw new Error(`Server responded with status: ${response.status}`);
-                        }
-                        
-                        console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
-                      } catch (error) {
-                        console.error(`Error saving profile data: ${error.message}`);
+                  console.log(`[DICTIONARY] Completely removed ${baseWordKey} and ${removedEntries.length - 1} senses from flashcards.`);
+                  return updated;
+                });
+                
+                // Save the updated state to the backend
+                if (selectedProfile !== 'non-saving') {
+                  setTimeout(async () => {
+                    try {
+                      // Save the updated flashcards to the backend
+                      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ flashcards: wordDefinitions, selectedWords })
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error(`Server responded with status: ${response.status}`);
                       }
-                    }, 500);
-                  }
-                } else {
-                  console.warn(`Definition with ID ${wordSenseId} not found in dictionary`);
+                      
+                      console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
+                    } catch (error) {
+                      console.error(`Error saving profile data: ${error.message}`);
+                    }
+                  }, 100);
                 }
               } catch (error) {
-                console.error(`Error removing definition from dictionary: ${error}`);
+                console.error(`Error removing word from dictionary: ${error}`);
               }
             }}
           />
