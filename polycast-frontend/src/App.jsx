@@ -34,13 +34,31 @@ function App({ targetLanguages, onReset, roomSetup }) {
       // Log the received data
       console.log('Received profile data:', data);
       
-      // Update state with the received data
-      setWordDefinitions(data.flashcards || {});
-      setSelectedWords(data.selectedWords || []);
+      // Get flashcards from the data
+      const flashcards = data.flashcards || {};
+      
+      // Update wordDefinitions state
+      setWordDefinitions(flashcards);
+      
+      // Derive selectedWords from the flashcards
+      // Extract unique words from flashcard entries
+      const uniqueWords = new Set();
+      Object.values(flashcards).forEach(entry => {
+        if (entry && entry.word && entry.inFlashcards) {
+          uniqueWords.add(entry.word);
+        }
+      });
+      
+      // Convert the Set to an Array
+      const derivedSelectedWords = Array.from(uniqueWords);
+      
+      // Update selectedWords state
+      setSelectedWords(derivedSelectedWords);
       
       // Log the updated state for verification
-      console.log(`Updated wordDefinitions with ${Object.keys(data.flashcards || {}).length} flashcards`);
-      console.log(`Updated selectedWords with ${(data.selectedWords || []).length} words`);
+      console.log(`Updated wordDefinitions with ${Object.keys(flashcards).length} flashcards`);
+      console.log(`Updated selectedWords with ${derivedSelectedWords.length} words derived from flashcards:`, 
+        derivedSelectedWords);
     } catch (error) {
       console.error(`Error fetching profile data for ${profile}:`, error);
     }
@@ -687,54 +705,60 @@ function App({ targetLanguages, onReset, roomSetup }) {
             onRemoveWord={(wordSenseId, word) => {
               console.log(`Removing word from dictionary: ${word} (${wordSenseId})`);
               try {
-                // Find the base word entry
-                const baseWordKey = Object.keys(wordDefinitions).find(key => {
-                  const entry = wordDefinitions[key];
-                  return entry.allSenses && entry.allSenses.includes(wordSenseId);
-                });
-                
-                if (!baseWordKey) {
-                  console.warn(`Could not find base word for sense ID: ${wordSenseId}`);
+                // Get the word entry from wordSenseId
+                const wordEntry = wordDefinitions[wordSenseId];
+                if (!wordEntry) {
+                  console.warn(`Could not find entry for sense ID: ${wordSenseId}`);
                   return;
                 }
                 
-                // Get all the sense IDs associated with this word
-                const allSenses = wordDefinitions[baseWordKey]?.allSenses || [];
+                const wordLower = wordEntry.word.toLowerCase();
                 
-                // Update the wordDefinitions state to COMPLETELY REMOVE entries
+                // Find all sense entries for this word
+                const wordSenseEntries = Object.entries(wordDefinitions)
+                  .filter(([key, entry]) => 
+                    entry && entry.word && entry.word.toLowerCase() === wordLower &&
+                    entry.wordSenseId && entry.inFlashcards);
+                
+                // Get array of sense IDs to remove
+                const senseIdsToRemove = wordSenseEntries.map(([key, entry]) => entry.wordSenseId);
+                console.log(`Found ${senseIdsToRemove.length} sense entries to remove for word: ${wordLower}`);
+                
+                // Remove from wordDefinitions
                 setWordDefinitions(prev => {
                   const updated = { ...prev };
                   
-                  // Keep track of removed entries for logging
-                  const removedEntries = [];
-                  
-                  // Completely remove the word entry
-                  if (updated[baseWordKey]) {
-                    removedEntries.push(baseWordKey);
-                    delete updated[baseWordKey];
-                  }
-                  
-                  // Remove all sense entries
-                  allSenses.forEach(senseId => {
+                  // Remove all sense entries for this word
+                  senseIdsToRemove.forEach(senseId => {
                     if (updated[senseId]) {
-                      removedEntries.push(senseId);
                       delete updated[senseId];
+                      console.log(`Removed sense entry: ${senseId}`);
                     }
                   });
                   
-                  console.log(`[DICTIONARY] Completely removed ${baseWordKey} and ${removedEntries.length - 1} senses from flashcards.`);
                   return updated;
+                });
+                
+                // Also remove the word from selectedWords
+                setSelectedWords(prev => {
+                  return prev.filter(selectedWord => selectedWord.toLowerCase() !== wordLower);
                 });
                 
                 // Save the updated state to the backend
                 if (selectedProfile !== 'non-saving') {
                   setTimeout(async () => {
                     try {
+                      // Need to update the selectedWords in the state that's sent
+                      const updatedSelectedWords = selectedWords.filter(w => w.toLowerCase() !== wordLower);
+                      
                       // Save the updated flashcards to the backend
                       const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ flashcards: wordDefinitions, selectedWords })
+                        body: JSON.stringify({ 
+                          flashcards: wordDefinitions, 
+                          selectedWords: updatedSelectedWords 
+                        })
                       });
                       
                       if (!response.ok) {

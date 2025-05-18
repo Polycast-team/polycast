@@ -908,33 +908,30 @@ const TranscriptionDisplay = ({
       const wordLower = word.toLowerCase();
       console.log(`Removing word from dictionary: ${wordLower}`);
       
-      // First, check if the word exists in our flashcards
-      if (!wordDefinitions[wordLower]) {
-        console.warn(`Word ${wordLower} not found in flashcards.`);
+      // Find all sense entries for this word
+      const wordSenseEntries = Object.entries(wordDefinitions)
+        .filter(([key, entry]) => 
+          entry && entry.word && entry.word.toLowerCase() === wordLower &&
+          entry.wordSenseId && entry.inFlashcards);
+      
+      if (wordSenseEntries.length === 0) {
+        console.warn(`No flashcard entries found for word: ${wordLower}`);
         return;
       }
       
-      // Get all the sense IDs associated with this word
-      const allSenses = wordDefinitions[wordLower]?.allSenses || [];
+      // Get array of sense IDs to remove
+      const senseIdsToRemove = wordSenseEntries.map(([key, entry]) => entry.wordSenseId);
+      console.log(`Found ${senseIdsToRemove.length} sense entries to remove for word: ${wordLower}`);
       
-      // Update the wordDefinitions state to COMPLETELY REMOVE entries
+      // Remove from wordDefinitions
       setWordDefinitions(prev => {
         const updated = { ...prev };
         
-        // Keep track of removed entries for logging
-        const removedEntries = [];
-        
-        // Completely remove the word entry and all its senses
-        if (updated[wordLower]) {
-          removedEntries.push(wordLower);
-          delete updated[wordLower];
-        }
-        
-        // Remove all sense entries
-        allSenses.forEach(senseId => {
+        // Remove all sense entries for this word
+        senseIdsToRemove.forEach(senseId => {
           if (updated[senseId]) {
-            removedEntries.push(senseId);
             delete updated[senseId];
+            console.log(`Removed sense entry: ${senseId}`);
           }
         });
         
@@ -944,8 +941,12 @@ const TranscriptionDisplay = ({
           visible: false
         }));
         
-        console.log(`[DICTIONARY] Completely removed ${wordLower} and ${removedEntries.length - 1} senses from flashcards.`);
         return updated;
+      });
+      
+      // Also remove the word from selectedWords
+      setSelectedWords(prev => {
+        return prev.filter(selectedWord => selectedWord.toLowerCase() !== wordLower);
       });
       
       // Save the updated state to the backend
