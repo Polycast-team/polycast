@@ -199,6 +199,9 @@ const TranscriptionDisplay = ({
   const handleWordClick = async (word, event) => {
     if (!event) return;
     
+    // Log the selectedWords array whenever a word is clicked
+    console.log('📋 Current selectedWords array when clicking:', word, selectedWords);
+    
     const wordLower = word.toLowerCase();
     
     // Calculate position for popup
