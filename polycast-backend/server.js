@@ -1524,22 +1524,20 @@ app.get('/api/local-dictionary/:letter/:word', async (req, res) => {
     }
     
     try {
-        // Create a prompt that asks for a dictionary-style definition and examples, but ONLY for the specific context
-        const prompt = `You are creating dictionary entries for non-native English speakers who are learning English. 
-    
-Your job is to explain the English word "${word}" in a simple, clear way that helps beginners understand it.
-The word appears in this context: "${contextSentence}". Your definition and example should be specific to how the word is used in this context ONLY.
-Your response must be in JSON format with these fields:
-{
-  "translation": "Spanish translation of the word as used in this specific context",
-  "partOfSpeech": "The part of speech (noun, verb, adjective, etc.) of the word in this context",
-  "frequencyRating": "A number from 1 to 5 representing how common this word is in everyday English in this sense",
-  "definition": "VERY SIMPLE and SHORT explanation in simple English for how the word is used in this context (1-2 short sentences max)",
-  "example": "A simple example sentence in English that uses this word in a similar way to the context."
-}
+        // Get possible definitions for this word from a dictionary source
+        // For now we're providing a simpler version without definitions list
+        // In the actual implementation, we would fetch definitions from dictionary API
+        
+        // Use the new format with possible definitions
+        const prompt = `You are helping a language learner understand the meaning of a word in a sentence.
 
-IMPORTANT: ONLY provide the definition of the word as it is used in the context sentence. DO NOT provide multiple definitions or alternative meanings.
-Only return the JSON object, nothing else.`;
+Word: "${word}"
+Context: "${contextSentence}"
+Possible definitions:
+1. A definition of ${word}
+2. Another possible definition of ${word}
+
+Which definition matches the word as used in the context sentence above? Respond with the word, followed by the text of the best matching definition, followed by the Spanish translation. These should be separated by '//', for example 'charge//To rush forward to attack.//cargar'`;
         
         // Log the prompt for debugging
         console.log('--- LLM Definition Prompt ---');
@@ -1557,30 +1555,33 @@ Only return the JSON object, nothing else.`;
         
         // Parse the JSON response
         try {
-            // Extract JSON object if it's embedded in text
-            const jsonMatch = llmResponse.match(/\{[\s\S]*?\}/); // Find first JSON-like object
+            // Parse the response in the format: word//definition//translation
+            const parts = llmResponse.trim().split('//');
             
-            if (jsonMatch) {
-                const jsonStr = jsonMatch[0];
-                console.log(`Extracted JSON response for ${word}:`, jsonStr);
+            if (parts.length >= 3) {
+                const responseWord = parts[0].trim();
+                const responseDefinition = parts[1].trim();
+                const translation = parts[2].trim();
                 
-                const parsedResponse = JSON.parse(jsonStr);
+                console.log(`Parsed response for ${word}:`, { responseWord, responseDefinition, translation });
                 
-                // Normalize the response format
+                // Format response to be compatible with existing frontend expectations
                 const normalizedResponse = {
-                    translation: parsedResponse.translation || '',
-                    partOfSpeech: parsedResponse.partOfSpeech || '',
-                    frequencyRating: parsedResponse.frequencyRating || 3,
+                    word: responseWord,
+                    translation: translation,
+                    partOfSpeech: 'unknown', // We don't get this in the new format
+                    frequencyRating: 3, // Default value since we don't get this in the new format
                     definitions: [{
-                        text: parsedResponse.definition || '',
-                        example: parsedResponse.example || ''
+                        text: responseDefinition,
+                        example: contextSentence || 'No example available.'
                     }],
                     isContextual: true
                 };
                 
                 res.json(normalizedResponse);
             } else {
-                throw new Error('Could not extract JSON from LLM response');
+                console.log(`Invalid response format for ${word}:`, llmResponse);
+                throw new Error('Response not in expected format (word//definition//translation)');
             }
         } catch (parseError) {
             console.error(`Error parsing LLM response for ${word}:`, parseError);
