@@ -737,86 +737,54 @@ app.get('/api/dictionary/:word', async (req, res) => {
         const context = req.query.context || '';
         console.log(`[Dictionary API] Getting definition for: ${word}${context ? ' with context: "' + context + '"' : ''}`);
         
-        // Create a prompt that asks for a single contextual definition and definition number
-        const prompt = `You are an expert language teacher helping a student understand a word in its specific context.
+        // Create a prompt for the new word//definition//translation format
+        const prompt = `You are helping a language learner understand the meaning of a word in a sentence.
 
-The word "${word}" appears in this context: "${context}"
+Word: "${word}"
+Context: "${context}"
 
-Your task is to:
-1. Identify the SINGLE best definition that applies to how this word is used in this specific context
-2. Determine the correct definition number from the following standard dictionary entries:
-
-For "charge" word:
-1: to make a rush at or sudden attack upon (verb)
-2: blame for, make a claim of wrongdoing against (verb)
-3: demand payment (verb)
-4: the quantity of unbalanced electricity in a body (noun)
-7: make an accusatory claim (verb)
-8: fill or load to capacity (verb)
-11: request for payment of a debt (noun)
-12: pay with a credit card (verb)
-24: energize a battery by passing a current through it (verb)
-
-For other words, use other standard definition numbers that apply.
-
-Output ONLY a JSON object with these fields:
-{
-  "translation": "Spanish translation of the word as used in this specific context",
-  "partOfSpeech": "The part of speech of the word in this context (noun, verb, adjective, etc.)",
-  "definition": "A clear and concise definition appropriate for how the word is used in this context only",
-  "example": "A simple example sentence showing a similar usage to the context",
-  "definitionNumber": The number from the standard dictionary that best matches this usage (e.g., 1, 3, 11, 24, etc.)
-}
-
-Do NOT provide multiple definitions or explanations outside the JSON.`;
+Respond with the word, followed by the text of your best definition for this word in this context, followed by the Spanish translation. These should be separated by '//', for example 'charge//To rush forward to attack.//cargar'`;
         
         // Log prompt for debugging
-        console.log('[Dictionary API] Prompt:', prompt.substring(0, 200) + '...');
+        console.log('[Dictionary API] Using new prompt format:', prompt);
         
         // Generate the response using Gemini with low temperature for consistency
         const llmResponse = await generateTextWithGemini(prompt, 0.2);
+        console.log(`[Dictionary API] Raw Gemini response: ${llmResponse}`);
         
-        try {
-            // Extract JSON from response
-            const jsonMatch = llmResponse.match(/\{[\s\S]*?\}/);
-            if (!jsonMatch) {
-                throw new Error('Could not extract JSON from LLM response');
-            }
-            const jsonStr = jsonMatch[0];
-            const parsedResponse = JSON.parse(jsonStr);
+        // Parse the response in the format: word//definition//translation
+        const parts = llmResponse.trim().split('//');
+        
+        if (parts.length >= 3) {
+            const responseWord = parts[0].trim();
+            const responseDefinition = parts[1].trim();
+            const translation = parts[2].trim();
             
             // Format for backward compatibility with existing frontend
             const formattedResponse = {
-                translation: parsedResponse.translation || '',
-                partOfSpeech: parsedResponse.partOfSpeech || '',
-                definition: parsedResponse.definition || '',
+                word: responseWord,
+                translation: translation,
+                partOfSpeech: 'unknown', // We'll need to infer this or add it to the prompt format
+                definition: responseDefinition,
                 definitions: [{
-                    text: parsedResponse.definition || '',
-                    example: parsedResponse.example || ''
+                    text: responseDefinition,
+                    example: context || 'No example available.'
                 }],
-                definitionNumber: parsedResponse.definitionNumber || 1, // Include the definition number
                 isContextual: true
             };
             
-            console.log(`[Dictionary API] Found definition number ${formattedResponse.definitionNumber} for "${word}" in context: "${context.substring(0, 30)}..."`);
-            
-            // After getting the definition, make a second Gemini call for example sentences
-            let exampleSentencesRaw = '';
-            try {
-                const examplePrompt = `Give three example sentences that use the word \"${word}\" in the sense of: \"${parsedResponse.definition}\". Separate each sentence with // and do not include any other text.`;
-                exampleSentencesRaw = await generateTextWithGemini(examplePrompt, 0.2);
-                console.log(`[Dictionary API] Example sentences for "${word}": ${exampleSentencesRaw}`);
-            } catch (exErr) {
-                console.error('[Dictionary API] Error generating example sentences:', exErr);
-                exampleSentencesRaw = '';
-            }
-            formattedResponse.exampleSentencesRaw = exampleSentencesRaw;
-            
-            console.log(`[Dictionary API] Final response for "${word}":`, JSON.stringify(formattedResponse, null, 2));
+            console.log(`[Dictionary API] Processed response for "${word}": ${JSON.stringify(formattedResponse, null, 2)}`);
             res.json(formattedResponse);
-        } catch (parseError) {
-            console.error('[Dictionary API] Error parsing response:', parseError);
-            res.status(500).json({ error: 'Failed to parse definition', raw: llmResponse });
+        } else {
+            // Fallback if response doesn't match expected format
+            console.error('[Dictionary API] Error: Response not in expected format');
+            res.status(500).json({
+                error: 'Response not in expected format',
+                raw: llmResponse,
+                word: word,
+                definition: 'Definition unavailable',
+                translation: 'Translation unavailable'
+            });
         }
     } catch (error) {
         console.error("Dictionary API error:", error);
