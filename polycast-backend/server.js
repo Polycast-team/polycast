@@ -1655,6 +1655,77 @@ Which definition matches the word as used in the context sentence above? Respond
             const definitionHash = responseDefinition.substring(0, 8).replace(/\W+/g, '');
             const wordSenseId = `${word.toLowerCase()}_${matchedDefinition.partOfSpeech || 'unknown'}_${definitionHash}`;
             
+            // STEP 2: Generate example sentences and frequency ratings
+            console.log(`[WORD SENSE DISAMBIGUATION] Step 2: Generating examples and frequency ratings`);
+            
+            const examplesPrompt = `Return three example sentences using the word '${responseWord}' in the context of '${responseDefinition}' with each sentence separated by '//.' After the three sentences, provide a frequency rating of 1-5 for how common that word is, followed by a frequency rating for how common that definition is for that word.
+
+Use the following criteria:
+
+Vocabulary Frequency (1–5):
+Rate how common the word is in general vocabulary, considering how likely it is to appear in everyday conversation, school materials, news articles, and basic media.
+1: Highly rare or technical; almost never appears outside specific fields
+2: Somewhat uncommon; appears occasionally in books or niche conversations
+3: Neutral; part of educated vocabulary but not basic
+4: Common; heard regularly by most speakers
+5: Core/basic vocabulary known and used by nearly all fluent speakers
+
+Definition Frequency (1–5):
+Rate how common this specific meaning of the word is compared to its other meanings.
+1: Obscure or outdated definition
+2: Infrequently used definition
+3: Less typical but still recognized
+4: One of the common meanings
+5: Most typical or dominant meaning
+
+Examples for calibration:
+- "apple" as a fruit = 5, "deciduous" = 2, "syzygy" = 1
+- "run" meaning "to jog" = 5, "run" meaning "to operate a play" = 3, "run" meaning "a small stream" = 2
+
+Your response should follow this exact format without any additional text:
+[example sentence 1]//[example sentence 2]//[example sentence 3]//[word frequency]//[definition frequency]`;
+            
+            let examples = [];
+            let wordFrequency = 3;
+            let definitionFrequency = 3;
+            
+            try {
+                // Call Gemini API for example sentences and frequency ratings
+                const examplesResponse = await generateTextWithGemini(examplesPrompt, 0.2);
+                console.log(`[WORD SENSE DISAMBIGUATION] Examples response: ${examplesResponse}`);
+                
+                // Parse the response (example1//example2//example3//wordFreq//defFreq)
+                const exampleParts = examplesResponse.trim().split('//');
+                
+                if (exampleParts.length >= 5) {
+                    examples = [
+                        exampleParts[0].trim(),
+                        exampleParts[1].trim(),
+                        exampleParts[2].trim()
+                    ];
+                    wordFrequency = parseInt(exampleParts[3].trim(), 10) || 3;
+                    definitionFrequency = parseInt(exampleParts[4].trim(), 10) || 3;
+                    
+                    console.log(`[WORD SENSE DISAMBIGUATION] Successfully parsed examples and frequencies`);
+                    console.log(`Word frequency: ${wordFrequency}, Definition frequency: ${definitionFrequency}`);
+                } else {
+                    console.log(`[WORD SENSE DISAMBIGUATION] Unexpected examples response format. Using defaults.`);
+                    // Generate simple example sentences as fallback
+                    examples = [
+                        `The word "${word}" can be used in a sentence like this.`,
+                        `Here is another example with "${word}".`,
+                        `"${word}" is also used in this way.`
+                    ];
+                }
+            } catch (exampleError) {
+                console.error(`[WORD SENSE DISAMBIGUATION] Error generating examples:`, exampleError);
+                examples = [
+                    `The word "${word}" can be used in a sentence like this.`,
+                    `Here is another example with "${word}".`,
+                    `"${word}" is also used in this way.`
+                ];
+            }
+            
             // Check if we already have a flashcard for this sense
             if (existingFlashcardSenseIds.includes(wordSenseId)) {
                 console.log(`[WORD SENSE DISAMBIGUATION] ⚠️ This sense of '${word}' already exists in flashcards. No new card needed.`);
@@ -1664,9 +1735,11 @@ Which definition matches the word as used in the context sentence above? Respond
                     disambiguatedDefinition: {
                         ...matchedDefinition,
                         translation: translation,
-                        // Keep the original definition text but add the specific definition from response
                         responseDefinition: responseDefinition
                     },
+                    examples: examples,
+                    wordFrequency: wordFrequency,
+                    definitionFrequency: definitionFrequency,
                     wordSenseId,
                     existingFlashcard: true,
                     rawLlmResponse: response
@@ -1679,9 +1752,11 @@ Which definition matches the word as used in the context sentence above? Respond
                     disambiguatedDefinition: {
                         ...matchedDefinition,
                         translation: translation,
-                        // Keep the original definition text but add the specific definition from response
                         responseDefinition: responseDefinition
                     },
+                    examples: examples,
+                    wordFrequency: wordFrequency,
+                    definitionFrequency: definitionFrequency,
                     wordSenseId,
                     existingFlashcard: false,
                     rawLlmResponse: response

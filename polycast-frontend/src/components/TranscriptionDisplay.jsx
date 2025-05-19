@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { createFlashcardEntry } from './FixedCardDefinitions';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
 
@@ -869,27 +870,41 @@ const TranscriptionDisplay = ({
         const senseKey = wordSenseId;
         console.log(`[FLASHCARD CREATE] Adding new sense ${senseKey} for word ${wordLower}`);
         
-        // Create updated state with just the new flashcard entry
+        // Get translation from the new workflow if available
+        const translation = disambiguatedDefinition?.translation || 
+                           (wordData.translation) || '';
+        
+        // Get examples from the new workflow if available
+        const examples = wordData.examples || [];
+        
+        // Get frequency ratings from the new workflow
+        const wordFrequency = wordData.wordFrequency || 3;
+        const definitionFrequency = wordData.definitionFrequency || 3;
+        
+        console.log('[FLASHCARD CREATE] Creating flashcard with new data format:', {
+          wordFrequency,
+          definitionFrequency,
+          examples: examples.length > 0 ? `${examples.length} examples` : 'No examples',
+          translation: translation || 'No translation'
+        });
+        
+        // Use the importable createFlashcardEntry function for consistent flashcard creation
+        const flashcardEntry = createFlashcardEntry(
+          wordLower,
+          wordSenseId,
+          contextSentence,
+          disambiguatedDefinition,
+          partOfSpeech,
+          examples,
+          wordFrequency,
+          definitionFrequency,
+          translation
+        );
+        
+        // Create updated state with the new flashcard entry
         const updatedState = {
           ...prev,
-          [senseKey]: {
-            word: wordLower,
-            imageUrl: imageResponse.url,
-            wordSenseId: wordSenseId,
-            contextSentence: contextSentence,
-            disambiguatedDefinition: disambiguatedDefinition,
-            // Store the best available definition as a flat property for UI reliability
-            definition: (disambiguatedDefinition && (disambiguatedDefinition.definition || disambiguatedDefinition.text)) ||
-                        wordData.definition ||
-                        (wordData.definitions && wordData.definitions[0] && wordData.definitions[0].text) ||
-                        '',
-            inFlashcards: true, // This is where we mark the card as in flashcards
-            cardCreatedAt: new Date().toISOString(),
-            partOfSpeech: partOfSpeech,
-            definitionNumber: definitionNumber,
-            // Include example sentences from API response if available
-            exampleSentencesRaw: wordData.exampleSentencesRaw || ''
-          }
+          [senseKey]: flashcardEntry
         };
         
         console.log(`[FLASHCARD CREATE] Successfully created flashcard with ID: ${wordSenseId}`);
