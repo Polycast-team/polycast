@@ -1635,11 +1635,10 @@ app.post('/api/disambiguate-word', async (req, res) => {
             });
         }
         
-        console.log(`\n[WORD SENSE DISAMBIGUATION] Processing '${word}' in context: "${contextSentence}"`);
-        console.log(`[WORD SENSE DISAMBIGUATION] Found ${definitions.length} possible definitions in dictionary`);
+        console.log(`\n[WORD DISAMBIGUATION] Processing '${word}' in context: "${contextSentence}"`);
+        console.log(`[WORD DISAMBIGUATION] Found ${definitions.length} possible definitions in dictionary`);
         
-        // STEP 1: Get the word, definition, and translation using the new format
-        // Create a prompt for the LLM to use context to disambiguate and translate
+        // STEP 1: Pick the correct definition based on context and get a translation
         const disambiguationPrompt = `You are helping a language learner understand the meaning of a word in a sentence.
 
 Word: "${word}"
@@ -1665,27 +1664,34 @@ Which definition matches the word as used in the context sentence above? Respond
             });
         }
         
+        // Get the matched definition and translation
         const responseWord = responseParts[0].trim();
         const responseDefinition = responseParts[1].trim();
         const translation = responseParts[2].trim();
         
         console.log(`[STEP 1] Parsed response: Word=${responseWord}, Definition=${responseDefinition}, Translation=${translation}`);
         
-        // Find the matching definition from our dictionary data
-        const bestMatch = definitions.find(def => {
+        // Find the matching definition from our dictionary data using text similarity
+        let bestMatch = definitions.find(def => {
             return calculateSimilarity(responseDefinition, def.definition) > 0.7; // Use similarity threshold
-        }) || { 
-            // If no good match, create a definition object from the response
-            partOfSpeech: 'unknown',
-            definition: responseDefinition
-        };
+        });
+        
+        // If no match was found, use the first definition as fallback
+        if (!bestMatch && definitions.length > 0) {
+            console.log(`[STEP 1] No good match found, using first definition as fallback`);
+            bestMatch = definitions[0];
+        } else if (!bestMatch) {
+            return res.status(500).json({ error: 'Could not find a matching definition' });
+        }
+        
+        console.log(`[STEP 1] Selected definition: (${bestMatch.partOfSpeech}) ${bestMatch.definition}`);
         
         // Create a unique sense ID for this definition
         const definitionHash = bestMatch.definition.substring(0, 8).replace(/\W+/g, '');
-        const wordSenseId = `${word.toLowerCase()}_${bestMatch.partOfSpeech || 'unknown'}_${definitionHash}`;
+        const wordSenseId = `${word.toLowerCase()}_${bestMatch.partOfSpeech}_${definitionHash}`;
         
         // STEP 2: Generate example sentences and frequency ratings
-        const flashcardPrompt = `Return three example sentences using the word '${word}' in the context of '${responseDefinition}' with each sentence separated by '//'.
+        const flashcardPrompt = `Return three example sentences using the word '${word}' in the context of '${bestMatch.definition}' with each sentence separated by '//'.
 
 After the three sentences, provide a frequency rating of 1-5 for how common that word is, followed by a frequency rating for how common that definition is for that word. Use the following criteria:
 
@@ -1736,27 +1742,26 @@ Your response should follow this exact format without any additional text:
         // Check if we already have a flashcard for this sense
         const existingFlashcard = existingFlashcardSenseIds.includes(wordSenseId);
         
-        // Add translation and frequency info to the definition
-        bestMatch.translation = translation;
-        bestMatch.wordFrequency = wordFrequency;
-        bestMatch.usageFrequency = definitionFrequency;
-        
-        // Construct and return the complete response
+        // Construct the final response with the local dictionary definition and enhancements
         return res.json({
             word,
             contextSentence,
-            disambiguatedDefinition: bestMatch,
+            disambiguatedDefinition: {
+                ...bestMatch,              // Use the local dictionary definition
+                translation: translation,  // Add the translation from Gemini
+                wordFrequency: wordFrequency,
+                usageFrequency: definitionFrequency
+            },
             wordSenseId,
             examples,
             translation,
             wordFrequency,
             definitionFrequency,
             existingFlashcard,
-            rawDisambiguationResponse: disambiguationResponse,
-            rawFlashcardResponse: flashcardResponse
+            // Remove raw response data from the response to keep it clean
         });
     } catch (error) {
-        console.error('[WORD SENSE DISAMBIGUATION] Error:', error);
+        console.error('[WORD DISAMBIGUATION] Error:', error);
         return res.status(500).json({ error: 'Error processing word definition' });
     }
 });
