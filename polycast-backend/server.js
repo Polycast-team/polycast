@@ -1621,13 +1621,20 @@ ${definitions.map((def, idx) => `${idx + 1}. (${def.partOfSpeech}) ${def.definit
 
 Which definition matches the word as used in the context sentence above? Respond with the word, followed by the text of the best matching definition, followed by the Spanish translation. These should be separated by '//', for example 'charge//To rush forward to attack.//cargar'`;
         
-        console.log(`[WORD SENSE DISAMBIGUATION] Sending prompt to Gemini for disambiguation`);
+        console.log(`[WORD SENSE DISAMBIGUATION] Sending prompt to Gemini for disambiguation (FIRST CALL)`);
+        console.log(`==================================================`);
+        console.log(`DISAMBIGUATION CALL - PROMPT:`);
+        console.log(prompt);
+        console.log(`==================================================`);
         
         // Call Gemini API with a custom function since llmService doesn't have generateText
         // We'll create our own direct call to the model
         const response = await generateTextWithGemini(prompt, 0.1);
         
-        console.log(`[WORD SENSE DISAMBIGUATION] Raw Gemini response: ${response}`);
+        console.log(`==================================================`);
+        console.log(`DISAMBIGUATION CALL - RESPONSE:`);
+        console.log(response);
+        console.log(`==================================================`);
         
         // Parse the response in the format: word//definition//translation
         const parts = response.trim().split('//');
@@ -1690,9 +1697,19 @@ Your response should follow this exact format without any additional text:
             let definitionFrequency = 3;
             
             try {
+                console.log(`[WORD SENSE DISAMBIGUATION] Sending prompt to Gemini for examples (SECOND CALL)`);
+                console.log(`==================================================`);
+                console.log(`2ND CALL - PROMPT:`);
+                console.log(examplesPrompt);
+                console.log(`==================================================`);
+                
                 // Call Gemini API for example sentences and frequency ratings
                 const examplesResponse = await generateTextWithGemini(examplesPrompt, 0.2);
-                console.log(`[WORD SENSE DISAMBIGUATION] Examples response: ${examplesResponse}`);
+                
+                console.log(`==================================================`);
+                console.log(`2ND CALL - RESPONSE:`);
+                console.log(examplesResponse);
+                console.log(`==================================================`);
                 
                 // Parse the response (example1//example2//example3//wordFreq//defFreq)
                 const exampleParts = examplesResponse.trim().split('//');
