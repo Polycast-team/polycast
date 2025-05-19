@@ -265,89 +265,81 @@ const TranscriptionDisplay = ({
     });
     
     try {
-      // STEP 1: Fetch ONLY dictionary definition from JSON files (no more Gemini definition lookup)
+      // Step 1: Fetch Gemini definition with context
+      const apiUrl = `https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}?context=${encodeURIComponent(contextSentence)}`;
+      console.log(`Fetching definition for "${word}" with context, from: ${apiUrl}`);
+      
+      const geminiFetch = fetch(apiUrl)
+        .then(res => res.json())
+        .then(data => {
+          console.log(`Received definition for "${word}":`, data);
+          return data;
+        })
+        .catch(err => {
+          console.error(`Error fetching definition for ${word}:`, err);
+          return null;
+        });
+      
+      // Step 2: Fetch dictionary definition from JSON files
       const firstLetter = word.charAt(0).toLowerCase();
       const dictUrl = `https://polycast-server.onrender.com/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?context=${encodeURIComponent(contextSentence)}`;
       
       console.log(`Fetching dictionary definition for "${word}" from: ${dictUrl}`);
       
-      // Fetch the dictionary definition
-      const dictData = await fetch(dictUrl)
+      const dictFetch = fetch(dictUrl)
         .then(res => res.json())
-        .then(data => {
-          console.log(`Received dictionary definition for "${word}":`, data);
-          return data;
+        .then(dictData => {
+          console.log(`Received dictionary definition for "${word}":`, dictData);
+          return dictData;
         })
         .catch(err => {
           console.error(`Error fetching dictionary definition for ${word}:`, err);
           return null;
         });
       
-      // Check if we have dictionary definitions
-      if (!dictData || !dictData.allDefinitions || dictData.allDefinitions.length === 0) {
-        console.error(`No dictionary definitions found for ${word}`);
-        setPopupInfo(prev => ({
-          ...prev,
-          loading: false,
-          error: `No dictionary definition found for "${word}"`
-        }));
-        return;
+      // Wait for both fetches to complete
+      const [geminiData, dictData] = await Promise.all([geminiFetch, dictFetch]);
+      
+      // Step 3: If we have multiple definitions, disambiguate using Gemini
+      let disambiguatedDefinition = null;
+      
+      if (dictData && dictData.allDefinitions && dictData.allDefinitions.length > 1) {
+        // Use the disambiguation API to find the correct sense
+        try {
+          console.log(`Disambiguating definition for "${word}" in context: "${contextSentence}"`);
+          
+          const disambiguationResponse = await fetch('https://polycast-server.onrender.com/api/disambiguate-word', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              word: word,
+              contextSentence: contextSentence,
+              definitions: dictData.allDefinitions
+            })
+          }).then(res => res.json());
+          
+          console.log(`Disambiguation result:`, disambiguationResponse);
+          disambiguatedDefinition = disambiguationResponse.disambiguatedDefinition;
+        } catch (error) {
+          console.error(`Error disambiguating definition for ${word}:`, error);
+          // Fall back to first definition if disambiguation fails
+          disambiguatedDefinition = dictData.allDefinitions[0];
+        }
+      } else if (dictData && dictData.allDefinitions && dictData.allDefinitions.length === 1) {
+        // Only one definition, no need to disambiguate
+        disambiguatedDefinition = dictData.allDefinitions[0];
       }
       
-      // STEP 2: Process the definitions using the new approach
-      let processedDefinition = null;
-      let examples = [];
-      let translation = '';
-      let wordFrequency = 3;
-      let definitionFrequency = 3;
-      
-      // Whether we have one or multiple definitions, we'll use the disambiguation API
-      // to select the right one and get translation + examples + frequency
-      try {
-        console.log(`Processing definition for "${word}" in context: "${contextSentence}"`);
-        
-        const disambiguationResponse = await fetch('https://polycast-server.onrender.com/api/disambiguate-word', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            word: word,
-            contextSentence: contextSentence,
-            definitions: dictData.allDefinitions
-          })
-        }).then(res => res.json());
-        
-        console.log(`Disambiguation and enrichment result:`, disambiguationResponse);
-        
-        // Extract the enhanced data
-        processedDefinition = disambiguationResponse.disambiguatedDefinition;
-        examples = disambiguationResponse.examples || [];
-        translation = disambiguationResponse.translation || '';
-        wordFrequency = disambiguationResponse.wordFrequency || 3;
-        definitionFrequency = disambiguationResponse.definitionFrequency || 3;
-        
-        console.log(`Selected definition: ${processedDefinition?.definition}`);
-        console.log(`Spanish translation: ${translation}`);
-        console.log(`Word frequency: ${wordFrequency}, Definition frequency: ${definitionFrequency}`);
-        console.log(`Generated ${examples.length} example sentences`);
-      } catch (error) {
-        console.error(`Error processing definition for ${word}:`, error);
-        // Fall back to first dictionary definition if processing fails
-        processedDefinition = dictData.allDefinitions[0];
-      }
-      
-      // Update the wordDefinitions state with the dictionary definition and enhancements
+      // Update the wordDefinitions state with all the data
       setWordDefinitions(prev => ({
         ...prev,
         [wordLower]: {
+          ...geminiData, // Gemini API definition
           dictionaryDefinition: dictData, // Full dictionary data
-          disambiguatedDefinition: processedDefinition, // The selected dictionary definition with enhancements
-          contextSentence: contextSentence, // Save the context for flashcards
-          examples: examples,
-          translation: translation,
-          wordFrequency: wordFrequency,
-          definitionFrequency: definitionFrequency
+          disambiguatedDefinition: disambiguatedDefinition, // The most relevant definition
+          contextSentence: contextSentence // Save the context for flashcards
         }
       }));
       

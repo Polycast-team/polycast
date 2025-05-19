@@ -41,52 +41,15 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                          (definition?.meanings && definition.meanings[0] && definition.meanings[0].definition) ||
                          '';
   
-  // Get examples from either the new format or fall back to old format
-  const examples = disambiguatedDefinition?.examples || definition?.examples || [];
+  const examples = definition?.examples || [];
   
   // Look for translations in multiple possible locations in the API response
+  // First check the new format from disambiguation
   const translation = disambiguatedDefinition?.translation || 
                      definition?.translation || 
                      (definition?.translations && definition.translations.es) || 
                      (definition?.translations && definition.translations.Spanish) || 
                      '';
-  
-  // Get frequency ratings from the disambiguated definition
-  const wordFrequency = disambiguatedDefinition?.wordFrequency || 3;
-  const usageFrequency = disambiguatedDefinition?.usageFrequency || 3;
-  
-  // Helper function to get color based on frequency
-  const getFrequencyColor = (freq) => {
-    const colors = {
-      1: '#ff4d4d', // Red (rare)
-      2: '#ff944d', // Orange
-      3: '#ffdd4d', // Yellow
-      4: '#75d147', // Light green
-      5: '#4ade80', // Green (common)
-    };
-    return colors[freq] || colors[3];
-  };
-  
-  // Get text labels for frequency
-  const getFrequencyLabel = (freq, isWordFreq) => {
-    if (isWordFreq) {
-      return [
-        'Highly rare or technical',
-        'Somewhat uncommon',
-        'Neutral vocabulary',
-        'Common word',
-        'Core/basic vocabulary'
-      ][freq - 1] || 'Neutral vocabulary';
-    } else {
-      return [
-        'Obscure/outdated definition',
-        'Infrequently used definition',
-        'Less typical but recognized',
-        'Common meaning',
-        'Primary/dominant meaning'
-      ][freq - 1] || 'Less typical but recognized';
-    }
-  };
   
   // Format dictionary definition - prefer disambiguated definition if available
   let dictPartOfSpeech = '';
@@ -214,51 +177,6 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                 <div className="dict-translation">{translation}</div>
               )}
               
-              {/* Frequency Indicators */}
-              <div className="dict-section">
-                <div className="dict-section-title">Frequency</div>
-                <div className="dict-frequency-indicators">
-                  <div className="dict-frequency-item">
-                    <div className="dict-frequency-label">Word:</div>
-                    <div className="dict-frequency-dots">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div 
-                          key={`word-${i}`}
-                          className={`dict-frequency-dot ${i < wordFrequency ? 'active' : 'inactive'}`}
-                          style={{ 
-                            backgroundColor: i < wordFrequency ? getFrequencyColor(wordFrequency) : '#39394d',
-                            opacity: i < wordFrequency ? 1 : 0.4
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <div className="dict-frequency-text" style={{ color: getFrequencyColor(wordFrequency) }}>
-                      {getFrequencyLabel(wordFrequency, true)}
-                    </div>
-                  </div>
-                  
-                  <div className="dict-frequency-item">
-                    <div className="dict-frequency-label">This meaning:</div>
-                    <div className="dict-frequency-dots">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div 
-                          key={`usage-${i}`}
-                          className={`dict-frequency-dot ${i < usageFrequency ? 'active' : 'inactive'}`}
-                          style={{ 
-                            backgroundColor: i < usageFrequency ? getFrequencyColor(usageFrequency) : '#39394d',
-                            opacity: i < usageFrequency ? 1 : 0.4
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <div className="dict-frequency-text" style={{ color: getFrequencyColor(usageFrequency) }}>
-                      {getFrequencyLabel(usageFrequency, false)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Definition */}
               {dictFullDefinition && (
                 <div className="dict-section">
                   <div className="dict-section-title">
@@ -268,25 +186,13 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                 </div>
               )}
               
-              {/* Example Sentences */}
-              {examples.length > 0 && (
-                <div className="dict-section">
-                  <div className="dict-section-title">Examples</div>
-                  <div className="dict-examples-list">
-                    {examples.map((example, idx) => (
-                      <div key={idx} className="dict-example">
-                        <span className="dict-example-number">{idx + 1}.</span> {example}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Translation Section */}
               {fullDefinition && (
                 <div className="dict-section">
                   <div className="dict-section-title">Translation</div>
                   <div className="dict-full-definition">{fullDefinition}</div>
+                  {examples.length > 0 && (
+                    <div className="dict-example">{examples[0]}</div>
+                  )}
                 </div>
               )}
             </div>
