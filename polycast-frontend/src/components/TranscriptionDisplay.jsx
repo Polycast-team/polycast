@@ -323,6 +323,25 @@ const TranscriptionDisplay = ({
           
           console.log(`Disambiguation result:`, disambiguationResponse);
           disambiguatedDefinition = disambiguationResponse.disambiguatedDefinition;
+          
+          // Extract the examples and frequency ratings from the two-step process
+          if (disambiguationResponse.examples && Array.isArray(disambiguationResponse.examples)) {
+            examples = disambiguationResponse.examples;
+          }
+          if (typeof disambiguationResponse.wordFrequency === 'number') {
+            wordFrequency = disambiguationResponse.wordFrequency;
+          }
+          if (typeof disambiguationResponse.definitionFrequency === 'number') {
+            definitionFrequency = disambiguationResponse.definitionFrequency;
+          }
+          
+          // Log the status of our new fields
+          console.log('FLASHCARD DEBUG - Received from disambiguation:', {
+            'Disambiguation Successful': !!disambiguatedDefinition,
+            'Has Examples': examples.length > 0 ? `Yes, ${examples.length} examples` : 'No',
+            'Word Frequency': wordFrequency,
+            'Definition Frequency': definitionFrequency
+          });
         } catch (error) {
           console.error(`Error disambiguating definition for ${word}:`, error);
           // Fall back to first definition if disambiguation fails
@@ -333,6 +352,11 @@ const TranscriptionDisplay = ({
         disambiguatedDefinition = dictData.allDefinitions[0];
       }
       
+      // Default values for the two-step process fields
+      let examples = [];
+      let wordFrequency = 3;
+      let definitionFrequency = 3;
+      
       // Update the wordDefinitions state with all the data
       setWordDefinitions(prev => ({
         ...prev,
@@ -340,7 +364,11 @@ const TranscriptionDisplay = ({
           ...geminiData, // Gemini API definition
           dictionaryDefinition: dictData, // Full dictionary data
           disambiguatedDefinition: disambiguatedDefinition, // The most relevant definition
-          contextSentence: contextSentence // Save the context for flashcards
+          contextSentence: contextSentence, // Save the context for flashcards
+          // Store the new fields from our two-step process
+          examples: examples,
+          wordFrequency: wordFrequency,
+          definitionFrequency: definitionFrequency
         }
       }));
       

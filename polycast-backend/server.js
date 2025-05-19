@@ -1628,8 +1628,8 @@ Which definition matches the word as used in the context sentence above? Respond
         console.log(`==================================================`);
         
         // Call Gemini API with a custom function since llmService doesn't have generateText
-        // We'll create our own direct call to the model
-        const response = await generateTextWithGemini(prompt, 0.1);
+        // Pass a specific debug tag for tracking in logs
+        const response = await generateTextWithGemini(prompt, 0.1, 'DISAMBIGUATE');
         
         console.log(`==================================================`);
         console.log(`DISAMBIGUATION CALL - RESPONSE:`);
@@ -1704,7 +1704,8 @@ Your response should follow this exact format without any additional text:
                 console.log(`==================================================`);
                 
                 // Call Gemini API for example sentences and frequency ratings
-                const examplesResponse = await generateTextWithGemini(examplesPrompt, 0.2);
+                // Pass a specific debug tag for tracking in logs
+                const examplesResponse = await generateTextWithGemini(examplesPrompt, 0.2, 'EXAMPLES');
                 
                 console.log(`==================================================`);
                 console.log(`2ND CALL - RESPONSE:`);
@@ -1925,25 +1926,28 @@ function calculateSimilarity(text1, text2) {
  * @param {number} temperature The temperature setting (0-1)
  * @returns {Promise<string>} The generated text response
  */
-async function generateTextWithGemini(prompt, temperature = 0.7) {
+async function generateTextWithGemini(prompt, temperature = 0.7, debugTag = '') {
     try {
         // Make sure we have the Google API key available
         if (!process.env.GOOGLE_API_KEY) {
             throw new Error('Google API Key (GOOGLE_API_KEY) is not configured');
         }
         
-        // We'll initialize directly rather than going through llmService
-        // to avoid unnecessary test translations
+        // More explicit debugging for Render.com to clearly see what's happening
+        const tag = debugTag ? `[GEMINI-${debugTag}]` : '[GEMINI]';
         
-        console.log(`[GEMINI] Generating text with prompt: ${prompt.substring(0, 50)}...`);
+        console.log('====================================================================');
+        console.log(`${tag} GENERATING TEXT [temperature=${temperature}]`);
+        console.log(`${tag} PROMPT SUMMARY: ${prompt.substring(0, 100)}...`);
+        console.log('====================================================================');
         
         // Use the raw Google API directly instead of going through llmService
-        // We're using require at this point to avoid needing to move this to llmService.js
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
         const model = genAI.getGenerativeModel({ model: "models/gemini-2.0-flash" });
         
         // Generate content with the provided temperature
+        console.log(`${tag} SENDING REQUEST TO GEMINI API...`);
         const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             generationConfig: { temperature: temperature }
@@ -1952,10 +1956,17 @@ async function generateTextWithGemini(prompt, temperature = 0.7) {
         const response = result.response;
         const text = response.text();
         
-        console.log(`[GEMINI] Generated ${text.length} chars of text`);
+        console.log('====================================================================');
+        console.log(`${tag} RECEIVED RESPONSE [${text.length} chars]`);
+        console.log(`${tag} RESPONSE SUMMARY: ${text.substring(0, 100)}...`);
+        console.log('====================================================================');
+        
         return text;
     } catch (error) {
-        console.error('[GEMINI] Error generating text:', error);
+        console.error('====================================================================');
+        console.error(`[GEMINI-ERROR] ERROR GENERATING TEXT:`);
+        console.error(error);
+        console.error('====================================================================');
         throw error;
     }
 }
