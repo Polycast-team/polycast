@@ -321,15 +321,71 @@ const TranscriptionDisplay = ({
           }).then(res => res.json());
           
           console.log(`Disambiguation result:`, disambiguationResponse);
+          
+          // Process the new response format which includes:
+          // - disambiguatedDefinition: The selected definition
+          // - translation: Spanish translation
+          // - examples: Three example sentences
+          // - wordFrequency: Overall frequency rating (1-5)
+          // - definitionFrequency: Specific definition frequency rating (1-5)
+          
           disambiguatedDefinition = disambiguationResponse.disambiguatedDefinition;
+          
+          // Enhance the definition with the additional data from our two-step process
+          if (disambiguatedDefinition) {
+            // Add translation if it's not already there
+            if (disambiguationResponse.translation && !disambiguatedDefinition.translation) {
+              disambiguatedDefinition.translation = disambiguationResponse.translation;
+            }
+            
+            // Add frequency ratings
+            disambiguatedDefinition.wordFrequency = disambiguationResponse.wordFrequency || 3;
+            disambiguatedDefinition.usageFrequency = disambiguationResponse.definitionFrequency || 3;
+            
+            // Add example sentences (keep a maximum of 3)
+            disambiguatedDefinition.examples = disambiguationResponse.examples || [];
+            
+            console.log(`Enhanced definition with: Translation=${disambiguatedDefinition.translation}, Word Frequency=${disambiguatedDefinition.wordFrequency}, Usage Frequency=${disambiguatedDefinition.usageFrequency}`);
+            console.log(`Added ${disambiguatedDefinition.examples.length} example sentences`);
+          }
         } catch (error) {
           console.error(`Error disambiguating definition for ${word}:`, error);
           // Fall back to first definition if disambiguation fails
           disambiguatedDefinition = dictData.allDefinitions[0];
         }
       } else if (dictData && dictData.allDefinitions && dictData.allDefinitions.length === 1) {
-        // Only one definition, no need to disambiguate
-        disambiguatedDefinition = dictData.allDefinitions[0];
+        // Only one definition, no need to disambiguate - but we still want to get translations and examples
+        // So we'll call the disambiguation endpoint anyway
+        try {
+          console.log(`Single definition for "${word}", using disambiguation for enrichment`);
+          
+          const disambiguationResponse = await fetch('https://polycast-server.onrender.com/api/disambiguate-word', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              word: word,
+              contextSentence: contextSentence,
+              definitions: dictData.allDefinitions
+            })
+          }).then(res => res.json());
+          
+          disambiguatedDefinition = disambiguationResponse.disambiguatedDefinition || dictData.allDefinitions[0];
+          
+          // Enhance with the same data as above
+          if (disambiguatedDefinition) {
+            if (disambiguationResponse.translation) {
+              disambiguatedDefinition.translation = disambiguationResponse.translation;
+            }
+            disambiguatedDefinition.wordFrequency = disambiguationResponse.wordFrequency || 3;
+            disambiguatedDefinition.usageFrequency = disambiguationResponse.definitionFrequency || 3;
+            disambiguatedDefinition.examples = disambiguationResponse.examples || [];
+          }
+        } catch (error) {
+          console.error(`Error enriching single definition for ${word}:`, error);
+          disambiguatedDefinition = dictData.allDefinitions[0];
+        }
       }
       
       // Update the wordDefinitions state with all the data
@@ -338,8 +394,10 @@ const TranscriptionDisplay = ({
         [wordLower]: {
           ...geminiData, // Gemini API definition
           dictionaryDefinition: dictData, // Full dictionary data
-          disambiguatedDefinition: disambiguatedDefinition, // The most relevant definition
-          contextSentence: contextSentence // Save the context for flashcards
+          disambiguatedDefinition: disambiguatedDefinition, // The most relevant definition with enhanced data
+          contextSentence: contextSentence, // Save the context for flashcards
+          examples: disambiguatedDefinition?.examples || [],
+          translation: disambiguatedDefinition?.translation || ''
         }
       }));
       
