@@ -156,35 +156,17 @@ const TranscriptionDisplay = ({
     
     // Auto-fill the text input with specific text when in text mode
     if (isTextMode) {
+      // Keep empty text input - no automatic test phrases
       setTextInputs(prev => ({
         ...prev,
-        'English': "Testing this now. I will charge my phone\n\ni will charge into battle\n\ni will charge him with murder"
+        'English': ""
       }));
     }
   }, [isTextMode, setTextInputs]);
   
-  // Add default transcript content regardless of mode
-  useEffect(() => {
-    // Create demo transcript text
-    const demoText1 = "Testing this now. I will charge my phone";
-    const demoText2 = "i will charge into battle";
-    const demoText3 = "i will charge him with murder";
-    
-    // Override the segments directly in the component
-    if (englishSegments.length === 0 || (englishSegments.length === 1 && englishSegments[0].text === "Waiting...")) {
-      const segments = [
-        { text: demoText1, isNew: false },
-        { text: demoText2, isNew: false },
-        { text: demoText3, isNew: false }
-      ];
-      
-      // Use the englishSegments.splice hack to modify the array in place without a setter
-      if (englishSegments.splice) {
-        englishSegments.splice(0, englishSegments.length, ...segments);
-      }
-    }
-  }, [englishSegments]);
-  const containerRef = useRef(null);
+  // Removed automatic demo content insertion
+  // This space intentionally left empty to ensure the transcript starts empty
+  // Test phrases are now controlled entirely by the Test Phrase checkbox
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
   const [langBoxStates, setLangBoxStates] = useState([]);
   const lastPersistedTranslations = useRef({});
