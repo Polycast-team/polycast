@@ -70,6 +70,7 @@
 }
 
 .student-join-row input[type="text"] {
+    color: black;
   flex: 1 1 120px;
   font-size: 1.1rem;
   padding: 0.6rem 1rem;
