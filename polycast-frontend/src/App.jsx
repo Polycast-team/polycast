@@ -97,6 +97,18 @@ function App({ targetLanguages, onReset, roomSetup }) {
       });
     }
   }, [testPhraseEnabled]);
+  
+  // Send translation toggle state to students when host changes it
+  useEffect(() => {
+    // Only send if we're the host and WebSocket is connected
+    if (roomSetup && roomSetup.isHost && readyState === ReadyState.OPEN) {
+      console.log('Host changed translation visibility to:', showTranslation);
+      sendMessage(JSON.stringify({
+        type: 'translation_visibility',
+        visible: showTranslation
+      }));
+    }
+  }, [showTranslation, roomSetup, readyState, sendMessage]);
   // The test phrase content
   const TEST_PHRASE_SEGMENTS = [
     { text: "Testing this now. I will charge my phone", isNew: false },
@@ -120,7 +132,8 @@ function App({ targetLanguages, onReset, roomSetup }) {
   }, []);
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
-  const [showTranslation, setShowTranslation] = useState(true); 
+  const [showTranslation, setShowTranslation] = useState(true);
+  const [translationLockedByHost, setTranslationLockedByHost] = useState(false); 
   const [appMode, setAppMode] = useState('audio'); // Options: 'audio', 'text', 'dictionary', 'flashcard'
   const [selectedWords, setSelectedWords] = useState([]); // Selected words for dictionary
   const [wordDefinitions, setWordDefinitions] = useState({}); // Cache for word definitions
@@ -409,6 +422,21 @@ function App({ targetLanguages, onReset, roomSetup }) {
           // Optionally, alert the user and redirect to the home page after a timeout
           alert(`Room error: ${parsedData.message}`);
           setTimeout(() => onReset(), 1000); // Go back to home screen after 1 second
+        } else if (parsedData.type === 'translation_visibility') {
+          // Handle translation visibility toggle from host
+          console.log('Received translation visibility update from host:', parsedData.visible);
+          
+          // If we're a student, update our state based on host's settings
+          if (roomSetup && !roomSetup.isHost) {
+            if (!parsedData.visible) {
+              // If host turned off translations, force off and lock
+              setShowTranslation(false);
+              setTranslationLockedByHost(true);
+            } else {
+              // If host turned on translations, unlock but let student choose visibility
+              setTranslationLockedByHost(false);
+            }
+          }
         } else if (parsedData.type === 'info') {
           console.log('Backend Info:', parsedData.message);
           // Optionally display info messages somewhere
@@ -630,29 +658,21 @@ function App({ targetLanguages, onReset, roomSetup }) {
               isRecording={isRecording}
               onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
               onStopRecording={roomSetup && roomSetup.isHost ? handleStopRecording : null}
-              isTextMode={appMode === 'text'}
-              setIsTextMode={roomSetup && roomSetup.isHost ? setIsTextMode : null}
+              setIsTextMode={setIsTextMode}
               appMode={appMode}
               setAppMode={handleAppModeChange}
               autoSend={autoSend}
-              setAutoSend={roomSetup && roomSetup.isHost ? setAutoSend : null}
+              setAutoSend={setAutoSend}
               showNoiseLevel={showNoiseLevel}
-              setShowNoiseLevel={roomSetup && roomSetup.isHost ? setShowNoiseLevel : null}
+              setShowNoiseLevel={setShowNoiseLevel}
               showLiveTranscript={showLiveTranscript}
-              setShowLiveTranscript={(checked) => {
-                setShowLiveTranscript(checked);
-                if (!checked && !showTranslation) setShowTranslation(true);
-              }}
+              setShowLiveTranscript={setShowLiveTranscript}
               showTranslation={showTranslation}
-              setShowTranslation={(checked) => {
-                setShowTranslation(checked);
-                if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
-              }}
+              setShowTranslation={setShowTranslation}
+              translationLockedByHost={translationLockedByHost}
+              isStudentMode={roomSetup && !roomSetup.isHost}
               selectedProfile={selectedProfile}
-              setSelectedProfile={profile => {
-                setSelectedProfile(profile);
-                console.log('Profile switched to:', profile);
-              }}
+              setSelectedProfile={setSelectedProfile}
               testPhraseEnabled={testPhraseEnabled}
               setTestPhraseEnabled={setTestPhraseEnabled}
             />

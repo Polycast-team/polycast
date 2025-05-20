@@ -22,6 +22,8 @@ function Controls({
     setShowLiveTranscript,
     showTranslation,
     setShowTranslation,
+    translationLockedByHost = false,
+    isStudentMode = false,
     selectedProfile,
     setSelectedProfile,
     testPhraseEnabled,
@@ -86,9 +88,14 @@ function Controls({
                         onChange={e => {
                           setShowTranslation && setShowTranslation(e.target.checked);
                         }}
-                        disabled={isRecording}
+                        disabled={isRecording || translationLockedByHost}
                       />
                       Show Translation
+                      {translationLockedByHost && (
+                        <span style={{ fontSize: 13, color: '#ff6b6b', marginLeft: 6, fontStyle: 'italic' }}>
+                          (disabled by teacher)
+                        </span>
+                      )}
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
                       <input
