@@ -81,33 +81,17 @@ function Controls({
                       />
                       Show Transcript
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc', position: 'relative' }}>
-  <input
-    type="checkbox"
-    checked={showTranslation}
-    onChange={e => {
-      setShowTranslation && setShowTranslation(e.target.checked);
-    }}
-    disabled={isRecording || (isStudentMode && translationLockedByHost)}
-  />
-  Show Translation
-  {isStudentMode && translationLockedByHost && (
-    <span style={{
-      color: '#ffb84d',
-      fontSize: 13,
-      marginLeft: 8,
-      fontWeight: 600,
-      background: 'rgba(255,184,77,0.07)',
-      borderRadius: 4,
-      padding: '2px 8px',
-      position: 'absolute',
-      top: '100%',
-      left: 0
-    }}>
-      (Disabled by teacher)
-    </span>
-  )}
-</label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
+                      <input
+                        type="checkbox"
+                        checked={showTranslation}
+                        onChange={e => {
+                          setShowTranslation && setShowTranslation(e.target.checked);
+                        }}
+                        disabled={isRecording}
+                      />
+                      Show Translation
+                    </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
                       <input
                         type="checkbox"
@@ -217,8 +201,6 @@ Controls.propTypes = {
     setShowLiveTranscript: PropTypes.func,
     showTranslation: PropTypes.bool.isRequired,
     setShowTranslation: PropTypes.func,
-    translationLockedByHost: PropTypes.bool,
-    isStudentMode: PropTypes.bool,
     selectedProfile: PropTypes.string.isRequired,
     setSelectedProfile: PropTypes.func.isRequired,
 };
