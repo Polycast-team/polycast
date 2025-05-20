@@ -142,6 +142,7 @@ const TranscriptionDisplay = ({
   wordDefinitions,
   setWordDefinitions,
   isStudentMode = false,
+  translationLockedByHost = false,
   // Add setter for transcript segments if available
   setEnglishSegments = null,
   // Add profile management props
@@ -817,7 +818,7 @@ const TranscriptionDisplay = ({
       setSelectedWords(prev => {
         // We now allow multiple entries of the same word with different senses
         console.log(`Adding "${word}" to selected words list in context: "${contextSentence.substring(0, 30)}..."`);
-        console.log('🔵🔵🔵 SELECTED WORDS BEFORE ADDING', word, '🔵🔵🔵');
+        console.log('🔴🔴🔴 SELECTED WORDS BEFORE ADDING', word, '🔴🔴🔴');
         console.log('📋 SELECTED WORDS BEFORE:', JSON.stringify(prev));
         
         // Still add to the list for backward compatibility
@@ -1318,20 +1319,41 @@ const TranscriptionDisplay = ({
       )}
       {/* Language boxes fill the remaining space */}
       {translationVisible && (
-        <div
-          style={{
-            width: '100%',
-            display: 'flex',
-            justifyContent: langCount === 1 ? 'center' : 'flex-start',
-            flex: '1 1 66.5%',
-            alignItems: 'stretch',
-            minHeight: 0,
-            gap: 24,
-            boxSizing: 'border-box',
-            marginTop: 24,
-          }}
-        >
-          {targetLanguages.map((lang, idx) => {
+  isStudentMode && translationLockedByHost ? (
+    <div style={{
+      width: '100%',
+      marginTop: 32,
+      background: '#fffbe6',
+      color: '#b38a00',
+      border: '1.5px solid #ffe58f',
+      borderRadius: 10,
+      padding: '30px 0',
+      textAlign: 'center',
+      fontWeight: 600,
+      fontSize: 18,
+      letterSpacing: 0.2,
+      boxShadow: '0 2px 8px #ffecb366',
+      opacity: 0.98,
+      minHeight: 80,
+    }}>
+      <span style={{ fontSize: 28, marginRight: 12 }}>🚫</span>
+      Translations are disabled by the teacher.
+    </div>
+  ) : (
+    <div
+      style={{
+        width: '100%',
+        display: 'flex',
+        justifyContent: langCount === 1 ? 'center' : 'flex-start',
+        flex: '1 1 66.5%',
+        alignItems: 'stretch',
+        minHeight: 0,
+        gap: 24,
+        boxSizing: 'border-box',
+        marginTop: 24,
+      }}
+    >
+      {targetLanguages.map((lang, idx) => {
             const scheme = colorSchemes[(idx + 1) % colorSchemes.length];
             const layout = langBoxLayout[idx] || { x: 0, y: 0, w: 320, h: 250 };
             
@@ -1417,9 +1439,10 @@ const TranscriptionDisplay = ({
             );
           })}
         </div>
-      )}
-    </div>
-  );
+      )
+    )}
+  </div>
+);
 };
 
 TranscriptionDisplay.propTypes = {

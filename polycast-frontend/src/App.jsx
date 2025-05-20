@@ -97,18 +97,6 @@ function App({ targetLanguages, onReset, roomSetup }) {
       });
     }
   }, [testPhraseEnabled]);
-  
-  // Send translation toggle state to students when host changes it
-  useEffect(() => {
-    // Only send if we're the host and WebSocket is connected
-    if (roomSetup && roomSetup.isHost && readyState === ReadyState.OPEN) {
-      console.log('Host changed translation visibility to:', showTranslation);
-      sendMessage(JSON.stringify({
-        type: 'translation_visibility',
-        visible: showTranslation
-      }));
-    }
-  }, [showTranslation, roomSetup, readyState, sendMessage]);
   // The test phrase content
   const TEST_PHRASE_SEGMENTS = [
     { text: "Testing this now. I will charge my phone", isNew: false },
@@ -133,7 +121,8 @@ function App({ targetLanguages, onReset, roomSetup }) {
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
   const [showTranslation, setShowTranslation] = useState(true);
-  const [translationLockedByHost, setTranslationLockedByHost] = useState(false); 
+const [translationLockedByHost, setTranslationLockedByHost] = useState(false); // New state for teacher lock
+
   const [appMode, setAppMode] = useState('audio'); // Options: 'audio', 'text', 'dictionary', 'flashcard'
   const [selectedWords, setSelectedWords] = useState([]); // Selected words for dictionary
   const [wordDefinitions, setWordDefinitions] = useState({}); // Cache for word definitions
@@ -422,21 +411,6 @@ function App({ targetLanguages, onReset, roomSetup }) {
           // Optionally, alert the user and redirect to the home page after a timeout
           alert(`Room error: ${parsedData.message}`);
           setTimeout(() => onReset(), 1000); // Go back to home screen after 1 second
-        } else if (parsedData.type === 'translation_visibility') {
-          // Handle translation visibility toggle from host
-          console.log('Received translation visibility update from host:', parsedData.visible);
-          
-          // If we're a student, update our state based on host's settings
-          if (roomSetup && !roomSetup.isHost) {
-            if (!parsedData.visible) {
-              // If host turned off translations, force off and lock
-              setShowTranslation(false);
-              setTranslationLockedByHost(true);
-            } else {
-              // If host turned on translations, unlock but let student choose visibility
-              setTranslationLockedByHost(false);
-            }
-          }
         } else if (parsedData.type === 'info') {
           console.log('Backend Info:', parsedData.message);
           // Optionally display info messages somewhere
@@ -658,69 +632,44 @@ function App({ targetLanguages, onReset, roomSetup }) {
               isRecording={isRecording}
               onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
               onStopRecording={roomSetup && roomSetup.isHost ? handleStopRecording : null}
-              setIsTextMode={setIsTextMode}
+              isTextMode={appMode === 'text'}
+              setIsTextMode={roomSetup && roomSetup.isHost ? setIsTextMode : null}
               appMode={appMode}
               setAppMode={handleAppModeChange}
               autoSend={autoSend}
-              setAutoSend={setAutoSend}
+              setAutoSend={roomSetup && roomSetup.isHost ? setAutoSend : null}
               showNoiseLevel={showNoiseLevel}
-              setShowNoiseLevel={setShowNoiseLevel}
+              setShowNoiseLevel={roomSetup && roomSetup.isHost ? setShowNoiseLevel : null}
               showLiveTranscript={showLiveTranscript}
-              setShowLiveTranscript={setShowLiveTranscript}
+              setShowLiveTranscript={(checked) => {
+                setShowLiveTranscript(checked);
+                if (!checked && !showTranslation) setShowTranslation(true);
+              }}
               showTranslation={showTranslation}
-              setShowTranslation={setShowTranslation}
+              setShowTranslation={(checked) => {
+                if (roomSetup && roomSetup.isHost) {
+                  setShowTranslation(checked);
+                  setTranslationLockedByHost(!checked);
+                } else {
+                  if (!translationLockedByHost) {
+                    setShowTranslation(checked);
+                  }
+                }
+              }}
               translationLockedByHost={translationLockedByHost}
               isStudentMode={roomSetup && !roomSetup.isHost}
               selectedProfile={selectedProfile}
-              setSelectedProfile={setSelectedProfile}
+              setSelectedProfile={profile => {
+                setSelectedProfile(profile);
+                console.log('Profile switched to:', profile);
+              }}
               testPhraseEnabled={testPhraseEnabled}
               setTestPhraseEnabled={setTestPhraseEnabled}
             />
           </div>
-          {appMode === 'audio' && roomSetup && !roomSetup.isHost && (
-            <div style={{
-              marginTop: -45,
-              marginBottom: 0,
-              width: '100%',
-              textAlign: 'center',
-              color: '#10b981',  /* Green for student mode */
-              fontWeight: 600,
-              fontSize: '1.05rem',
-              letterSpacing: 0.1,
-              textShadow: '0 1px 2px #2228',
-              opacity: 0.96,
-              userSelect: 'none',
-            }}>
-              Viewing host's transcription in real-time • <span style={{ color: '#ffb84d' }}>Click words to add to dictionary</span>
-            </div>
-          )}
         </div>
       </div>
-      {/* Remove the floating Recording indicator entirely */}
-      {modeError && (
-        <div style={{ color: 'red', fontWeight: 500, marginBottom: 8 }}>
-          {modeError}
-        </div>
-      )}
-      {errorMessages.length > 0 && (
-        <div className="app-container">
-          <div className="top-bar">
-            <div className="app-title">
-              <h1>PolyCast</h1>
-              {roomSetup && (
-                <div className="room-info">
-                  <span className="room-label">{roomSetup.isHost ? 'Host' : 'Student'}</span>
-                  <span className="room-code">Room: {roomSetup.roomCode}</span>
-                </div>
-              )}
-            </div>
-            <button onClick={onReset} className="reset-button">
-              Exit Room
-            </button>
-          </div>
-        </div>
-      )}
-      {/* Notification Pop-up */} 
+      {/* Notification Pop-up */}
       {showNotification && (
         <div 
           className="notification-popup" 
@@ -742,27 +691,21 @@ function App({ targetLanguages, onReset, roomSetup }) {
                   console.warn(`Could not find entry for sense ID: ${wordSenseId}`);
                   return;
                 }
-                
                 const wordLower = wordEntry.word.toLowerCase();
-                
                 // Only remove the specific wordSenseId that was clicked
                 const senseIdsToRemove = [wordSenseId];
                 console.log(`Removing only the specific sense: ${wordSenseId}`);
-                
                 // Check if this is the last sense for this word
                 const otherSensesForSameWord = Object.entries(wordDefinitions)
                   .filter(([key, entry]) => 
                     entry && entry.word && entry.word.toLowerCase() === wordLower &&
                     entry.wordSenseId && entry.wordSenseId !== wordSenseId &&
                     entry.inFlashcards);
-                
                 const isLastSenseOfWord = otherSensesForSameWord.length === 0;
                 console.log(`This ${isLastSenseOfWord ? 'is' : 'is not'} the last sense of the word '${wordLower}'`);
-                
                 // Remove from wordDefinitions
                 setWordDefinitions(prev => {
                   const updated = { ...prev };
-                  
                   // Remove all sense entries for this word
                   senseIdsToRemove.forEach(senseId => {
                     if (updated[senseId]) {
@@ -770,10 +713,8 @@ function App({ targetLanguages, onReset, roomSetup }) {
                       console.log(`Removed sense entry: ${senseId}`);
                     }
                   });
-                  
                   return updated;
                 });
-                
                 // Only remove the word from selectedWords if this is the last sense of the word
                 let updatedSelectedWords = [...selectedWords];
                 if (isLastSenseOfWord) {
@@ -785,12 +726,10 @@ function App({ targetLanguages, onReset, roomSetup }) {
                 } else {
                   console.log(`Kept '${wordLower}' in selectedWords as other senses remain`);
                 }
-                
                 // Save the updated state to the backend
                 if (selectedProfile !== 'non-saving') {
                   setTimeout(async () => {
                     try {
-                      
                       // Save the updated flashcards to the backend
                       const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
                         method: 'POST',
@@ -800,11 +739,9 @@ function App({ targetLanguages, onReset, roomSetup }) {
                           selectedWords: updatedSelectedWords 
                         })
                       });
-                      
                       if (!response.ok) {
                         throw new Error(`Server responded with status: ${response.status}`);
                       }
-                      
                       console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
                     } catch (error) {
                       console.error(`Error saving profile data: ${error.message}`);
@@ -832,6 +769,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
             showTranslation={showTranslation}
             isTextMode={appMode === 'text'}
             isStudentMode={roomSetup && !roomSetup.isHost}
+            translationLockedByHost={translationLockedByHost}
             forceKey={`transcript-${testPhraseEnabled ? 'with-test' : 'no-test'}`} // Force re-render when test phrase changes
             onTextSubmit={(lang, text) => {
               // Send text submission for translation to backend
@@ -848,9 +786,8 @@ function App({ targetLanguages, onReset, roomSetup }) {
         )}
       </div>
     </div>
-  )
-}
-
+  );
+// ... (rest of the code remains the same)
 // Update PropTypes
 App.propTypes = {
     targetLanguages: PropTypes.arrayOf(PropTypes.string).isRequired,
