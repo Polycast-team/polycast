@@ -84,6 +84,11 @@ function App({ targetLanguages, onReset, roomSetup }) {
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   // Test Phrase toggle state
   const [testPhraseEnabled, setTestPhraseEnabled] = useState(false);
+  
+  // Log when test phrase state changes
+  useEffect(() => {
+    console.log('Test phrase enabled changed to:', testPhraseEnabled);
+  }, [testPhraseEnabled]);
   // The test phrase content
   const TEST_PHRASE_SEGMENTS = [
     { text: "Testing this now. I will charge my phone", isNew: false },
@@ -336,17 +341,43 @@ function App({ targetLanguages, onReset, roomSetup }) {
         // Check message type and update state accordingly
         if (parsedData.type === 'recognized') {
           // Replace any existing interim segment with the final one
-          setEnglishSegments(prevSegments => [
-            // Find the index of the last segment (which might be an interim one)
-            // Keep all segments *except* the last one if it was interim, then add final.
-            // OR simpler: just mark all as old and add final.
-            ...prevSegments.map(seg => ({ ...seg, isNew: false })),
-            { text: parsedData.data, isNew: true }
-          ]);
+          setEnglishSegments(prevSegments => {
+            // Determine if we already have test phrases in the segments
+            const hasTestPhrases = testPhraseEnabled && 
+              prevSegments.some(seg => TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text));
+            
+            // Original segments without test phrases (for proper updates)
+            const regularSegments = hasTestPhrases
+              ? prevSegments.filter(seg => !TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text))
+              : prevSegments;
+            
+            // Normal update logic - mark all as old and add the new segment
+            const updatedRegularSegments = [
+              ...regularSegments.map(seg => ({ ...seg, isNew: false })),
+              { text: parsedData.data, isNew: true }
+            ];
+            
+            // Add test phrases if enabled
+            return hasTestPhrases 
+              ? [...TEST_PHRASE_SEGMENTS, ...updatedRegularSegments]
+              : updatedRegularSegments;
+          });
         } else if (parsedData.type === 'recognizing_interim') { 
            // Only update if toggle is on
            if (showLiveTranscript) {
-             setEnglishSegments([{ text: parsedData.data, isNew: false }]); 
+             setEnglishSegments(prevSegments => {
+               // Preserve test phrases if they exist
+               const hasTestPhrases = testPhraseEnabled && 
+                 prevSegments.some(seg => TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text));
+               
+               // Create the new segments array with the interim segment
+               const interimSegments = [{ text: parsedData.data, isNew: false }];
+               
+               // Add test phrases at the beginning if enabled
+               return hasTestPhrases
+                 ? [...TEST_PHRASE_SEGMENTS, ...interimSegments]
+                 : interimSegments;
+             });
            }
         } else if (parsedData.type === 'error') {
           console.error('Backend Error:', parsedData.message);
@@ -500,38 +531,10 @@ function App({ targetLanguages, onReset, roomSetup }) {
   return (
     <div className="App">
       {/* Remove the iguana overlay for audio mode 
-      {appMode === 'audio' && (
-        <div className="iguana-debug" style={{
-          position: 'fixed',
-          zIndex: 999,
-          top: '10px',
-          left: '10px',
-          background: 'rgba(0,0,0,0.7)',
-          color: 'white',
-          padding: '5px 10px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          pointerEvents: 'none'
-        }}>
-          {iguanaLoading ? 'Loading iguana...' : (iguanaImageUrl ? 'Iguana loaded!' : 'Failed to load iguana')}
-        </div>
-      )}
-      {appMode === 'audio' && iguanaImageUrl && (
-        <div className="iguana-bg" style={{
-          backgroundImage: `url(${iguanaImageUrl})`,
-          position: 'fixed',
-          zIndex: 1,
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          opacity: 0.93,
-          transition: 'opacity 0.6s',
-          pointerEvents: 'none',
-        }} />
-      )} */}
+       - Code removed to fix lint errors, originally showed an iguana overlay
+       - when in audio mode with conditional rendering based on iguanaLoading
+       - and iguanaImageUrl states.
+      */}
       {/* Big Polycast Title */}
       <h1
         className="polycast-title"
@@ -635,6 +638,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
               testPhraseEnabled={testPhraseEnabled}
               setTestPhraseEnabled={setTestPhraseEnabled}
             />
+          </div>
           {appMode === 'audio' && roomSetup && !roomSetup.isHost && (
             <div style={{
               marginTop: -45,
@@ -789,6 +793,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
             showTranslation={showTranslation}
             isTextMode={appMode === 'text'}
             isStudentMode={roomSetup && !roomSetup.isHost}
+            forceKey={`transcript-${testPhraseEnabled ? 'with-test' : 'no-test'}`} // Force re-render when test phrase changes
             onTextSubmit={(lang, text) => {
               // Send text submission for translation to backend
               sendMessage(JSON.stringify({ type: 'text_submit', lang, text }));
@@ -822,4 +827,4 @@ const config = {
     backendPort: 8080
 };
 
-export default App
+export default App;

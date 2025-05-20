@@ -94,7 +94,11 @@ function Controls({
                       <input
                         type="checkbox"
                         checked={testPhraseEnabled}
-                        onChange={e => setTestPhraseEnabled && setTestPhraseEnabled(e.target.checked)}
+                        onChange={e => {
+                          console.log('Test phrase checkbox clicked, new value:', e.target.checked);
+                          // Remove the conditional check - always call the setter directly
+                          setTestPhraseEnabled(e.target.checked);
+                        }}
                         disabled={isRecording}
                       />
                       Test Phrase

@@ -478,7 +478,7 @@ const TranscriptionDisplay = ({
   
   const doesWordSenseExist = (word, contextSentence) => {
     const wordLower = word.toLowerCase();
-    console.log(`[DUPLICATE CHECK] Checking if '${wordLower}' already exists in dictionary...`);
+    console.log(`[DUPLICATE CHECK] Checking if '${wordLower}' exists with the current meaning in dictionary...`);
     
     // First, determine the word sense ID this word would have
     let definitionNumber = 1;
@@ -492,11 +492,14 @@ const TranscriptionDisplay = ({
         definitionNumber = 24; // electrical sense
       } else if (contextLower.includes('murder')) {
         definitionNumber = 5; // legal accusation sense
+      } else if (contextLower.includes('you for') || contextLower.includes('payment') || contextLower.includes('cost')) {
+        definitionNumber = 2; // money/payment sense
       }
     }
     
     // Generate a proper word sense ID
     const wordSenseId = `${wordLower}${definitionNumber}`;
+    console.log(`[DUPLICATE CHECK] Current word sense ID: ${wordSenseId} for context: "${contextSentence}"`);
     
     // 1. Direct check - is there an entry with this exact sense ID?
     const directMatch = wordDefinitions[wordSenseId];
@@ -505,19 +508,53 @@ const TranscriptionDisplay = ({
       return true;
     }
     
-    // 2. Check all existing flashcards for this word to see if there's a similar word sense
+    // 2. Check existing flashcards for this word, but only consider it a match if
+    // both the context and definition are similar
     const existingFlashcards = Object.entries(wordDefinitions)
       .filter(([key, value]) => 
         value && value.word && value.word.toLowerCase() === wordLower && 
         value.inFlashcards && 
         value.contextSentence);
     
-    // Check if any existing flashcard has a very similar context
+    if (existingFlashcards.length > 0) {
+      console.log(`[DUPLICATE CHECK] Found ${existingFlashcards.length} existing flashcards for word '${wordLower}'`);
+    }
+    
+    // Get definition from context if available (for stricter matching)
+    // Since we might not have the definition here, we'll rely more on the wordSenseId
+    // and contextual clues
+    let currentDefinition = '';
+    
+    // Check for true semantic matches (both context AND definition should be similar)
     for (const [key, card] of existingFlashcards) {
-      if (card.contextSentence && 
-         (card.contextSentence.includes(contextSentence) || 
-          contextSentence.includes(card.contextSentence))) {
-        console.log(`[DUPLICATE CHECK] Similar context found: ${card.wordSenseId} has similar context`);
+      // Skip if we don't have both context sentences to compare
+      if (!card.contextSentence || !contextSentence) continue;
+      
+      // Check if the contexts are very similar
+      const contextOverlap = card.contextSentence.includes(contextSentence) || 
+                            contextSentence.includes(card.contextSentence);
+      
+      // Only check definitions if we have both to compare
+      let definitionMatch = false;
+      if (currentDefinition && card.definition) {
+        definitionMatch = card.definition.toLowerCase().includes(currentDefinition) || 
+                         currentDefinition.includes(card.definition.toLowerCase());
+      }
+      
+      // Different meanings should have different definitions
+      // If definitions are available and they don't match, consider it a different sense
+      if (currentDefinition && card.definition && !definitionMatch) {
+        console.log(`[DUPLICATE CHECK] Different definitions for same word:`);
+        console.log(`  Current: "${currentDefinition}"`);
+        console.log(`  Existing: "${card.definition.toLowerCase()}"`);
+        continue; // Skip this entry - it's a different meaning
+      }
+      
+      // If contexts are similar and we don't have conflicting definitions, consider it a match
+      if (contextOverlap) {
+        console.log(`[DUPLICATE CHECK] Similar context found: ${card.wordSenseId}`);
+        console.log(`  Current context: "${contextSentence}"`);
+        console.log(`  Existing context: "${card.contextSentence}"`);
         return true;
       }
     }
