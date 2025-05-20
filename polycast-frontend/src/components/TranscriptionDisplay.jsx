@@ -163,27 +163,6 @@ const TranscriptionDisplay = ({
     }
   }, [isTextMode, setTextInputs]);
   
-  // Add default transcript content regardless of mode
-  useEffect(() => {
-    // Create demo transcript text
-    const demoText1 = "Testing this now. I will charge my phone";
-    const demoText2 = "i will charge into battle";
-    
-    
-    // Override the segments directly in the component
-    if (englishSegments.length === 0 || (englishSegments.length === 1 && englishSegments[0].text === "Waiting...")) {
-      const segments = [
-        { text: demoText1, isNew: false },
-        { text: demoText2, isNew: false },
-        { text: demoText3, isNew: false }
-      ];
-      
-      // Use the englishSegments.splice hack to modify the array in place without a setter
-      if (englishSegments.splice) {
-        englishSegments.splice(0, englishSegments.length, ...segments);
-      }
-    }
-  }, [englishSegments]);
   const containerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
   const [langBoxStates, setLangBoxStates] = useState([]);
