@@ -118,20 +118,6 @@ function App({ targetLanguages, onReset, roomSetup }) {
   useEffect(() => { modeRef.current = appMode === 'text'; }, [appMode]);
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
 
-  // Add/remove test phrase from transcript when toggled
-  useEffect(() => {
-    setEnglishSegments(prev => {
-      const hasTest = prev.some(seg => seg.text === TEST_PHRASE_SEGMENTS[0].text);
-      if (testPhraseEnabled && !hasTest) {
-        // Add test phrase at the beginning
-        return [...TEST_PHRASE_SEGMENTS, ...prev];
-      } else if (!testPhraseEnabled && hasTest) {
-        // Remove test phrase
-        return prev.filter(seg => !TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text));
-      }
-      return prev;
-    });
-  }, [testPhraseEnabled]);
 
   // --- FIX: Only listen for spacebar in audio mode ---
   useEffect(() => {
@@ -796,7 +782,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
           />
         ) : (
           <TranscriptionDisplay 
-            englishSegments={englishSegments} 
+            englishSegments={testPhraseEnabled ? [...TEST_PHRASE_SEGMENTS, ...englishSegments] : englishSegments} 
             translations={translations} 
             targetLanguages={effectiveLanguages} 
             showLiveTranscript={showLiveTranscript}
