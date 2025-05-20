@@ -22,10 +22,10 @@ function Controls({
     setShowLiveTranscript,
     showTranslation,
     setShowTranslation,
-    showTestPhrase,
-    setShowTestPhrase,
     selectedProfile,
     setSelectedProfile,
+    testPhraseEnabled,
+    setTestPhraseEnabled,
 }) {
     // Check if we're in host mode (all control functions available) or student mode (view-only)
     const isHostMode = setIsTextMode !== null && onStartRecording !== null;
@@ -90,6 +90,15 @@ function Controls({
                       />
                       Show Translation
                     </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
+                      <input
+                        type="checkbox"
+                        checked={testPhraseEnabled}
+                        onChange={e => setTestPhraseEnabled && setTestPhraseEnabled(e.target.checked)}
+                        disabled={isRecording}
+                      />
+                      Test Phrase
+                    </label>
                   </>
                 )}
                 {/* Add auto-send checkbox in audio mode - host only */}
@@ -119,17 +128,6 @@ function Controls({
                     Show Noise Levels
                   </label>
                 )}
-                {/* Add Test Phrase toggle checkbox */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
-                  <input
-                    type="checkbox"
-                    checked={showTestPhrase}
-                    onChange={e => {
-                      setShowTestPhrase && setShowTestPhrase(e.target.checked);
-                    }}
-                  />
-                  Test Phrase
-                </label>
             </div>
             {/* Font size controls - available to both hosts and students */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 18 }}>
@@ -197,8 +195,6 @@ Controls.propTypes = {
     setShowLiveTranscript: PropTypes.func,
     showTranslation: PropTypes.bool.isRequired,
     setShowTranslation: PropTypes.func,
-    showTestPhrase: PropTypes.bool,
-    setShowTestPhrase: PropTypes.func,
     selectedProfile: PropTypes.string.isRequired,
     setSelectedProfile: PropTypes.func.isRequired,
 };

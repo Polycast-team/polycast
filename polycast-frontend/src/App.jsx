@@ -79,9 +79,16 @@ function App({ targetLanguages, onReset, roomSetup }) {
 
   const [messageHistory, setMessageHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [englishSegments, setEnglishSegments] = useState([]); // Start with empty transcript
-  const [showTestPhrase, setShowTestPhrase] = useState(false); // New state for test phrase toggle
+  // Start with an empty transcript
+  const [englishSegments, setEnglishSegments] = useState([]);
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
+  // Test Phrase toggle state
+  const [testPhraseEnabled, setTestPhraseEnabled] = useState(false);
+  // The test phrase content
+  const TEST_PHRASE_SEGMENTS = [
+    { text: "Testing this now. I will charge my phone", isNew: false },
+    { text: "i will charge into battle", isNew: false }
+  ];
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
   const [showTranslation, setShowTranslation] = useState(true); 
@@ -110,6 +117,21 @@ function App({ targetLanguages, onReset, roomSetup }) {
   // Update refs when state changes
   useEffect(() => { modeRef.current = appMode === 'text'; }, [appMode]);
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
+
+  // Add/remove test phrase from transcript when toggled
+  useEffect(() => {
+    setEnglishSegments(prev => {
+      const hasTest = prev.some(seg => seg.text === TEST_PHRASE_SEGMENTS[0].text);
+      if (testPhraseEnabled && !hasTest) {
+        // Add test phrase at the beginning
+        return [...TEST_PHRASE_SEGMENTS, ...prev];
+      } else if (!testPhraseEnabled && hasTest) {
+        // Remove test phrase
+        return prev.filter(seg => !TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text));
+      }
+      return prev;
+    });
+  }, [testPhraseEnabled]);
 
   // --- FIX: Only listen for spacebar in audio mode ---
   useEffect(() => {
@@ -596,56 +618,37 @@ function App({ targetLanguages, onReset, roomSetup }) {
                 onAudioSent={onAudioSent}
               />
             )}
-          </div>
-          <Controls
-            readyState={readyState}
-            isRecording={isRecording}
-            onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
-            onStopRecording={roomSetup && roomSetup.isHost ? handleStopRecording : null}
-            isTextMode={appMode === 'text'}
-            setIsTextMode={roomSetup && roomSetup.isHost ? setIsTextMode : null}
-            appMode={appMode}
-            setAppMode={handleAppModeChange}
-            autoSend={autoSend}
-            setAutoSend={roomSetup && roomSetup.isHost ? setAutoSend : null}
-            showNoiseLevel={showNoiseLevel}
-            setShowNoiseLevel={roomSetup && roomSetup.isHost ? setShowNoiseLevel : null}
-            showLiveTranscript={showLiveTranscript}
-            setShowLiveTranscript={(checked) => {
-              setShowLiveTranscript(checked);
-              if (!checked && !showTranslation) setShowTranslation(true);
-            }}
-            showTranslation={showTranslation}
-            setShowTranslation={(checked) => {
-              setShowTranslation(checked);
-              if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
-            }}
-            showTestPhrase={showTestPhrase}
-            setShowTestPhrase={setShowTestPhrase}
-            selectedProfile={selectedProfile}
-            setSelectedProfile={profile => {
-              setSelectedProfile(profile);
-              console.log('Profile switched to:', profile);
-            }}
-          />
-          {/* Audio mode user instructions at the bottom of the toolbar */}
-          {appMode === 'audio' && roomSetup && roomSetup.isHost && (
-            <div style={{
-              marginTop: -45,
-              marginBottom: 0,
-              width: '100%',
-              textAlign: 'center',
-              color: '#ffb84d',  /* Yellow color as per original */
-              fontWeight: 600,
-              fontSize: '1.05rem',
-              letterSpacing: 0.1,
-              textShadow: '0 1px 2px #2228',
-              opacity: 0.96,
-              userSelect: 'none',
-            }}>
-              Hold Spacebar to record.  Release Spacebar to send.
-            </div>
-          )}
+            <Controls
+              readyState={readyState}
+              isRecording={isRecording}
+              onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
+              onStopRecording={roomSetup && roomSetup.isHost ? handleStopRecording : null}
+              isTextMode={appMode === 'text'}
+              setIsTextMode={roomSetup && roomSetup.isHost ? setIsTextMode : null}
+              appMode={appMode}
+              setAppMode={handleAppModeChange}
+              autoSend={autoSend}
+              setAutoSend={roomSetup && roomSetup.isHost ? setAutoSend : null}
+              showNoiseLevel={showNoiseLevel}
+              setShowNoiseLevel={roomSetup && roomSetup.isHost ? setShowNoiseLevel : null}
+              showLiveTranscript={showLiveTranscript}
+              setShowLiveTranscript={(checked) => {
+                setShowLiveTranscript(checked);
+                if (!checked && !showTranslation) setShowTranslation(true);
+              }}
+              showTranslation={showTranslation}
+              setShowTranslation={(checked) => {
+                setShowTranslation(checked);
+                if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
+              }}
+              selectedProfile={selectedProfile}
+              setSelectedProfile={profile => {
+                setSelectedProfile(profile);
+                console.log('Profile switched to:', profile);
+              }}
+              testPhraseEnabled={testPhraseEnabled}
+              setTestPhraseEnabled={setTestPhraseEnabled}
+            />
           {appMode === 'audio' && roomSetup && !roomSetup.isHost && (
             <div style={{
               marginTop: -45,

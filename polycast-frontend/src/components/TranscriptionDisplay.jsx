@@ -145,9 +145,7 @@ const TranscriptionDisplay = ({
   // Add setter for transcript segments if available
   setEnglishSegments = null,
   // Add profile management props
-  selectedProfile = 'non-saving',
-  // Add test phrase toggle prop
-  showTestPhrase = false
+  selectedProfile = 'non-saving'
 }) => {
   const englishRef = useRef(null);
   const translationRefs = useRef({});
@@ -156,38 +154,36 @@ const TranscriptionDisplay = ({
     // Update font size default when mode changes
     setFontSize(isTextMode ? 18 : 30);
     
-    // Auto-fill the text input with test phrases in text mode only if test phrases toggle is on
-    if (isTextMode && showTestPhrase) {
+    // Auto-fill the text input with specific text when in text mode
+    if (isTextMode) {
       setTextInputs(prev => ({
         ...prev,
-        'English': "Testing this now. I will charge my phone\n\ni will charge into battle"
+        'English': "Testing this now. I will charge my phone\n\ni will charge into battle\n\ni will charge him with murder"
       }));
-    } else if (isTextMode) {
-      // Clear the text input if test phrases toggle is off
-      setTextInputs(prev => ({
-        ...prev,
-        'English': prev['English'] === "Testing this now. I will charge my phone\n\ni will charge into battle" ? "" : prev['English']
-      }));
-    }  
+    }
   }, [isTextMode, setTextInputs]);
   
-  // Add test phrases based on the toggle state
+  // Add default transcript content regardless of mode
   useEffect(() => {
-    // Only add test phrases if showTestPhrase is true
-    if (showTestPhrase === true && setEnglishSegments) {
-      // Create demo transcript text
-      const demoText1 = "Testing this now. I will charge my phone";
-      const demoText2 = "i will charge into battle";
-      
+    // Create demo transcript text
+    const demoText1 = "Testing this now. I will charge my phone";
+    const demoText2 = "i will charge into battle";
+    const demoText3 = "i will charge him with murder";
+    
+    // Override the segments directly in the component
+    if (englishSegments.length === 0 || (englishSegments.length === 1 && englishSegments[0].text === "Waiting...")) {
       const segments = [
         { text: demoText1, isNew: false },
-        { text: demoText2, isNew: false }
+        { text: demoText2, isNew: false },
+        { text: demoText3, isNew: false }
       ];
       
-      // Use the setter function to update the segments
-      setEnglishSegments(segments);
+      // Use the englishSegments.splice hack to modify the array in place without a setter
+      if (englishSegments.splice) {
+        englishSegments.splice(0, englishSegments.length, ...segments);
+      }
     }
-  }, [showTestPhrase, setEnglishSegments]);
+  }, [englishSegments]);
   const containerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
   const [langBoxStates, setLangBoxStates] = useState([]);
