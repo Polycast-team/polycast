@@ -85,15 +85,39 @@ function App({ targetLanguages, onReset, roomSetup }) {
   // Test Phrase toggle state
   const [testPhraseEnabled, setTestPhraseEnabled] = useState(false);
   
-  // Log when test phrase state changes
+  // Handle test phrase toggle changes
   useEffect(() => {
     console.log('Test phrase enabled changed to:', testPhraseEnabled);
+    
+    // If test phrase is disabled, make sure to remove any test phrases from the transcript
+    if (!testPhraseEnabled) {
+      setEnglishSegments(prevSegments => {
+        // Filter out any segments that match test phrases
+        return prevSegments.filter(seg => !TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text));
+      });
+    }
   }, [testPhraseEnabled]);
   // The test phrase content
   const TEST_PHRASE_SEGMENTS = [
     { text: "Testing this now. I will charge my phone", isNew: false },
     { text: "i will charge into battle", isNew: false }
   ];
+  
+  // Clean any test phrases from the transcript on component mount
+  useEffect(() => {
+    console.log('App component mounted - cleaning transcript');
+    // Ensure no test phrases are in the transcript by default
+    setEnglishSegments(prevSegments => {
+      // Filter out any test phrases that might be there initially
+      const filteredSegments = prevSegments.filter(seg => 
+        !TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text)
+      );
+      console.log('Initial transcript cleanup:', 
+        prevSegments.length - filteredSegments.length, 
+        'test phrases removed');
+      return filteredSegments;
+    });
+  }, []);
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
   const [showTranslation, setShowTranslation] = useState(true); 
@@ -342,23 +366,20 @@ function App({ targetLanguages, onReset, roomSetup }) {
         if (parsedData.type === 'recognized') {
           // Replace any existing interim segment with the final one
           setEnglishSegments(prevSegments => {
-            // Determine if we already have test phrases in the segments
-            const hasTestPhrases = testPhraseEnabled && 
-              prevSegments.some(seg => TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text));
-            
-            // Original segments without test phrases (for proper updates)
-            const regularSegments = hasTestPhrases
-              ? prevSegments.filter(seg => !TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text))
-              : prevSegments;
+            // ALWAYS filter out any test phrases from existing segments
+            // This ensures we don't accumulate test phrases inadvertently
+            const cleanSegments = prevSegments.filter(seg => 
+              !TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text)
+            );
             
             // Normal update logic - mark all as old and add the new segment
             const updatedRegularSegments = [
-              ...regularSegments.map(seg => ({ ...seg, isNew: false })),
+              ...cleanSegments.map(seg => ({ ...seg, isNew: false })),
               { text: parsedData.data, isNew: true }
             ];
             
-            // Add test phrases if enabled
-            return hasTestPhrases 
+            // Only add test phrases if the checkbox is checked
+            return testPhraseEnabled 
               ? [...TEST_PHRASE_SEGMENTS, ...updatedRegularSegments]
               : updatedRegularSegments;
           });
@@ -366,15 +387,12 @@ function App({ targetLanguages, onReset, roomSetup }) {
            // Only update if toggle is on
            if (showLiveTranscript) {
              setEnglishSegments(prevSegments => {
-               // Preserve test phrases if they exist
-               const hasTestPhrases = testPhraseEnabled && 
-                 prevSegments.some(seg => TEST_PHRASE_SEGMENTS.some(tp => tp.text === seg.text));
-               
+               // ALWAYS start with a clean slate for interim updates
                // Create the new segments array with the interim segment
                const interimSegments = [{ text: parsedData.data, isNew: false }];
                
-               // Add test phrases at the beginning if enabled
-               return hasTestPhrases
+               // Add test phrases ONLY if the checkbox is explicitly checked
+               return testPhraseEnabled
                  ? [...TEST_PHRASE_SEGMENTS, ...interimSegments]
                  : interimSegments;
              });
@@ -786,6 +804,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
           />
         ) : (
           <TranscriptionDisplay 
+            // Only add test phrases to the displayed transcript when checkbox is checked
             englishSegments={testPhraseEnabled ? [...TEST_PHRASE_SEGMENTS, ...englishSegments] : englishSegments} 
             translations={translations} 
             targetLanguages={effectiveLanguages} 
