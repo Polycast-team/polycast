@@ -1735,14 +1735,26 @@ Which definition matches the word as used in the context sentence above? Respond
         // Call Gemini API with error handling
         let response;
         try {
+            console.log(`[WORD SENSE DISAMBIGUATION] Calling Gemini API for word '${word}'`);
             response = await generateTextWithGemini(prompt, 0.1);
-            if (!response) throw new Error('Empty response from Gemini');
+            
+            // Validate the response
+            if (!response || response.trim() === '') {
+                throw new Error('Empty response from Gemini API');
+            }
+            
+            console.log(`[WORD SENSE DISAMBIGUATION] Received response: ${response.substring(0, 100)}...`);
         } catch (geminiError) {
-            console.error(`[WORD SENSE DISAMBIGUATION] Gemini API error:`, geminiError);
-            return res.status(500).json({
-                error: `Failed to generate disambiguation: ${geminiError.message}`,
+            // Log the error in detail
+            console.error(`[WORD SENSE DISAMBIGUATION] Gemini API error for word '${word}':`, geminiError);
+            
+            // Return a clear error message with HTTP 502 (Bad Gateway) to indicate an upstream service issue
+            return res.status(502).json({
+                error: `Gemini API error: ${geminiError.message}`,
                 status: 'error',
-                word: word
+                message: 'There was an issue contacting the Gemini API. Please try again later.',
+                word: word,
+                contextSentence: contextSentence
             });
         }
         
@@ -1988,31 +2000,56 @@ async function generateTextWithGemini(prompt, temperature = 0.7) {
             throw new Error('Google API Key (GOOGLE_API_KEY) is not configured');
         }
         
-        // We'll initialize directly rather than going through llmService
-        // to avoid unnecessary test translations
+        // Log the prompt for debugging
+        const promptPreview = prompt.length > 100 ? `${prompt.substring(0, 100)}...` : prompt;
+        console.log(`[GEMINI] Generating text with prompt: ${promptPreview}`);
         
-        console.log(`[GEMINI] Generating text with prompt: ${prompt.substring(0, 50)}...`);
-        
-        // Use the raw Google API directly instead of going through llmService
-        // We're using require at this point to avoid needing to move this to llmService.js
+        // Use the raw Google API directly
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "models/gemini-2.0-flash" });
         
-        // Generate content with the provided temperature
-        const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: temperature }
+        // Configure the model
+        const model = genAI.getGenerativeModel({ 
+            model: "models/gemini-2.0-flash",
+            systemInstruction: "You're helping language learners understand words in context."
         });
         
-        const response = result.response;
-        const text = response.text();
+        // Create a promise with timeout to ensure we don't hang indefinitely
+        const timeoutMs = 15000; // 15 seconds timeout
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error(`Gemini API timeout after ${timeoutMs}ms`)), timeoutMs);
+        });
         
-        console.log(`[GEMINI] Generated ${text.length} chars of text`);
+        // Generate content with the provided temperature
+        const generatePromise = model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { 
+                temperature: temperature,
+                maxOutputTokens: 800,
+                topP: 0.9,
+                topK: 40
+            }
+        });
+        
+        // Race the generate promise against the timeout
+        const result = await Promise.race([generatePromise, timeoutPromise]);
+        
+        // Process the result (only if not timed out)
+        const response = result.response;
+        if (!response) {
+            throw new Error('Empty response received from Gemini API');
+        }
+        
+        const text = response.text();
+        if (!text || text.trim() === '') {
+            throw new Error('Empty text received from Gemini API');
+        }
+        
+        console.log(`[GEMINI] Successfully generated ${text.length} chars of text`);
         return text;
     } catch (error) {
-        console.error('[GEMINI] Error generating text:', error);
-        throw error;
+        console.error('[GEMINI] Error generating text:', error.message);
+        throw error; // Explicitly throw the error to propagate it up
     }
 }
 

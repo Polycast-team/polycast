@@ -893,7 +893,20 @@ const TranscriptionDisplay = ({
         }
       } catch (error) {
         console.error(`[STAGE 1] Error during disambiguation:`, error);
-        throw new Error(`Failed to disambiguate word: ${error.message}`);
+        
+        // Show error message to user instead of silently failing
+        setPopupInfo(prev => ({
+          ...prev,
+          showPopup: true,
+          error: true,
+          popupMessage: `Could not add "${word}" to flashcards. ${error.message.includes('Gemini API') ? 'The AI service is currently unavailable. Please try again later.' : 'Please try again.'}`,
+        }));
+        
+        // Remove the word from selected words to allow the user to try again
+        setSelectedWords(prev => prev.filter(w => w !== word));
+        
+        // Stop processing further
+        return;
       }
       
       // STAGE 2: Send the disambiguated definition to the dictionary endpoint for example sentences and frequency
@@ -936,7 +949,7 @@ const TranscriptionDisplay = ({
           flashcardData = JSON.parse(responseText);
         } catch (parseError) {
           console.error(`[STAGE 2] JSON parse error:`, parseError, `for text: ${responseText}`);
-          throw new Error(`Failed to parse dictionary JSON response: ${parseError.message}`);
+          throw new Error(`Failed to parse dictionary response: ${parseError.message}`);
         }
         
         console.log(`[STAGE 2] Flashcard generation successful:`, flashcardData);
@@ -947,14 +960,20 @@ const TranscriptionDisplay = ({
         }
       } catch (error) {
         console.error(`[STAGE 2] Error during flashcard generation:`, error);
-        // Create fallback data instead of throwing
-        console.log(`[STAGE 2] Using fallback data for flashcard`);
-        flashcardData = {
-          partOfSpeech: disambiguateData?.disambiguatedDefinition?.partOfSpeech || 'unknown',
-          exampleSentencesRaw: '',
-          wordFrequency: 3,
-          definitionFrequency: 3
-        };
+        
+        // Show error message to user instead of using fallbacks
+        setPopupInfo(prev => ({
+          ...prev,
+          showPopup: true,
+          error: true,
+          popupMessage: `Could not add "${word}" to flashcards. ${error.message.includes('Gemini API') ? 'The AI service is currently unavailable. Please try again later.' : 'Please try again.'}`,
+        }));
+        
+        // Remove the word from selected words to allow the user to try again
+        setSelectedWords(prev => prev.filter(w => w !== word));
+        
+        // Stop processing further
+        return;
       }
       
       // Create a word sense ID from the disambiguation response or generate one
