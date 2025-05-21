@@ -185,6 +185,9 @@ const TranscriptionDisplay = ({
     console.log('📋 SELECTED WORDS COUNT:', selectedWords.length);
     
     const wordLower = word.toLowerCase();
+    let examples = [];
+    let wordFrequency = 3;
+    let definitionFrequency = 3;
     
     // Calculate position for popup
     const rect = event.currentTarget.getBoundingClientRect();
@@ -304,15 +307,9 @@ const TranscriptionDisplay = ({
           disambiguatedDefinition = disambiguationResponse.disambiguatedDefinition;
           
           // Extract the examples and frequency ratings from the two-step process
-          if (disambiguationResponse.examples && Array.isArray(disambiguationResponse.examples)) {
-            examples = disambiguationResponse.examples;
-          }
-          if (typeof disambiguationResponse.wordFrequency === 'number') {
-            wordFrequency = disambiguationResponse.wordFrequency;
-          }
-          if (typeof disambiguationResponse.definitionFrequency === 'number') {
-            definitionFrequency = disambiguationResponse.definitionFrequency;
-          }
+          examples = disambiguationResponse.examples || [];
+          wordFrequency = disambiguationResponse.wordFrequency || 3;
+          definitionFrequency = disambiguationResponse.definitionFrequency || 3;
           
           // Log the status of our new fields
           console.log('FLASHCARD DEBUG - Received from disambiguation:', {
@@ -331,11 +328,6 @@ const TranscriptionDisplay = ({
         disambiguatedDefinition = dictData.allDefinitions[0];
       }
       
-      // Default values for the two-step process fields
-      let examples = [];
-      let wordFrequency = 3;
-      let definitionFrequency = 3;
-      
       // Update the wordDefinitions state with all the data
       setWordDefinitions(prev => ({
         ...prev,
@@ -345,7 +337,7 @@ const TranscriptionDisplay = ({
           disambiguatedDefinition: disambiguatedDefinition, // The most relevant definition
           contextSentence: contextSentence, // Save the context for flashcards
           // Store the new fields from our two-step process
-          examples: examples,
+          exampleSentencesRaw: examples.join('//'),
           wordFrequency: wordFrequency,
           definitionFrequency: definitionFrequency
         }
