@@ -1771,7 +1771,6 @@ Which definition matches the word as used in the context sentence above? Respond
                     contextSentence,
                     disambiguatedDefinition: bestMatch,
                     wordSenseId,
-                    sampleSentence,
                     existingFlashcard: true,
                     rawLlmResponse: response
                 });
@@ -1782,7 +1781,6 @@ Which definition matches the word as used in the context sentence above? Respond
                     contextSentence,
                     disambiguatedDefinition: bestMatch,
                     wordSenseId,
-                    sampleSentence,
                     existingFlashcard: false,
                     rawLlmResponse: response
                 });
