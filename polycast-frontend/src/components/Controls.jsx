@@ -22,6 +22,7 @@ function Controls({
     setShowLiveTranscript,
     showTranslation,
     setShowTranslation,
+    teacherTranslationsEnabled, // Added new prop
     translationLockedByHost = false,
     isStudentMode = false,
     selectedProfile,
@@ -32,6 +33,7 @@ function Controls({
     // Check if we're in host mode (all control functions available) or student mode (view-only)
     const isHostMode = setIsTextMode !== null && onStartRecording !== null;
     const isConnected = readyState === ReadyState.OPEN;
+    const isTranslationsDisabledByTeacher = isStudentMode && !teacherTranslationsEnabled;
 
     return (
         <div className="controls">
@@ -84,13 +86,18 @@ function Controls({
                     <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
                       <input
                         type="checkbox"
-                        checked={showTranslation}
+                        checked={isTranslationsDisabledByTeacher ? false : showTranslation}
                         onChange={e => {
                           setShowTranslation && setShowTranslation(e.target.checked);
                         }}
-                        disabled={isRecording}
+                        disabled={isRecording || isTranslationsDisabledByTeacher}
                       />
                       Show Translation
+                      {isTranslationsDisabledByTeacher && (
+                        <span style={{ marginLeft: '8px', color: '#ffcc00', fontSize: '0.9em' }}>
+                          (Translations disabled by teacher)
+                        </span>
+                      )}
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
                       <input
@@ -201,6 +208,7 @@ Controls.propTypes = {
     setShowLiveTranscript: PropTypes.func,
     showTranslation: PropTypes.bool.isRequired,
     setShowTranslation: PropTypes.func,
+    teacherTranslationsEnabled: PropTypes.bool, // Added prop type
     selectedProfile: PropTypes.string.isRequired,
     setSelectedProfile: PropTypes.func.isRequired,
 };
