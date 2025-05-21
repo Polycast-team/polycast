@@ -812,72 +812,149 @@ const TranscriptionDisplay = ({
       // STAGE 1: Call the disambiguate endpoint with our new format
       console.log(`[STAGE 1] Calling disambiguate endpoint for word: ${word}`);
       
-      // Store the disambiguation data for later use
+      // STAGE 1: Call the disambiguate endpoint to get the correct definition
       let disambiguateData;
       let responseWord, responseDefinition, responseTranslation;
+      let wordSenseId;
       
       try {
-        // Make API request to disambiguate the word based on context
+        console.log(`[STAGE 1] Making API request to disambiguate word: ${wordLower}`);
+        
+        // Create a clean request payload with only valid data
+        const requestPayload = {
+          word: wordLower,
+          contextSentence: contextSentence,
+          definitions: allDictDefinitions.filter(def => def && typeof def === 'object'),
+          existingFlashcardSenseIds: getAllFlashcardSenseIds() // Get fresh list
+        };
+        
+        // Log the exact request we're making
+        console.log(`[STAGE 1] Request payload:`, JSON.stringify(requestPayload).substring(0, 200) + '...');
+        
+        // Make API request with a timeout
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 20000); // 20 second timeout
+        
         const disambiguateResponse = await fetch('/api/disambiguate-word', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            word: wordLower,
-            contextSentence: contextSentence,
-            definitions: allDictDefinitions,
-            existingFlashcardSenseIds: existingFlashcardSenseIds
-          })
+          body: JSON.stringify(requestPayload),
+          signal: abortController.signal
         });
         
+        clearTimeout(timeoutId);
+        
+        // Check for successful response
         if (!disambiguateResponse.ok) {
-          throw new Error(`Disambiguation request failed with status: ${disambiguateResponse.status}`);
+          const errorText = await disambiguateResponse.text();
+          throw new Error(`Disambiguation request failed with status: ${disambiguateResponse.status}, response: ${errorText}`);
         }
         
-        disambiguateData = await disambiguateResponse.json();
-        console.log(`[STAGE 1] Disambiguation response:`, disambiguateData);
+        // Parse the response with extra safety measures
+        const responseText = await disambiguateResponse.text();
+        if (!responseText || responseText.trim() === '') {
+          throw new Error('Empty response from disambiguation endpoint');
+        }
+        
+        try {
+          disambiguateData = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error(`[STAGE 1] JSON parse error:`, parseError, `for text: ${responseText}`);
+          throw new Error(`Failed to parse JSON response: ${parseError.message}`);
+        }
+        
+        console.log(`[STAGE 1] Disambiguation successful:`, disambiguateData);
+        
+        // Check for error in response
+        if (disambiguateData.error || disambiguateData.status === 'error') {
+          throw new Error(`API error: ${disambiguateData.error || 'Unknown error'}`);
+        }
         
         // Stop if the API indicates this is an existing flashcard
         if (disambiguateData.existingFlashcard) {
-          console.log(`This sense of "${word}" already exists in flashcards with ID: ${disambiguateData.wordSenseId}`);
+          console.log(`This sense of "${word}" already exists with ID: ${disambiguateData.wordSenseId}`);
           return;
         }
         
         // Extract the key information from the response
         const responseParts = disambiguateData.rawLlmResponse?.split('//') || [];
+        wordSenseId = disambiguateData.wordSenseId; // Store for later use
         
         if (responseParts.length >= 3) {
           [responseWord, responseDefinition, responseTranslation] = responseParts.map(part => part.trim());
-          console.log(`[STAGE 1] Parsed response: Word=${responseWord}, Definition=${responseDefinition}, Translation=${responseTranslation}`);
+          console.log(`[STAGE 1] Parsed parts: Word=${responseWord}, Definition=${responseDefinition}, Translation=${responseTranslation}`);
         } else {
-          console.warn(`[STAGE 1] Unexpected format in disambiguation response:`, responseParts);
+          console.warn(`[STAGE 1] Unexpected response format, using fallbacks`);
           responseWord = wordLower;
           responseDefinition = disambiguateData.disambiguatedDefinition?.definition || '';
-          responseTranslation = '';
+          responseTranslation = disambiguateData.disambiguatedDefinition?.translation || '';
         }
       } catch (error) {
         console.error(`[STAGE 1] Error during disambiguation:`, error);
         throw new Error(`Failed to disambiguate word: ${error.message}`);
       }
       
-      // STAGE 2: Send the disambiguated definition to the dictionary endpoint to generate a flashcard
+      // STAGE 2: Send the disambiguated definition to the dictionary endpoint for example sentences and frequency
       console.log(`[STAGE 2] Generating flashcard content for word: ${word}`);
       
       let flashcardData;
       try {
-        // Make API request to the dictionary endpoint for the flashcard content
-        const dictionaryResponse = await fetch(`/api/dictionary/${wordLower}?context=${encodeURIComponent(contextSentence)}`);
+        // Make API request with a timeout
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 20000); // 20 second timeout
+        
+        // Add a timestamp to prevent caching
+        const timestamp = Date.now();
+        const url = `/api/dictionary/${wordLower}?context=${encodeURIComponent(contextSentence)}&t=${timestamp}`;
+        
+        console.log(`[STAGE 2] Making request to dictionary endpoint: ${url}`);
+        
+        const dictionaryResponse = await fetch(url, {
+          signal: abortController.signal,
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        clearTimeout(timeoutId);
         
         if (!dictionaryResponse.ok) {
-          throw new Error(`Dictionary request failed with status: ${dictionaryResponse.status}`);
+          const errorText = await dictionaryResponse.text();
+          throw new Error(`Dictionary request failed with status: ${dictionaryResponse.status}, response: ${errorText}`);
         }
         
-        flashcardData = await dictionaryResponse.json();
-        console.log(`[STAGE 2] Flashcard generation response:`, flashcardData);
+        // Parse the response with extra safety measures
+        const responseText = await dictionaryResponse.text();
+        if (!responseText || responseText.trim() === '') {
+          throw new Error('Empty response from dictionary endpoint');
+        }
+        
+        try {
+          flashcardData = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error(`[STAGE 2] JSON parse error:`, parseError, `for text: ${responseText}`);
+          throw new Error(`Failed to parse dictionary JSON response: ${parseError.message}`);
+        }
+        
+        console.log(`[STAGE 2] Flashcard generation successful:`, flashcardData);
+        
+        // Validate the flashcard data
+        if (!flashcardData || typeof flashcardData !== 'object') {
+          throw new Error('Invalid flashcard data received');
+        }
       } catch (error) {
         console.error(`[STAGE 2] Error during flashcard generation:`, error);
-        throw new Error(`Failed to generate flashcard: ${error.message}`);
+        // Create fallback data instead of throwing
+        console.log(`[STAGE 2] Using fallback data for flashcard`);
+        flashcardData = {
+          partOfSpeech: disambiguateData?.disambiguatedDefinition?.partOfSpeech || 'unknown',
+          exampleSentencesRaw: '',
+          wordFrequency: 3,
+          definitionFrequency: 3
+        };
       }
       
       // Create a word sense ID from the disambiguation response or generate one

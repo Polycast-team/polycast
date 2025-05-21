@@ -1692,33 +1692,59 @@ app.post('/api/disambiguate-word', async (req, res) => {
     try {
         const { word, contextSentence, definitions, existingFlashcardSenseIds = [] } = req.body;
         
-        if (!word || !contextSentence || !definitions || !Array.isArray(definitions)) {
+        // Validate input parameters
+        if (!word || typeof word !== 'string') {
             return res.status(400).json({ 
-                error: 'Missing required parameters (word, contextSentence, definitions)' 
+                error: 'Missing or invalid word parameter',
+                status: 'error'
+            });
+        }
+        
+        if (!contextSentence || typeof contextSentence !== 'string') {
+            return res.status(400).json({ 
+                error: 'Missing or invalid contextSentence parameter',
+                status: 'error'
+            });
+        }
+        
+        if (!definitions || !Array.isArray(definitions) || definitions.length === 0) {
+            return res.status(400).json({ 
+                error: 'Missing or invalid definitions array',
+                status: 'error'
             });
         }
         
         console.log(`\n[WORD SENSE DISAMBIGUATION] Processing '${word}' in context: "${contextSentence}"`);
         console.log(`[WORD SENSE DISAMBIGUATION] Found ${definitions.length} possible definitions in dictionary`);
         
-        // The context sentence may have the target word emphasized with asterisks
-        // Example: "I am going to *charge* my phone"
-        console.log(`Context received with emphasis: ${contextSentence}`);
-
+        // Safety check for existingFlashcardSenseIds
+        const safeExistingIds = Array.isArray(existingFlashcardSenseIds) ? existingFlashcardSenseIds : [];
+        
         // New prompt format as requested by user
         const prompt = `You are helping a language learner understand the meaning of a word in a sentence.
 
 Word: "${word}"
 Context: "${contextSentence}"
 Possible definitions:
-${definitions.map((def, idx) => `${idx + 1}. ${def.definition}`).join('\n')}
+${definitions.map((def, idx) => `${idx + 1}. ${def.definition || 'No definition provided'}`).join('\n')}
 
 Which definition matches the word as used in the context sentence above? Respond with the word, followed by the text of the best matching definition, followed by the Spanish translation. These should be separated by a '//', for example 'charge//To rush forward to attack.//cargar'`;
         
         console.log(`[WORD SENSE DISAMBIGUATION] Sending prompt to Gemini for disambiguation`);
         
-        // Call Gemini API
-        const response = await generateTextWithGemini(prompt, 0.1);
+        // Call Gemini API with error handling
+        let response;
+        try {
+            response = await generateTextWithGemini(prompt, 0.1);
+            if (!response) throw new Error('Empty response from Gemini');
+        } catch (geminiError) {
+            console.error(`[WORD SENSE DISAMBIGUATION] Gemini API error:`, geminiError);
+            return res.status(500).json({
+                error: `Failed to generate disambiguation: ${geminiError.message}`,
+                status: 'error',
+                word: word
+            });
+        }
         
         // Parse the new response format (word//definition//translation)
         const responseParts = response.split('//').map(part => part.trim());
@@ -1742,63 +1768,99 @@ Which definition matches the word as used in the context sentence above? Respond
         let bestMatch = null;
         let highestSimilarity = -1;
         
-        for (const def of definitions) {
-            // Simple string similarity check
-            const similarity = stringSimilarity(def.definition, responseDefinition);
-            if (similarity > highestSimilarity) {
-                highestSimilarity = similarity;
-                bestMatch = def;
+        try {
+            for (const def of definitions) {
+                if (!def || typeof def !== 'object') continue;
+                
+                // Ensure definition is a string before comparing
+                const defText = def.definition || '';
+                const respText = responseDefinition || '';
+                
+                // Simple string similarity check with safety
+                if (typeof defText === 'string' && typeof respText === 'string') {
+                    const similarity = stringSimilarity(defText, respText);
+                    if (similarity > highestSimilarity) {
+                        highestSimilarity = similarity;
+                        bestMatch = {...def}; // Create a copy to avoid mutating the original
+                    }
+                }
             }
+        } catch (matchError) {
+            console.error(`[WORD SENSE DISAMBIGUATION] Error finding best match:`, matchError);
+            // Continue with a default match if needed
         }
         
-        // We'll use the matched definition, but keep the translation from Gemini
-        if (bestMatch) {
-            bestMatch.translation = responseTranslation;
+        // Create a basic match if we couldn't find one
+        if (!bestMatch && definitions.length > 0) {
+            bestMatch = {...definitions[0]};
+        } else if (!bestMatch) {
+            // Create a completely new definition as last resort
+            bestMatch = {
+                definition: responseDefinition || 'No definition available',
+                partOfSpeech: 'unknown'
+            };
         }
         
-        if (bestMatch) {
-            console.log(`[WORD SENSE DISAMBIGUATION] Gemini identified definition: (${bestMatch.partOfSpeech}) ${bestMatch.definition}`);
+        // Add the translation from Gemini
+        bestMatch.translation = responseTranslation || '';
+        
+        // Always generate a unique, safe word sense ID
+        let wordSenseId;
+        try {
+            // Create a unique sense ID for this definition using a safe substring
+            const definitionBase = (bestMatch && bestMatch.definition) ? bestMatch.definition : 'fallback';
+            const safeDefinition = typeof definitionBase === 'string' ? definitionBase : 'unknown';
+            const partOfSpeech = bestMatch && bestMatch.partOfSpeech ? bestMatch.partOfSpeech : 'unknown';
             
-            // Create a unique sense ID for this definition
-            const definitionHash = bestMatch.definition.substring(0, 8).replace(/\W+/g, '');
-            const wordSenseId = `${word.toLowerCase()}_${bestMatch.partOfSpeech}_${definitionHash}`;
-            
-            // Check if we already have a flashcard for this sense
-            if (existingFlashcardSenseIds.includes(wordSenseId)) {
-                console.log(`[WORD SENSE DISAMBIGUATION] ⚠️ This sense of '${word}' already exists in flashcards. No new card needed.`);
-                return res.json({
-                    word,
-                    contextSentence,
-                    disambiguatedDefinition: bestMatch,
-                    wordSenseId,
-                    existingFlashcard: true,
-                    rawLlmResponse: response
-                });
-            } else {
-                console.log(`[WORD SENSE DISAMBIGUATION] ✓ New sense of '${word}' identified! Creating new flashcard with ID: ${wordSenseId}`);
-                return res.json({
-                    word,
-                    contextSentence,
-                    disambiguatedDefinition: bestMatch,
-                    wordSenseId,
-                    existingFlashcard: false,
-                    rawLlmResponse: response
-                });
+            // Create a hash from the definition part
+            let definitionHash;
+            try {
+                definitionHash = safeDefinition.substring(0, Math.min(8, safeDefinition.length)).replace(/\W+/g, '');
+                if (!definitionHash) definitionHash = 'def' + Date.now().toString().substring(8);
+            } catch (hashError) {
+                console.error('[WORD SENSE DISAMBIGUATION] Error creating definition hash:', hashError);
+                definitionHash = 'def' + Date.now().toString().substring(8);
             }
+            
+            wordSenseId = `${word.toLowerCase()}_${partOfSpeech}_${definitionHash}`;
+            console.log(`[WORD SENSE DISAMBIGUATION] Generated word sense ID: ${wordSenseId}`);
+        } catch (idError) {
+            console.error('[WORD SENSE DISAMBIGUATION] Error generating ID:', idError);
+            wordSenseId = `${word.toLowerCase()}_${Date.now()}`;
+        }
+        
+        // Check if we already have a flashcard for this sense
+        const alreadyExists = Array.isArray(existingFlashcardSenseIds) && 
+                            existingFlashcardSenseIds.includes(wordSenseId);
+        
+        // Prepare the response
+        const responseData = {
+            word,
+            contextSentence,
+            disambiguatedDefinition: bestMatch,
+            wordSenseId,
+            existingFlashcard: alreadyExists,
+            rawLlmResponse: response,
+            status: 'success'
+        };
+        
+        if (alreadyExists) {
+            console.log(`[WORD SENSE DISAMBIGUATION] ⚠️ This sense of '${word}' already exists in flashcards. No new card needed.`);
         } else {
-            console.log(`[WORD SENSE DISAMBIGUATION] ⚠️ Failed to identify best matching definition`);
-            return res.json({
-                word,
-                contextSentence,
-                allDefinitions: definitions,
-                disambiguatedDefinition: null,
-                rawLlmResponse: response,
-                error: 'Could not determine best definition match'
-            });
+            console.log(`[WORD SENSE DISAMBIGUATION] ✓ New sense of '${word}' identified with ID: ${wordSenseId}`);
         }
+        
+        // Send the response
+        return res.json(responseData);
     } catch (error) {
-        console.error('[WORD SENSE DISAMBIGUATION] Error:', error);
-        return res.status(500).json({ error: 'Error disambiguating definition' });
+        console.error(`[WORD SENSE DISAMBIGUATION] Error:`, error);
+        // Always return a valid JSON response, even in error cases
+        return res.status(500).json({ 
+            error: `Server error: ${error.message}`,
+            status: 'error',
+            word: req.body?.word || 'unknown',
+            contextSentence: req.body?.contextSentence || ''
+        });
     }
 });
 
