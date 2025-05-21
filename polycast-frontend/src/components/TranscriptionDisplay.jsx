@@ -772,18 +772,13 @@ const TranscriptionDisplay = ({
       setSelectedWords(prev => {
         // We now allow multiple entries of the same word with different senses
         console.log(`Adding "${word}" to selected words list in context: "${contextSentence.substring(0, 30)}..."`);
-        console.log('🔵🔵🔵 SELECTED WORDS BEFORE ADDING', word, '🔵🔵🔵');
-        console.log('📋 SELECTED WORDS BEFORE:', JSON.stringify(prev));
         
         // Still add to the list for backward compatibility
         let updated = prev;
         if (!prev.some(w => w.toLowerCase() === wordLower)) {
           updated = [...prev, word];
-          console.log('🟢🟢🟢 SELECTED WORDS AFTER ADDING', word, '🟢🟢🟢');
-          console.log('📋 SELECTED WORDS AFTER:', JSON.stringify(updated));
           return updated;
         }
-        console.log('⚠️ Word already in selectedWords, not adding again');
         return prev;
       });
 
@@ -792,72 +787,81 @@ const TranscriptionDisplay = ({
         return;
       }
       
-      // Get dictionary definitions from the word data
-      const dictData = wordData.dictionaryDefinition;
-      
-      // We need to check if dictData exists and has valid content
-      if (!dictData) {
-        console.warn(`No dictionary data found for word: ${word}. Using disambiguated definition instead.`);
-        // Continue with fallback definitions...
-      }
-      
       // Get all existing flashcard sense IDs
       const existingFlashcardSenseIds = getAllFlashcardSenseIds();
+            
+      // Get dictionary definitions from the original API response
+      const allDictDefinitions = [];
       
-      // Get the best definition based on what's available
-      const bestDefinition = wordData.disambiguatedDefinition || 
-                            (dictData && dictData.allDefinitions && dictData.allDefinitions.length > 0 ? 
-                              dictData.allDefinitions[0] : 
-                              (dictData && dictData.definitions && dictData.definitions.length > 0 ? 
-                                dictData.definitions[0] : 
-                                null));
+      // Extract definitions from all available sources
+      if (wordData.dictionaryDefinition && wordData.dictionaryDefinition.allDefinitions) {
+        allDictDefinitions.push(...wordData.dictionaryDefinition.allDefinitions);
+      } else if (wordData.dictionaryDefinition && wordData.dictionaryDefinition.definitions) {
+        allDictDefinitions.push(...wordData.dictionaryDefinition.definitions);
+      }
       
-      if (!bestDefinition) {
-        console.error(`No definition found for ${word} in context: ${contextSentence}`);
+      if (allDictDefinitions.length === 0 && wordData.disambiguatedDefinition) {
+        allDictDefinitions.push(wordData.disambiguatedDefinition);
+      }
+      
+      if (allDictDefinitions.length === 0) {
+        console.error(`No definitions found for ${word} in context: ${contextSentence}`);
         return;
       }
       
-      // Get the part of speech from the best available source
-      const partOfSpeech = bestDefinition.partOfSpeech || 
-                          (dictData && dictData.partOfSpeech) ||
-                          wordData.partOfSpeech ||
-                          'unknown';
+      // STAGE 1: Call the disambiguate endpoint with our new format
+      console.log(`[STAGE 1] Calling disambiguate endpoint for word: ${word}`);
       
-      // Get the definition number from the API response or use a fallback
-      let definitionNumber = 1;
+      // Make API request to disambiguate the word based on context
+      const disambiguateResponse = await fetch('/api/disambiguate-word', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          word: wordLower,
+          contextSentence: contextSentence,
+          definitions: allDictDefinitions,
+          existingFlashcardSenseIds: existingFlashcardSenseIds
+        })
+      });
       
-      // Special case for different senses of "charge"
-      const contextLower = contextSentence ? contextSentence.toLowerCase() : '';
+      const disambiguateData = await disambiguateResponse.json();
+      console.log(`[STAGE 1] Disambiguation response:`, disambiguateData);
       
-      if (wordLower === 'charge') {
-        if (contextLower.includes('battle')) {
-          definitionNumber = 1; // attack sense
-        } else if (contextLower.includes('phone') || contextLower.includes('battery')) {
-          definitionNumber = 24; // electrical sense
-        } else if (contextLower.includes('murder')) {
-          definitionNumber = 5; // legal accusation sense
-        }
-      }
-      
-      // Generate word sense ID based on word and definition number (e.g., "abbey3")
-      const wordSenseId = `${wordLower}${definitionNumber}`;
-      
-      // Robust check: Prevent duplicate flashcards by checking current wordDefinitions state
-      if (
-        (existingFlashcardSenseIds.includes(wordSenseId)) ||
-        (wordDefinitions && wordDefinitions[wordSenseId] && wordDefinitions[wordSenseId].inFlashcards)
-      ) {
-        console.log(`This sense of "${word}" (ID: ${wordSenseId}) already exists in flashcards. No new card needed.`);
+      // Stop if the API indicates this is an existing flashcard
+      if (disambiguateData.existingFlashcard) {
+        console.log(`This sense of "${word}" already exists in flashcards with ID: ${disambiguateData.wordSenseId}`);
         return;
       }
       
-      console.log(`Creating flashcard with ID: ${wordSenseId} for definition ${definitionNumber} of "${word}"`);
+      // Extract the key information from the response
+      const responseParts = disambiguateData.rawLlmResponse?.split('//') || [];
+      let responseWord, responseDefinition, responseTranslation;
       
-      const disambiguatedDefinition = bestDefinition;
+      if (responseParts.length >= 3) {
+        [responseWord, responseDefinition, responseTranslation] = responseParts.map(part => part.trim());
+        console.log(`[STAGE 1] Parsed response: Word=${responseWord}, Definition=${responseDefinition}, Translation=${responseTranslation}`);
+      } else {
+        console.warn(`[STAGE 1] Unexpected format in disambiguation response:`, responseParts);
+        responseWord = wordLower;
+        responseDefinition = disambiguateData.disambiguatedDefinition?.definition || '';
+        responseTranslation = '';
+      }
       
-      // Use placeholder image instead of generating one
-      const imageResponse = { url: 'https://placehold.co/300x200/1a1a2e/CCCCCC?text=Placeholder+Image' };
+      // STAGE 2: Send the disambiguated definition to the dictionary endpoint to generate a flashcard
+      console.log(`[STAGE 2] Generating flashcard content for word: ${word}`);
       
+      // Make API request to the dictionary endpoint for the flashcard content
+      const dictionaryResponse = await fetch(`/api/dictionary/${wordLower}?context=${encodeURIComponent(contextSentence)}`);
+      const flashcardData = await dictionaryResponse.json();
+      
+      console.log(`[STAGE 2] Flashcard generation response:`, flashcardData);
+      
+      // Extract the wordSenseId from the disambiguation response or generate one
+      const wordSenseId = disambiguateData.wordSenseId || `${wordLower}_${Date.now()}`;
+      
+      // Create the flashcard using the response data
       setWordDefinitions(prev => {
         // Double-check to prevent race conditions
         if (prev[wordSenseId] && prev[wordSenseId].inFlashcards) {
@@ -865,40 +869,46 @@ const TranscriptionDisplay = ({
           return prev;
         }
         
-        // No need to track all senses in a base word entry anymore
-        const senseKey = wordSenseId;
-        console.log(`[FLASHCARD CREATE] Adding new sense ${senseKey} for word ${wordLower}`);
-        
-        // Create updated state with just the new flashcard entry
+        // Create updated state with the new flashcard entry using our new data format
         const updatedState = {
           ...prev,
-          [senseKey]: {
+          [wordSenseId]: {
             word: wordLower,
-            imageUrl: imageResponse.url,
             wordSenseId: wordSenseId,
             contextSentence: contextSentence,
-            disambiguatedDefinition: disambiguatedDefinition,
-            // Store the best available definition as a flat property for UI reliability
-            definition: (disambiguatedDefinition && (disambiguatedDefinition.definition || disambiguatedDefinition.text)) ||
-                        wordData.definition ||
-                        (wordData.definitions && wordData.definitions[0] && wordData.definitions[0].text) ||
-                        '',
-            inFlashcards: true, // This is where we mark the card as in flashcards
+            
+            // Store the disambiguated definition from Stage 1
+            disambiguatedDefinition: disambiguateData.disambiguatedDefinition || {
+              definition: responseDefinition,
+              partOfSpeech: flashcardData.partOfSpeech || 'unknown',
+              translation: responseTranslation
+            },
+            
+            // Store the translation from the disambiguated response
+            translation: responseTranslation || flashcardData.translation || '',
+            
+            // Marker properties
+            inFlashcards: true, 
             cardCreatedAt: new Date().toISOString(),
-            partOfSpeech: partOfSpeech,
-            definitionNumber: definitionNumber,
-            // Include example sentences from API response if available
-            exampleSentencesRaw: wordData.exampleSentencesRaw || ''
+            
+            // Part of speech from Stage 2
+            partOfSpeech: flashcardData.partOfSpeech || disambiguateData.disambiguatedDefinition?.partOfSpeech || 'unknown',
+            
+            // Store example sentences from Stage 2
+            exampleSentencesRaw: flashcardData.exampleSentencesRaw || '',
+            exampleSentences: flashcardData.exampleSentences || [],
+            
+            // Store frequency ratings from Stage 2
+            wordFrequency: flashcardData.wordFrequency || 3,
+            definitionFrequency: flashcardData.definitionFrequency || 3
           }
         };
         
         console.log(`[FLASHCARD CREATE] Successfully created flashcard with ID: ${wordSenseId}`);
-        
-        // Return the updated state - we'll clean up duplicates after the state update
         return updatedState;
       });
       
-      // Run cleanup to ensure no duplicates after the state update (using setTimeout to ensure state is updated first)
+      // Run cleanup to ensure no duplicates after the state update
       setTimeout(() => {
         console.log('Running duplicate cleanup after adding flashcard...');
         cleanupDuplicateFlashcards();

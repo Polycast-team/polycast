@@ -463,15 +463,11 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                          currentCardData.disambiguatedDefinition?.partOfSpeech || 
                          'verb'}
                       </div>
-                      <div className="flashcard-definition">
-                        {currentCardData.definition ||
-                          currentCardData.disambiguatedDefinition?.definition ||
-                          (currentSenseId.includes('charge1') ? 'to rush forward in attack' :
-                            currentSenseId.includes('charge24') ? 'to restore power to a battery' :
-                            'No definition available')}
+                      <div className="flashcard-translation">
+                        {currentCardData.translation || currentCardData.disambiguatedDefinition?.translation || ''}
                       </div>
                       <div className="flashcard-example">
-                        {/* Show Gemini example sentences if available */}
+                        {/* Display the example sentences from the API */}
                         {currentCardData.exampleSentencesRaw && currentCardData.exampleSentencesRaw.includes('//') ? (
                           <ul style={{ margin: 0, paddingLeft: 18 }}>
                             {currentCardData.exampleSentencesRaw.split('//').map((sentence, idx) => (
@@ -480,16 +476,20 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                           </ul>
                         ) : (
                           <span>
-                            {currentCardData.sampleSentence ||
-                              currentCardData.disambiguatedDefinition?.sampleSentence ||
-                              currentCardData.contextSentence ||
-                              currentCardData.disambiguatedDefinition?.example ||
-                              generatedSentences[currentSenseId] ||
-                              (currentSenseId.includes('charge1') ? 'Testing this now, I will "charge" into battle' :
-                                currentSenseId.includes('charge24') ? 'Testing this now, I will "charge" my phone' :
-                                'Example not available')}
+                            {currentCardData.contextSentence || 'No example available'}
                           </span>
                         )}
+                      </div>
+                      {/* Display frequency ratings if available */}
+                      <div className="flashcard-frequency">
+                        <div className="frequency-item">
+                          <span className="frequency-label">Word Frequency:</span>
+                          <span className="frequency-value">{currentCardData.wordFrequency || 3}/5</span>
+                        </div>
+                        <div className="frequency-item">
+                          <span className="frequency-label">Usage Frequency:</span>
+                          <span className="frequency-value">{currentCardData.definitionFrequency || 3}/5</span>
+                        </div>
                       </div>
                       
                        {/* Correct/Incorrect buttons */}
