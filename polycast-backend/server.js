@@ -910,6 +910,8 @@ async function initializeDatabase() {
                 context TEXT,
                 definition_number INTEGER,
                 example TEXT,
+                word_frequency INTEGER DEFAULT 3,
+                definition_frequency INTEGER DEFAULT 3,
                 in_flashcards BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT NOW(),
                 UNIQUE(profile_name, word_sense_id)
@@ -928,10 +930,10 @@ async function initializeDatabase() {
             // Insert sample flashcards
             await client.query(`
                 INSERT INTO flashcards 
-                (profile_name, word_sense_id, word, definition, translation, part_of_speech, context, definition_number, example, in_flashcards)
+                (profile_name, word_sense_id, word, definition, translation, part_of_speech, context, definition_number, example, word_frequency, definition_frequency, in_flashcards)
                 VALUES 
-                ('cat', 'charge24', 'charge', 'energize a battery by passing a current through it', 'cargar', 'verb', 'I need to charge my phone', 24, 'Remember to charge your devices overnight', true),
-                ('cat', 'run1', 'run', 'move at a speed faster than a walk', 'correr', 'verb', 'She likes to run in the park', 1, 'He runs every morning to stay fit', true)
+                ('cat', 'charge24', 'charge', 'energize a battery by passing a current through it', 'cargar', 'verb', 'I need to charge my phone', 24, 'Remember to charge your devices overnight', 4, 4, true),
+                ('cat', 'run1', 'run', 'move at a speed faster than a walk', 'correr', 'verb', 'She likes to run in the park', 1, 'He runs every morning to stay fit', 5, 5, true)
                 ON CONFLICT (profile_name, word_sense_id) DO NOTHING
             `);
         }
@@ -1084,8 +1086,10 @@ app.get('/api/profile/:profile/words', async (req, res) => {
                             contextSentence: card.context || '', // Map to the expected frontend property name
                             context: card.context || '',
                             definitionNumber: definitionNumber,
-                            example: card.example || '',
-                            exampleSentencesRaw: card.example || '', // Additional property for frontend compatibility
+                            example: card.example || '', // Raw example from DB
+                            exampleSentencesRaw: card.example || '', // Should contain 'sent1//sent2//sent3'
+                            wordFrequency: card.word_frequency || 3, // New field
+                            definitionFrequency: card.definition_frequency || 3, // New field
                             inFlashcards: true // Always set this to true when coming from DB
                         };
                     } catch (cardError) {
@@ -1278,6 +1282,8 @@ app.post('/api/profile/:profile/words', async (req, res) => {
             
             // Example sentence fallback
             const exampleValue = card.example || card.exampleSentencesRaw || contextValue || '';
+            const wordFrequencyValue = card.wordFrequency || 3;
+            const definitionFrequencyValue = card.definitionFrequency || 3;
             
             try {
                 console.log(`[Profile API] Executing upsert for flashcard ${wordSenseId} with SQL parameters:`);
@@ -1287,13 +1293,16 @@ app.post('/api/profile/:profile/words', async (req, res) => {
                 console.log(`  - definition: ${definitionValue.substring(0, 50)}${definitionValue.length > 50 ? '...' : ''}`);
                 console.log(`  - partOfSpeech: ${partOfSpeechValue}`);
                 console.log(`  - definitionNumber: ${definitionNumber}`);
+                console.log(`  - wordFrequency: ${wordFrequencyValue}`);
+                console.log(`  - definitionFrequency: ${definitionFrequencyValue}`);
                 console.log(`  - inFlashcards: ${card.inFlashcards === false ? false : true}`);
                 
                 const flashcardResult = await client.query(`
                     INSERT INTO flashcards (
                         profile_name, word_sense_id, word, definition, translation, 
-                        part_of_speech, context, definition_number, example, in_flashcards
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                        part_of_speech, context, definition_number, example, 
+                        word_frequency, definition_frequency, in_flashcards
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                     ON CONFLICT (profile_name, word_sense_id) DO UPDATE SET
                         word = $3,
                         definition = $4,
@@ -1302,7 +1311,9 @@ app.post('/api/profile/:profile/words', async (req, res) => {
                         context = $7,
                         definition_number = $8,
                         example = $9,
-                        in_flashcards = $10
+                        word_frequency = $10,
+                        definition_frequency = $11,
+                        in_flashcards = $12
                     RETURNING *
                 `, [
                     profile,
@@ -1314,6 +1325,8 @@ app.post('/api/profile/:profile/words', async (req, res) => {
                     contextValue,
                     definitionNumber,
                     exampleValue,
+                    wordFrequencyValue,
+                    definitionFrequencyValue,
                     card.inFlashcards === false ? false : true
                 ]);
                 

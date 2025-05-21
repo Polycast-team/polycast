@@ -188,9 +188,10 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
   const getWordFrequency = (word) => {
     const entries = groupedEntries[word] || [];
     const firstEntry = entries[0] || {};
-    const frequency = firstEntry?.disambiguatedDefinition?.wordFrequency || null;
+    // Access wordFrequency directly from the first entry
+    const frequency = firstEntry?.wordFrequency || null; 
     
-    if (!frequency) {
+    if (frequency === null || typeof frequency === 'undefined') {
       // Generate a consistent frequency rating if none available
       const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       return (sum % 5) + 1;
@@ -539,40 +540,39 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
                             <div className="part-of-speech">{partOfSpeech}</div>
                             {/* Usage frequency for this specific definition */}
                             {(() => {
-                              const usageFrequency = entry?.disambiguatedDefinition?.definitions?.[0]?.usageFrequency || 
-                                                   entry?.disambiguatedDefinition?.usageFrequency;
+                              const usageFrequencyValue = entry?.definitionFrequency ||
+                                                       entry?.disambiguatedDefinition?.definitionFrequency ||
+                                                       null;
+                              const usageFrequency = usageFrequencyValue ? parseInt(usageFrequencyValue, 10) : 3; // Default to 3 if null
                               
-                              if (usageFrequency) {
-                                // Get a text description of the frequency
-                                const frequencyText = {
-                                  1: 'Very Rare Usage',
-                                  2: 'Uncommon Usage',
-                                  3: 'Secondary Usage',
-                                  4: 'Common Usage',
-                                  5: 'Primary Usage'
-                                }[parseInt(usageFrequency, 10)] || '';
+                              // Get a text description of the frequency
+                              const frequencyText = {
+                                1: 'Very Rare Usage',
+                                2: 'Uncommon Usage',
+                                3: 'Secondary Usage',
+                                4: 'Common Usage',
+                                5: 'Primary Usage'
+                              }[usageFrequency] || '';
                                 
-                                return (
-                                  <div className="usage-frequency" style={{ 
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    marginLeft: '12px',
-                                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                                    padding: '4px 10px',
-                                    borderRadius: '12px',
-                                    gap: '8px'
-                                  }}>
-                                    <span style={{ color: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>
-                                      Definition Frequency: 
-                                    </span>
-                                    <FrequencyDots frequency={parseInt(usageFrequency, 10)} size={8} showValue={false} />
-                                    <span style={{ color: '#a0a0b8', fontSize: '13px' }}>
-                                      {frequencyText}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              return null;
+                              return (
+                                <div className="usage-frequency" style={{ 
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  marginLeft: '12px',
+                                  backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  gap: '8px'
+                                }}>
+                                  <span style={{ color: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>
+                                    Definition Frequency: 
+                                  </span>
+                                  <FrequencyDots frequency={usageFrequency} size={8} showValue={false} />
+                                  <span style={{ color: '#a0a0b8', fontSize: '13px' }}>
+                                    {frequencyText}
+                                  </span>
+                                </div>
+                              );
                             })()}
                           </div>
                           {onRemoveWord && (

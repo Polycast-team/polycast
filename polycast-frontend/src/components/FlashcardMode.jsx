@@ -479,16 +479,7 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                             ))}
                           </ul>
                         ) : (
-                          <span>
-                            {currentCardData.sampleSentence ||
-                              currentCardData.disambiguatedDefinition?.sampleSentence ||
-                              currentCardData.contextSentence ||
-                              currentCardData.disambiguatedDefinition?.example ||
-                              generatedSentences[currentSenseId] ||
-                              (currentSenseId.includes('charge1') ? 'Testing this now, I will "charge" into battle' :
-                                currentSenseId.includes('charge24') ? 'Testing this now, I will "charge" my phone' :
-                                'Example not available')}
-                          </span>
+                          <span>No example sentences available for this card.</span>
                         )}
                       </div>
                       
