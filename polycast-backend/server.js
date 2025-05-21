@@ -244,6 +244,7 @@ wss.on('connection', (ws, req) => {
                         hostWs: ws,
                         students: [],
                         transcript: [],
+                        translationsEnabled: true, // Default to true
                         createdAt: Date.now()
                     });
                     console.log(`[Room] Host created room on connect: ${roomCode}`);
@@ -279,6 +280,19 @@ wss.on('connection', (ws, req) => {
                         ws.send(JSON.stringify({
                             type: 'transcript_history',
                             data: room.transcript
+                        }));
+                    }
+                    // Send current translations status to newly joined student
+                    if (room.hasOwnProperty('translationsEnabled')) {
+                        ws.send(JSON.stringify({
+                            type: 'ROOM_TRANSLATIONS_STATUS',
+                            payload: { translationsEnabled: room.translationsEnabled }
+                        }));
+                    } else {
+                        // Should not happen if initialization is correct, but as a fallback:
+                        ws.send(JSON.stringify({
+                            type: 'ROOM_TRANSLATIONS_STATUS',
+                            payload: { translationsEnabled: true } // Default to true
                         }));
                     }
                 }
@@ -547,9 +561,38 @@ wss.on('connection', (ws, req) => {
                     } else {
                         ws.send(JSON.stringify({ type: 'error', message: 'Text submissions are only allowed in text mode.' }));
                     }
+                } else if (data.type === 'TOGGLE_ROOM_TRANSLATIONS') {
+                    if (!isInRoom || !isRoomHost) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Only the host can toggle translations.' }));
+                        return;
+                    }
+                    if (data.payload && typeof data.payload.enabled === 'boolean') {
+                        const room = activeRooms.get(clientRoom.roomCode);
+                        if (room) {
+                            room.translationsEnabled = data.payload.enabled;
+                            console.log(`[Room] Host toggled translations for room ${clientRoom.roomCode} to ${room.translationsEnabled}`);
+
+                            // Persist to Redis
+                            redisService.saveRoom(clientRoom.roomCode, room)
+                                .catch(err => console.error(`[Redis] Failed to save room ${clientRoom.roomCode} after toggling translations:`, err));
+
+                            // Broadcast to students
+                            const statusMessage = JSON.stringify({
+                                type: 'ROOM_TRANSLATIONS_STATUS',
+                                payload: { translationsEnabled: room.translationsEnabled }
+                            });
+                            room.students.forEach(student => {
+                                if (student.readyState === WebSocket.OPEN) {
+                                    student.send(statusMessage);
+                                }
+                            });
+                        }
+                    } else {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Invalid payload for TOGGLE_ROOM_TRANSLATIONS.' }));
+                    }
                 }
             } catch (err) {
-                console.error('Failed to parse or handle text_submit:', err);
+                console.error('Failed to parse or handle incoming string message:', err);
             }
         } else {
             console.warn('[Server] Received unexpected non-buffer message, ignoring.');
@@ -657,6 +700,7 @@ app.post('/api/create-room', async (req, res) => {
             hostWs: null,  // Will be set when host connects via WebSocket
             students: [],  // List of student WebSocket connections
             transcript: [], // Current transcript data
+            translationsEnabled: true, // Default to true
             createdAt: Date.now() // Timestamp for cleanup later
         };
         
@@ -697,6 +741,7 @@ app.get('/api/check-room/:roomCode', async (req, res) => {
                 hostWs: null,
                 students: [],
                 transcript: roomData.transcript || [],
+                translationsEnabled: typeof roomData.translationsEnabled === 'boolean' ? roomData.translationsEnabled : true, // Load or default to true
                 createdAt: roomData.createdAt || Date.now()
             });
             

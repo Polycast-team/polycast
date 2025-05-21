@@ -82,6 +82,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
   // Start with an empty transcript
   const [englishSegments, setEnglishSegments] = useState([]);
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
+  const [teacherTranslationsEnabled, setTeacherTranslationsEnabled] = useState(true); // Added state
   // Test Phrase toggle state
   const [testPhraseEnabled, setTestPhraseEnabled] = useState(false);
   
@@ -450,6 +451,13 @@ function App({ targetLanguages, onReset, roomSetup }) {
             }
             return newTranslations;
           });
+        } else if (parsedData.type === 'ROOM_TRANSLATIONS_STATUS') {
+          if (parsedData.payload && typeof parsedData.payload.translationsEnabled === 'boolean') {
+            setTeacherTranslationsEnabled(parsedData.payload.translationsEnabled);
+            console.log(`[App.jsx] ROOM_TRANSLATIONS_STATUS received, teacherTranslationsEnabled set to: ${parsedData.payload.translationsEnabled}`);
+          } else {
+            console.warn('[App.jsx] Invalid ROOM_TRANSLATIONS_STATUS payload:', parsedData.payload);
+          }
         } else {
             console.warn('Received unknown message type:', parsedData.type);
         }
@@ -644,9 +652,19 @@ function App({ targetLanguages, onReset, roomSetup }) {
                 if (!checked && !showTranslation) setShowTranslation(true);
               }}
               showTranslation={showTranslation}
+              teacherTranslationsEnabled={teacherTranslationsEnabled} // Added prop
               setShowTranslation={(checked) => {
-                setShowTranslation(checked);
-                if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
+                setShowTranslation(checked); // Update local state for host's own view
+                if (!checked && !showLiveTranscript) setShowLiveTranscript(true); // Maintain mutual exclusivity
+
+                // If the user is the host, send the toggle message to the backend
+                if (roomSetup && roomSetup.isHost) {
+                  sendMessage(JSON.stringify({
+                    type: 'TOGGLE_ROOM_TRANSLATIONS',
+                    payload: { enabled: checked }
+                  }));
+                  console.log(`[App.jsx] Host toggled translations. Sending TOGGLE_ROOM_TRANSLATIONS: ${checked}`);
+                }
               }}
               selectedProfile={selectedProfile}
               setSelectedProfile={profile => {
@@ -809,7 +827,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
             translations={translations} 
             targetLanguages={effectiveLanguages} 
             showLiveTranscript={showLiveTranscript}
-            showTranslation={showTranslation}
+            showTranslation={roomSetup && !roomSetup.isHost && !teacherTranslationsEnabled ? false : showTranslation}
             isTextMode={appMode === 'text'}
             isStudentMode={roomSetup && !roomSetup.isHost}
             forceKey={`transcript-${testPhraseEnabled ? 'with-test' : 'no-test'}`} // Force re-render when test phrase changes
