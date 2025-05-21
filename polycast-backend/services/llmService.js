@@ -128,28 +128,74 @@ async function translateTextBatch(text, targetLanguages) {
  * @returns {Promise<Object>} The definition object with Spanish definition and example.
  * @throws {Error} If initialization fails or API call fails.
  */
-/**
- * This function has been removed as part of the transition to a new dictionary workflow.
- * 
- * The old implementation used to generate dictionary entries directly from Gemini.
- * The new approach will use the disambiguate-word endpoint with a new prompt format
- * that returns word//definition//translation format.
- */
 async function getWordDefinition(word, context = '') {
-    console.log('[LLM Service] getWordDefinition function is deprecated and has been removed.');
-    // Return a minimal object to prevent errors in case any code still calls this function
-    return {
-        translation: '',
-        partOfSpeech: '',
-        wordFrequency: 3,
-        definitions: [
-            {
-                text: 'Definition unavailable. Using new workflow.',
-                example: '',
-                usageFrequency: 3
-            }
-        ]
-    };
+    initializeLLM(); // Ensure LLM is initialized
+
+    if (!word || word.trim().length === 0) {
+        console.log('[LLM Service] Skipping definition for empty word.');
+        return { definition: '', example: '' };
+    }
+
+    const contextInfo = context ? 
+        `The word appears in this context: "${context}". Your definition and examples should be specific to how the word is used in this context.` : 
+        '';
+
+    const prompt = `You are creating dictionary entries for non-native English speakers who are learning English. 
+    
+Your job is to explain the English word "${word}" in a simple, clear way that helps beginners understand it.
+
+${contextInfo}
+
+Your response must be in JSON format with these fields:
+{
+  "translation": "Spanish translation of the word",
+  "partOfSpeech": "The part of speech (noun, verb, adjective, etc.)",
+  "wordFrequency": "A number from 1 to 5 representing how common this word is in general English vocabulary, with precise definitions: 1 = rare/specialized (known by fewer than 30% of native speakers), 2 = somewhat uncommon (known by 30-60% of native speakers), 3 = moderately common (known by 60-80% of native speakers), 4 = very common (known by 80-95% of native speakers), 5 = extremely common/basic vocabulary (known by >95% of native speakers). Please be realistic and accurate with your assessment.",
+  "definitions": [
+    {
+      "text": "VERY SIMPLE and SHORT explanation in simple English (1-2 short sentences max). Use basic vocabulary a beginner would understand.",
+      "example": "A simple example sentence in English that uses this word. Make the context very obvious.",
+      "usageFrequency": "A number from 1 to 5 representing how common this specific definition/sense of the word is compared to other meanings: 1 = very rare usage (less than 10% of uses), 2 = uncommon usage (10-25% of uses), 3 = secondary usage (25-40% of uses), 4 = common usage (40-60% of uses), 5 = primary/dominant usage (more than 60% of uses). Be realistic and adjust numbers so they make sense across all definitions of this word."
+    },
+    {
+      "text": "If the word has another common meaning, provide a second SIMPLE and SHORT definition here.",
+      "example": "An example sentence for this second meaning.",
+      "usageFrequency": "A number from 1 to 5 representing how common this specific usage is"
+    },
+    {
+      "text": "If the word has a third common meaning, provide a third SIMPLE and SHORT definition here.",
+      "example": "An example sentence for this third meaning.",
+      "usageFrequency": "A number from 1 to 5 representing how common this specific usage is"
+    }
+  ]
+}
+
+If the word only has one common meaning, just include one item in the definitions array. If it has two common meanings, include two items. Only include definitions that would be useful for a language learner to know.
+
+Only return the JSON object, nothing else.`;
+
+    console.log(`[LLM Service] Getting Spanish definition for: "${word}" ${context ? 'with context' : ''}`);
+    console.log(`--- LLM Definition Prompt ---`);
+    console.log(prompt);
+    console.log(`--- End LLM Definition Prompt ---`);
+
+    try {
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text().trim();
+        console.log(`[LLM Service] Received definition response: "${text.substring(0, 100)}..."`);
+        
+        // Extract JSON from response
+        let parsedResponse = extractJsonFromText(text);
+        
+        // Normalize the response format for backward compatibility
+        parsedResponse = normalizeDefinitionFormat(parsedResponse);
+        
+        return parsedResponse;
+    } catch (error) {
+        console.error('[LLM Service] Error during definition API call:', error);
+        throw new Error(`LLM API Error: ${error.message}`);
+    }
 }
 
 // Helper to extract JSON from LLM response text

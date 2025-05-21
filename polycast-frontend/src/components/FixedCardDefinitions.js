@@ -72,7 +72,7 @@ export function doesWordSenseExist(wordDefinitions, word, contextSentence, defin
  * @param {number} definitionNumber - Definition number
  * @returns {object} - Properly formatted flashcard entry
  */
-export function createFlashcardEntry(wordLower, wordSenseId, contextSentence, definition, partOfSpeech, examples = [], wordFrequency = 3, definitionFrequency = 3, translation = '') {
+export function createFlashcardEntry(wordLower, wordSenseId, contextSentence, definition, partOfSpeech, definitionNumber) {
   // Normalize definition to ensure it's stored in a consistent format
   const definitionText = typeof definition === 'string' 
     ? definition 
@@ -80,11 +80,6 @@ export function createFlashcardEntry(wordLower, wordSenseId, contextSentence, de
     
   // Create placeholder image URL
   const imageUrl = 'https://placehold.co/300x200/1a1a2e/CCCCCC?text=Placeholder+Image';
-  
-  // Ensure examples is an array with at least one item
-  const normalizedExamples = Array.isArray(examples) && examples.length > 0
-    ? examples
-    : [contextSentence || `Example using the word "${wordLower}"`];
   
   return {
     word: wordLower,
@@ -95,20 +90,15 @@ export function createFlashcardEntry(wordLower, wordSenseId, contextSentence, de
     disambiguatedDefinition: { 
       definition: definitionText,
       text: definitionText,
-      partOfSpeech: partOfSpeech,
-      translation: translation
+      partOfSpeech: partOfSpeech
     },
     definition: definitionText,
     text: definitionText, // Legacy field needed by FlashcardMode
     exampleSentence: contextSentence,
-    // New fields for the updated workflow
-    examples: normalizedExamples,
-    wordFrequency: wordFrequency,
-    definitionFrequency: definitionFrequency,
-    translation: translation,
     inFlashcards: true,
     cardCreatedAt: new Date().toISOString(),
-    partOfSpeech: partOfSpeech
+    partOfSpeech: partOfSpeech,
+    definitionNumber: definitionNumber
   };
 }
 

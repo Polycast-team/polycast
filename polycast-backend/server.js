@@ -737,54 +737,149 @@ app.get('/api/dictionary/:word', async (req, res) => {
         const context = req.query.context || '';
         console.log(`[Dictionary API] Getting definition for: ${word}${context ? ' with context: "' + context + '"' : ''}`);
         
-        // Create a prompt for the new word//definition//translation format
-        const prompt = `You are helping a language learner understand the meaning of a word in a sentence.
+        // Create a prompt that asks for a single contextual definition and definition number
+        const prompt = `You are an expert language teacher helping a student understand a word in its specific context.
 
-Word: "${word}"
-Context: "${context}"
+The word "${word}" appears in this context: "${context}"
 
-Respond with the word, followed by the text of your best definition for this word in this context, followed by the Spanish translation. These should be separated by '//', for example 'charge//To rush forward to attack.//cargar'`;
+Your task is to:
+1. Identify the SINGLE best definition that applies to how this word is used in this specific context
+2. Determine the correct definition number from the following standard dictionary entries:
+
+For "charge" word:
+1: to make a rush at or sudden attack upon (verb)
+2: blame for, make a claim of wrongdoing against (verb)
+3: demand payment (verb)
+4: the quantity of unbalanced electricity in a body (noun)
+7: make an accusatory claim (verb)
+8: fill or load to capacity (verb)
+11: request for payment of a debt (noun)
+12: pay with a credit card (verb)
+24: energize a battery by passing a current through it (verb)
+
+For other words, use other standard definition numbers that apply.
+
+Output ONLY a JSON object with these fields:
+{
+  "translation": "Spanish translation of the word as used in this specific context",
+  "partOfSpeech": "The part of speech of the word in this context (noun, verb, adjective, etc.)",
+  "definition": "A clear and concise definition appropriate for how the word is used in this context only",
+  "example": "A simple example sentence showing a similar usage to the context",
+  "definitionNumber": The number from the standard dictionary that best matches this usage (e.g., 1, 3, 11, 24, etc.)
+}
+
+Do NOT provide multiple definitions or explanations outside the JSON.`;
         
         // Log prompt for debugging
-        console.log('[Dictionary API] Using new prompt format:', prompt);
+        console.log('[Dictionary API] Prompt:', prompt.substring(0, 200) + '...');
         
         // Generate the response using Gemini with low temperature for consistency
         const llmResponse = await generateTextWithGemini(prompt, 0.2);
-        console.log(`[Dictionary API] Raw Gemini response: ${llmResponse}`);
         
-        // Parse the response in the format: word//definition//translation
-        const parts = llmResponse.trim().split('//');
-        
-        if (parts.length >= 3) {
-            const responseWord = parts[0].trim();
-            const responseDefinition = parts[1].trim();
-            const translation = parts[2].trim();
+        try {
+            // Extract JSON from response
+            const jsonMatch = llmResponse.match(/\{[\s\S]*?\}/);
+            if (!jsonMatch) {
+                throw new Error('Could not extract JSON from LLM response');
+            }
+            const jsonStr = jsonMatch[0];
+            const parsedResponse = JSON.parse(jsonStr);
             
             // Format for backward compatibility with existing frontend
             const formattedResponse = {
-                word: responseWord,
-                translation: translation,
-                partOfSpeech: 'unknown', // We'll need to infer this or add it to the prompt format
-                definition: responseDefinition,
+                translation: parsedResponse.translation || '',
+                partOfSpeech: parsedResponse.partOfSpeech || '',
+                definition: parsedResponse.definition || '',
                 definitions: [{
-                    text: responseDefinition,
-                    example: context || 'No example available.'
+                    text: parsedResponse.definition || '',
+                    example: parsedResponse.example || ''
                 }],
+                definitionNumber: parsedResponse.definitionNumber || 1, // Include the definition number
                 isContextual: true
             };
             
-            console.log(`[Dictionary API] Processed response for "${word}": ${JSON.stringify(formattedResponse, null, 2)}`);
+            console.log(`[Dictionary API] Found definition number ${formattedResponse.definitionNumber} for "${word}" in context: "${context.substring(0, 30)}..."`);
+            
+            // Second stage: Generate flashcard content with example sentences and frequency ratings
+            let flashcardContent = '';
+            try {
+                // Using the exact format requested by the user
+                const flashcardPrompt = `Return three example sentences using the word '${word}' in the context of '${parsedResponse.definition}' with each sentence separated by '//.' after the three sentences, provide a frequency rating of 1-5 for how common that word is, followed by a frequency rating for how common that definition is for that word. use the following criteria: 
+
+Vocabulary Frequency (1–5):
+
+Rate how common the word is in general vocabulary, considering how likely it is to appear in everyday conversation, school materials, news articles, and basic media.
+
+1: Highly rare or technical; almost never appears outside specific fields
+
+2: Somewhat uncommon; appears occasionally in books or niche conversations
+
+3: Neutral; part of educated vocabulary but not basic
+
+4: Common; heard regularly by most speakers
+
+5: Core/basic vocabulary known and used by nearly all fluent speakers
+
+Definition Frequency (1–5):
+
+Rate how common this specific meaning of the word is compared to its other meanings.
+
+1: Obscure or outdated definition
+
+2: Infrequently used definition
+
+3: Less typical but still recognized
+
+4: One of the common meanings
+
+5: Most typical or dominant meaning
+
+Additional Tips Phrase it as a ranking relative to other words and meanings, not percentages.
+
+You can also give a few examples in your prompt to calibrate Gemini:
+
+"apple" as a fruit = 5, "deciduous" = 2, "syzygy" = 1
+
+"run" meaning "to jog" = 5, "run" meaning "to operate a play" = 3, "run" meaning "a small stream" = 2"
+
+your final output should look something like this: [example sentence 1]//[example sentence 2]//[example sentence 3]//4//4`;
+                
+                flashcardContent = await generateTextWithGemini(flashcardPrompt, 0.2);
+                console.log(`[Dictionary API] Flashcard content for "${word}": ${flashcardContent}`);
+                
+                // Parse the flashcard content
+                const contentParts = flashcardContent.split('//').map(part => part.trim());
+                
+                if (contentParts.length >= 5) {
+                    // Extract example sentences and frequency ratings
+                    const [sentence1, sentence2, sentence3, wordFrequency, definitionFrequency] = contentParts;
+                    
+                    // Add to the formatted response
+                    formattedResponse.exampleSentences = [sentence1, sentence2, sentence3];
+                    formattedResponse.exampleSentencesRaw = `${sentence1}//${sentence2}//${sentence3}`;
+                    formattedResponse.wordFrequency = parseInt(wordFrequency) || 3;
+                    formattedResponse.definitionFrequency = parseInt(definitionFrequency) || 3;
+                    
+                    console.log(`[Dictionary API] Word frequency: ${formattedResponse.wordFrequency}, Definition frequency: ${formattedResponse.definitionFrequency}`);
+                } else {
+                    console.error('[Dictionary API] Unexpected flashcard content format:', flashcardContent);
+                    // Fallback to default values
+                    formattedResponse.exampleSentencesRaw = flashcardContent;
+                    formattedResponse.wordFrequency = 3;
+                    formattedResponse.definitionFrequency = 3;
+                }
+            } catch (exErr) {
+                console.error('[Dictionary API] Error generating flashcard content:', exErr);
+                formattedResponse.exampleSentencesRaw = '';
+                formattedResponse.wordFrequency = 3;
+                formattedResponse.definitionFrequency = 3;
+            }
+            
+            console.log(`[Dictionary API] Final response for "${word}":`, JSON.stringify(formattedResponse, null, 2));
             res.json(formattedResponse);
-        } else {
-            // Fallback if response doesn't match expected format
-            console.error('[Dictionary API] Error: Response not in expected format');
-            res.status(500).json({
-                error: 'Response not in expected format',
-                raw: llmResponse,
-                word: word,
-                definition: 'Definition unavailable',
-                translation: 'Translation unavailable'
-            });
+        } catch (parseError) {
+            console.error('[Dictionary API] Error parsing response:', parseError);
+            res.status(500).json({ error: 'Failed to parse definition', raw: llmResponse });
         }
     } catch (error) {
         console.error("Dictionary API error:", error);
@@ -1524,20 +1619,22 @@ app.get('/api/local-dictionary/:letter/:word', async (req, res) => {
     }
     
     try {
-        // Get possible definitions for this word from a dictionary source
-        // For now we're providing a simpler version without definitions list
-        // In the actual implementation, we would fetch definitions from dictionary API
-        
-        // Use the new format with possible definitions
-        const prompt = `You are helping a language learner understand the meaning of a word in a sentence.
+        // Create a prompt that asks for a dictionary-style definition and examples, but ONLY for the specific context
+        const prompt = `You are creating dictionary entries for non-native English speakers who are learning English. 
+    
+Your job is to explain the English word "${word}" in a simple, clear way that helps beginners understand it.
+The word appears in this context: "${contextSentence}". Your definition and example should be specific to how the word is used in this context ONLY.
+Your response must be in JSON format with these fields:
+{
+  "translation": "Spanish translation of the word as used in this specific context",
+  "partOfSpeech": "The part of speech (noun, verb, adjective, etc.) of the word in this context",
+  "frequencyRating": "A number from 1 to 5 representing how common this word is in everyday English in this sense",
+  "definition": "VERY SIMPLE and SHORT explanation in simple English for how the word is used in this context (1-2 short sentences max)",
+  "example": "A simple example sentence in English that uses this word in a similar way to the context."
+}
 
-Word: "${word}"
-Context: "${contextSentence}"
-Possible definitions:
-1. A definition of ${word}
-2. Another possible definition of ${word}
-
-Which definition matches the word as used in the context sentence above? Respond with the word, followed by the text of the best matching definition, followed by the Spanish translation. These should be separated by '//', for example 'charge//To rush forward to attack.//cargar'`;
+IMPORTANT: ONLY provide the definition of the word as it is used in the context sentence. DO NOT provide multiple definitions or alternative meanings.
+Only return the JSON object, nothing else.`;
         
         // Log the prompt for debugging
         console.log('--- LLM Definition Prompt ---');
@@ -1555,33 +1652,30 @@ Which definition matches the word as used in the context sentence above? Respond
         
         // Parse the JSON response
         try {
-            // Parse the response in the format: word//definition//translation
-            const parts = llmResponse.trim().split('//');
+            // Extract JSON object if it's embedded in text
+            const jsonMatch = llmResponse.match(/\{[\s\S]*?\}/); // Find first JSON-like object
             
-            if (parts.length >= 3) {
-                const responseWord = parts[0].trim();
-                const responseDefinition = parts[1].trim();
-                const translation = parts[2].trim();
+            if (jsonMatch) {
+                const jsonStr = jsonMatch[0];
+                console.log(`Extracted JSON response for ${word}:`, jsonStr);
                 
-                console.log(`Parsed response for ${word}:`, { responseWord, responseDefinition, translation });
+                const parsedResponse = JSON.parse(jsonStr);
                 
-                // Format response to be compatible with existing frontend expectations
+                // Normalize the response format
                 const normalizedResponse = {
-                    word: responseWord,
-                    translation: translation,
-                    partOfSpeech: 'unknown', // We don't get this in the new format
-                    frequencyRating: 3, // Default value since we don't get this in the new format
+                    translation: parsedResponse.translation || '',
+                    partOfSpeech: parsedResponse.partOfSpeech || '',
+                    frequencyRating: parsedResponse.frequencyRating || 3,
                     definitions: [{
-                        text: responseDefinition,
-                        example: contextSentence || 'No example available.'
+                        text: parsedResponse.definition || '',
+                        example: parsedResponse.example || ''
                     }],
                     isContextual: true
                 };
                 
                 res.json(normalizedResponse);
             } else {
-                console.log(`Invalid response format for ${word}:`, llmResponse);
-                throw new Error('Response not in expected format (word//definition//translation)');
+                throw new Error('Could not extract JSON from LLM response');
             }
         } catch (parseError) {
             console.error(`Error parsing LLM response for ${word}:`, parseError);
@@ -1593,7 +1687,7 @@ Which definition matches the word as used in the context sentence above? Respond
     }
 });
 
-// New endpoint for disambiguating word definitions using Gemini
+// New endpoint for disambiguating word definitions using Gemini with custom format
 app.post('/api/disambiguate-word', async (req, res) => {
     try {
         const { word, contextSentence, definitions, existingFlashcardSenseIds = [] } = req.body;
@@ -1611,138 +1705,63 @@ app.post('/api/disambiguate-word', async (req, res) => {
         // Example: "I am going to *charge* my phone"
         console.log(`Context received with emphasis: ${contextSentence}`);
 
-        // Create a prompt for the LLM to use context to disambiguate
+        // New prompt format as requested by user
         const prompt = `You are helping a language learner understand the meaning of a word in a sentence.
 
 Word: "${word}"
 Context: "${contextSentence}"
 Possible definitions:
-${definitions.map((def, idx) => `${idx + 1}. (${def.partOfSpeech}) ${def.definition}`).join('\n')}
+${definitions.map((def, idx) => `${idx + 1}. ${def.definition}`).join('\n')}
 
-Which definition matches the word as used in the context sentence above? Respond with the word, followed by the text of the best matching definition, followed by the Spanish translation. These should be separated by '//', for example 'charge//To rush forward to attack.//cargar'`;
+Which definition matches the word as used in the context sentence above? Respond with the word, followed by the text of the best matching definition, followed by the Spanish translation. These should be separated by a '//', for example 'charge//To rush forward to attack.//cargar'`;
         
-        console.log(`[WORD SENSE DISAMBIGUATION] Sending prompt to Gemini for disambiguation (FIRST CALL)`);
-        console.log(`==================================================`);
-        console.log(`DISAMBIGUATION CALL - PROMPT:`);
-        console.log(prompt);
-        console.log(`==================================================`);
+        console.log(`[WORD SENSE DISAMBIGUATION] Sending prompt to Gemini for disambiguation`);
         
-        // Call Gemini API with a custom function since llmService doesn't have generateText
-        // Pass a specific debug tag for tracking in logs
-        const response = await generateTextWithGemini(prompt, 0.1, 'DISAMBIGUATE');
+        // Call Gemini API
+        const response = await generateTextWithGemini(prompt, 0.1);
         
-        console.log(`==================================================`);
-        console.log(`DISAMBIGUATION CALL - RESPONSE:`);
-        console.log(response);
-        console.log(`==================================================`);
+        // Parse the new response format (word//definition//translation)
+        const responseParts = response.split('//').map(part => part.trim());
+        console.log(`[WORD SENSE DISAMBIGUATION] Response parts:`, responseParts);
         
-        // Parse the response in the format: word//definition//translation
-        const parts = response.trim().split('//');
+        // Parse response parts into word, definition and translation
+        let responseWord, responseDefinition, responseTranslation;
         
-        if (parts.length >= 3) {
-            const responseWord = parts[0].trim();
-            const responseDefinition = parts[1].trim();
-            const translation = parts[2].trim();
-            
-            // Find the dictionary definition entry that best matches the response
-            const bestMatch = definitions.find(def => 
-                def.definition.toLowerCase().includes(responseDefinition.toLowerCase()) || 
-                responseDefinition.toLowerCase().includes(def.definition.toLowerCase()));
-            
-            // If we can't find a match, use the first definition or create a simple one
-            const matchedDefinition = bestMatch || {
-                partOfSpeech: 'unknown',
-                definition: responseDefinition
-            };
-            
-            console.log(`[WORD SENSE DISAMBIGUATION] Gemini identified definition: ${responseDefinition}`);
-            console.log(`[WORD SENSE DISAMBIGUATION] Translation: ${translation}`);
+        if (responseParts.length >= 3) {
+            [responseWord, responseDefinition, responseTranslation] = responseParts;
+        } else {
+            // Fallback if we don't get the expected format
+            console.log(`[WORD SENSE DISAMBIGUATION] Unexpected response format: ${response}`);
+            responseWord = word;
+            responseDefinition = responseParts[1] || response;
+            responseTranslation = '';
+        }
+        
+        // Find the best matching definition from our original list
+        // We need this to get the part of speech and other metadata
+        let bestMatch = null;
+        let highestSimilarity = -1;
+        
+        for (const def of definitions) {
+            // Simple string similarity check
+            const similarity = stringSimilarity(def.definition, responseDefinition);
+            if (similarity > highestSimilarity) {
+                highestSimilarity = similarity;
+                bestMatch = def;
+            }
+        }
+        
+        // We'll use the matched definition, but keep the translation from Gemini
+        if (bestMatch) {
+            bestMatch.translation = responseTranslation;
+        }
+        
+        if (bestMatch) {
+            console.log(`[WORD SENSE DISAMBIGUATION] Gemini identified definition: (${bestMatch.partOfSpeech}) ${bestMatch.definition}`);
             
             // Create a unique sense ID for this definition
-            const definitionHash = responseDefinition.substring(0, 8).replace(/\W+/g, '');
-            const wordSenseId = `${word.toLowerCase()}_${matchedDefinition.partOfSpeech || 'unknown'}_${definitionHash}`;
-            
-            // STEP 2: Generate example sentences and frequency ratings
-            console.log(`[WORD SENSE DISAMBIGUATION] Step 2: Generating examples and frequency ratings`);
-            
-            const examplesPrompt = `Return three example sentences using the word '${responseWord}' in the context of '${responseDefinition}' with each sentence separated by '//.' After the three sentences, provide a frequency rating of 1-5 for how common that word is, followed by a frequency rating for how common that definition is for that word.
-
-Use the following criteria:
-
-Vocabulary Frequency (1–5):
-Rate how common the word is in general vocabulary, considering how likely it is to appear in everyday conversation, school materials, news articles, and basic media.
-1: Highly rare or technical; almost never appears outside specific fields
-2: Somewhat uncommon; appears occasionally in books or niche conversations
-3: Neutral; part of educated vocabulary but not basic
-4: Common; heard regularly by most speakers
-5: Core/basic vocabulary known and used by nearly all fluent speakers
-
-Definition Frequency (1–5):
-Rate how common this specific meaning of the word is compared to its other meanings.
-1: Obscure or outdated definition
-2: Infrequently used definition
-3: Less typical but still recognized
-4: One of the common meanings
-5: Most typical or dominant meaning
-
-Examples for calibration:
-- "apple" as a fruit = 5, "deciduous" = 2, "syzygy" = 1
-- "run" meaning "to jog" = 5, "run" meaning "to operate a play" = 3, "run" meaning "a small stream" = 2
-
-Your response should follow this exact format without any additional text:
-[example sentence 1]//[example sentence 2]//[example sentence 3]//[word frequency]//[definition frequency]`;
-            
-            let examples = [];
-            let wordFrequency = 3;
-            let definitionFrequency = 3;
-            
-            try {
-                console.log(`[WORD SENSE DISAMBIGUATION] Sending prompt to Gemini for examples (SECOND CALL)`);
-                console.log(`==================================================`);
-                console.log(`2ND CALL - PROMPT:`);
-                console.log(examplesPrompt);
-                console.log(`==================================================`);
-                
-                // Call Gemini API for example sentences and frequency ratings
-                // Pass a specific debug tag for tracking in logs
-                const examplesResponse = await generateTextWithGemini(examplesPrompt, 0.2, 'EXAMPLES');
-                
-                console.log(`==================================================`);
-                console.log(`2ND CALL - RESPONSE:`);
-                console.log(examplesResponse);
-                console.log(`==================================================`);
-                
-                // Parse the response (example1//example2//example3//wordFreq//defFreq)
-                const exampleParts = examplesResponse.trim().split('//');
-                
-                if (exampleParts.length >= 5) {
-                    examples = [
-                        exampleParts[0].trim(),
-                        exampleParts[1].trim(),
-                        exampleParts[2].trim()
-                    ];
-                    wordFrequency = parseInt(exampleParts[3].trim(), 10) || 3;
-                    definitionFrequency = parseInt(exampleParts[4].trim(), 10) || 3;
-                    
-                    console.log(`[WORD SENSE DISAMBIGUATION] Successfully parsed examples and frequencies`);
-                    console.log(`Word frequency: ${wordFrequency}, Definition frequency: ${definitionFrequency}`);
-                } else {
-                    console.log(`[WORD SENSE DISAMBIGUATION] Unexpected examples response format. Using defaults.`);
-                    // Generate simple example sentences as fallback
-                    examples = [
-                        `The word "${word}" can be used in a sentence like this.`,
-                        `Here is another example with "${word}".`,
-                        `"${word}" is also used in this way.`
-                    ];
-                }
-            } catch (exampleError) {
-                console.error(`[WORD SENSE DISAMBIGUATION] Error generating examples:`, exampleError);
-                examples = [
-                    `The word "${word}" can be used in a sentence like this.`,
-                    `Here is another example with "${word}".`,
-                    `"${word}" is also used in this way.`
-                ];
-            }
+            const definitionHash = bestMatch.definition.substring(0, 8).replace(/\W+/g, '');
+            const wordSenseId = `${word.toLowerCase()}_${bestMatch.partOfSpeech}_${definitionHash}`;
             
             // Check if we already have a flashcard for this sense
             if (existingFlashcardSenseIds.includes(wordSenseId)) {
@@ -1750,15 +1769,9 @@ Your response should follow this exact format without any additional text:
                 return res.json({
                     word,
                     contextSentence,
-                    disambiguatedDefinition: {
-                        ...matchedDefinition,
-                        translation: translation,
-                        responseDefinition: responseDefinition
-                    },
-                    examples: examples,
-                    wordFrequency: wordFrequency,
-                    definitionFrequency: definitionFrequency,
+                    disambiguatedDefinition: bestMatch,
                     wordSenseId,
+                    sampleSentence,
                     existingFlashcard: true,
                     rawLlmResponse: response
                 });
@@ -1767,40 +1780,22 @@ Your response should follow this exact format without any additional text:
                 return res.json({
                     word,
                     contextSentence,
-                    disambiguatedDefinition: {
-                        ...matchedDefinition,
-                        translation: translation,
-                        responseDefinition: responseDefinition
-                    },
-                    examples: examples,
-                    wordFrequency: wordFrequency,
-                    definitionFrequency: definitionFrequency,
+                    disambiguatedDefinition: bestMatch,
                     wordSenseId,
+                    sampleSentence,
                     existingFlashcard: false,
                     rawLlmResponse: response
                 });
             }
         } else {
-            console.log(`[WORD SENSE DISAMBIGUATION] ⚠️ Failed to parse Gemini response in expected format`);
-            // Try to extract something useful from the response
-            const cleanResponse = response.trim();
-            const fallbackDefinition = definitions.length > 0 ? definitions[0] : { 
-                partOfSpeech: 'unknown',
-                definition: 'No definition available' 
-            };
-            
+            console.log(`[WORD SENSE DISAMBIGUATION] ⚠️ Failed to identify best matching definition`);
             return res.json({
                 word,
                 contextSentence,
                 allDefinitions: definitions,
-                disambiguatedDefinition: {
-                    ...fallbackDefinition,
-                    translation: 'Translation unavailable',
-                    responseDefinition: cleanResponse.includes('//') ? cleanResponse.split('//')[1] : cleanResponse
-                },
-                wordSenseId: `${word.toLowerCase()}_${fallbackDefinition.partOfSpeech || 'unknown'}_fallback`,
+                disambiguatedDefinition: null,
                 rawLlmResponse: response,
-                error: 'Could not parse Gemini response in expected format'
+                error: 'Could not determine best definition match'
             });
         }
     } catch (error) {
@@ -1926,28 +1921,25 @@ function calculateSimilarity(text1, text2) {
  * @param {number} temperature The temperature setting (0-1)
  * @returns {Promise<string>} The generated text response
  */
-async function generateTextWithGemini(prompt, temperature = 0.7, debugTag = '') {
+async function generateTextWithGemini(prompt, temperature = 0.7) {
     try {
         // Make sure we have the Google API key available
         if (!process.env.GOOGLE_API_KEY) {
             throw new Error('Google API Key (GOOGLE_API_KEY) is not configured');
         }
         
-        // More explicit debugging for Render.com to clearly see what's happening
-        const tag = debugTag ? `[GEMINI-${debugTag}]` : '[GEMINI]';
+        // We'll initialize directly rather than going through llmService
+        // to avoid unnecessary test translations
         
-        console.log('====================================================================');
-        console.log(`${tag} GENERATING TEXT [temperature=${temperature}]`);
-        console.log(`${tag} PROMPT SUMMARY: ${prompt.substring(0, 100)}...`);
-        console.log('====================================================================');
+        console.log(`[GEMINI] Generating text with prompt: ${prompt.substring(0, 50)}...`);
         
         // Use the raw Google API directly instead of going through llmService
+        // We're using require at this point to avoid needing to move this to llmService.js
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
         const model = genAI.getGenerativeModel({ model: "models/gemini-2.0-flash" });
         
         // Generate content with the provided temperature
-        console.log(`${tag} SENDING REQUEST TO GEMINI API...`);
         const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             generationConfig: { temperature: temperature }
@@ -1956,19 +1948,41 @@ async function generateTextWithGemini(prompt, temperature = 0.7, debugTag = '') 
         const response = result.response;
         const text = response.text();
         
-        console.log('====================================================================');
-        console.log(`${tag} RECEIVED RESPONSE [${text.length} chars]`);
-        console.log(`${tag} RESPONSE SUMMARY: ${text.substring(0, 100)}...`);
-        console.log('====================================================================');
-        
+        console.log(`[GEMINI] Generated ${text.length} chars of text`);
         return text;
     } catch (error) {
-        console.error('====================================================================');
-        console.error(`[GEMINI-ERROR] ERROR GENERATING TEXT:`);
-        console.error(error);
-        console.error('====================================================================');
+        console.error('[GEMINI] Error generating text:', error);
         throw error;
     }
+}
+
+// String similarity function for matching definitions
+function stringSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    
+    // Convert both strings to lowercase for case-insensitive comparison
+    const s1 = str1.toLowerCase();
+    const s2 = str2.toLowerCase();
+    
+    // Check if one string contains the other
+    if (s1.includes(s2) || s2.includes(s1)) {
+        return 0.8; // High similarity if one contains the other
+    }
+    
+    // Split into words and check for word overlap
+    const words1 = s1.split(/\W+/).filter(w => w.length > 2); // Only consider words with 3+ chars
+    const words2 = s2.split(/\W+/).filter(w => w.length > 2);
+    
+    let matches = 0;
+    for (const word1 of words1) {
+        if (words2.some(word2 => word2.includes(word1) || word1.includes(word2))) {
+            matches++;
+        }
+    }
+    
+    // Calculate similarity based on matched words vs total words
+    const totalWords = Math.max(words1.length, words2.length);
+    return totalWords > 0 ? matches / totalWords : 0;
 }
 
 module.exports = { server, wss };

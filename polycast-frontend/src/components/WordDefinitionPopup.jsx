@@ -44,9 +44,7 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
   const examples = definition?.examples || [];
   
   // Look for translations in multiple possible locations in the API response
-  // First check the new format from disambiguation
-  const translation = disambiguatedDefinition?.translation || 
-                     definition?.translation || 
+  const translation = definition?.translation || 
                      (definition?.translations && definition.translations.es) || 
                      (definition?.translations && definition.translations.Spanish) || 
                      '';
