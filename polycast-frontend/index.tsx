@@ -1508,25 +1508,29 @@ export class GdmLiveAudio extends LitElement {
 
     .microphone-dropdown {
       position: absolute;
-      top: 100%;
+      top: -120px; /* Position above the button instead of below */
       left: 0;
-      right: 0;
       margin-top: 5px;
-      background: rgba(40, 40, 40, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      padding: 8px 0;
-      z-index: 1000;
-      min-width: 250px;
-      backdrop-filter: blur(10px);
+      background: rgba(20, 20, 20, 0.98);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 12px;
+      padding: 12px 0;
+      z-index: 2000;
+      min-width: 300px;
+      max-width: 400px;
+      backdrop-filter: blur(15px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     }
 
     .microphone-dropdown-header {
-      padding: 8px 12px;
-      font-size: 12px;
-      color: #aaa;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      margin-bottom: 5px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #bbb;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 8px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .microphone-option {
@@ -1534,27 +1538,46 @@ export class GdmLiveAudio extends LitElement {
       background: none;
       border: none;
       color: white;
-      padding: 10px 12px;
-      font-size: 14px;
+      padding: 14px 16px;
+      font-size: 15px;
       cursor: pointer;
       text-align: left;
-      transition: background-color 0.2s ease;
+      transition: all 0.2s ease;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
     }
 
     .microphone-option:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateX(2px);
     }
 
     .microphone-option.selected {
-      background: rgba(100, 200, 100, 0.2);
+      background: rgba(100, 200, 100, 0.25);
       color: #90ee90;
+      font-weight: 600;
+    }
+
+    .microphone-option.selected::before {
+      content: "✓ ";
+      color: #90ee90;
+      font-weight: bold;
     }
 
     .no-microphones {
-      padding: 12px;
-      color: #aaa;
-      font-size: 14px;
+      padding: 20px 16px;
+      color: #ff7b7b;
+      font-size: 15px;
       text-align: center;
+      font-style: italic;
+    }
+
+    .no-microphones::before {
+      content: "⚠️ ";
+      margin-right: 8px;
     }
 
     #status {
