@@ -153,10 +153,11 @@ export class GdmLiveAudio extends LitElement {
   @state() private isInitializingSession = false;
   @state() private isDiagnosticSessionActive = false;
 
-  // Microphone device selection
-  @state() availableMicrophones: MediaDeviceInfo[] = [];
-  @state() selectedMicrophoneId: string | null = null;
+  // Microphone device selection state
   @state() showMicrophoneSelector = false;
+  @state() availableAudioDevices: MediaDeviceInfo[] = [];
+  @state() selectedAudioDeviceId: string | null = null;
+  @state() hasMicrophone = true;
 
   // Video mode state
   @state() leftPanelMode: 'ai' | 'video' = 'ai';
@@ -1480,123 +1481,6 @@ export class GdmLiveAudio extends LitElement {
       }
     }
 
-    /* Microphone selector styles */
-    .microphone-controls {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .microphone-selector-btn {
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: white;
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 14px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      transition: background-color 0.2s ease;
-    }
-
-    .microphone-selector-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .microphone-modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .microphone-dropdown {
-      background: #23233a;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-radius: 16px;
-      width: 400px;
-      min-width: 260px;
-      max-width: 90vw;
-      max-height: 80vh;
-      overflow-y: auto;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.8);
-      display: flex;
-      flex-direction: column;
-      word-break: break-word;
-      white-space: normal;
-    }
-    .microphone-dropdown-header {
-      padding: 24px 24px 16px 24px;
-      font-size: 16px;
-      color: #fff;
-      border-bottom: 1px solid rgba(255,255,255,0.3);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      background: rgba(255,255,255,0.08);
-      border-radius: 16px 16px 0 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .close-modal-btn {
-      background: none;
-      border: none;
-      color: #aaa;
-      font-size: 24px;
-      cursor: pointer;
-      padding: 0;
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      transition: all 0.2s ease;
-    }
-    .close-modal-btn:hover {
-      background: rgba(255,255,255,0.1);
-      color: #fff;
-    }
-    .microphone-option {
-      width: 100%;
-      background: none;
-      border: none;
-      color: white;
-      padding: 16px 24px;
-      font-size: 16px;
-      cursor: pointer;
-      text-align: left;
-      transition: all 0.2s ease;
-      line-height: 1.4;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      display: block;
-      word-break: break-word;
-      white-space: normal;
-      overflow-wrap: anywhere;
-    }
-    .microphone-option.selected::before {
-      content: "✓ ";
-      color: #90ee90;
-      font-weight: bold;
-      font-size: 18px;
-    }
-    .no-microphones {
-      padding: 40px 24px;
-      color: #ff9999;
-      font-size: 16px;
-      text-align: center;
-      font-style: italic;
-      border-radius: 0 0 16px 16px;
-      word-break: break-word;
-      white-space: normal;
-    }
-
     #status {
       position: absolute;
       bottom: 1vh;
@@ -2269,6 +2153,124 @@ export class GdmLiveAudio extends LitElement {
         bottom: 15px;
       }
     }
+
+    /* Microphone Selector Styles */
+    .microphone-selector-container {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .microphone-selector-button {
+      background: #3c3152;
+      border: 1px solid #5a4b73;
+      color: #e0e0e0;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9em;
+      transition: all 0.2s ease;
+    }
+    
+    .microphone-selector-button:hover {
+      background: #4a3d60;
+      border-color: #6b5a84;
+    }
+    
+    .microphone-selector-button.no-microphone {
+      background: #5d2f2f;
+      border-color: #8b4545;
+      color: #ffcccc;
+    }
+    
+    .microphone-selector-popup {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 1000;
+      background: #2a2139;
+      border: 1px solid #3c3152;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      min-width: 280px;
+      max-width: 400px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    
+    .microphone-selector-header {
+      padding: 12px 16px;
+      background: #3c3152;
+      border-bottom: 1px solid #5a4b73;
+      font-weight: 600;
+      color: #bca0dc;
+      font-size: 0.9em;
+    }
+    
+    .microphone-device-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .microphone-device-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid #3c3152;
+      transition: background 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .microphone-device-item:last-child {
+      border-bottom: none;
+    }
+    
+    .microphone-device-item:hover {
+      background: #3c3152;
+    }
+    
+    .microphone-device-item.selected {
+      background: #4a3d60;
+      color: #bca0dc;
+    }
+    
+    .microphone-device-name {
+      flex: 1;
+      font-size: 0.9em;
+      color: #e0e0e0;
+      word-break: break-word;
+    }
+    
+    .microphone-device-selected-indicator {
+      color: #7c6eb8;
+      font-size: 1.1em;
+    }
+    
+    .microphone-no-devices {
+      padding: 16px;
+      text-align: center;
+      color: #a093c4;
+      font-style: italic;
+    }
+    
+    .microphone-refresh-button {
+      padding: 8px 16px;
+      margin: 12px;
+      background: #4a3d60;
+      border: 1px solid #5a4b73;
+      color: #e0e0e0;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85em;
+      transition: background 0.2s ease;
+    }
+    
+    .microphone-refresh-button:hover {
+      background: #5a4b73;
+    }
   `;
 
   constructor() {
@@ -2419,6 +2421,108 @@ export class GdmLiveAudio extends LitElement {
 
   private initAudio() {
     this.nextStartTime = this.outputAudioContext.currentTime;
+    // Check for microphone devices on audio init
+    this.enumerateAudioDevices();
+  }
+
+  // Microphone device detection and selection methods
+  private async enumerateAudioDevices() {
+    try {
+      // First check if mediaDevices is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        console.warn('MediaDevices API not supported');
+        this.hasMicrophone = false;
+        return;
+      }
+
+      // Get all media devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
+      
+      console.log('📱 Found audio input devices:', audioInputDevices.length);
+      audioInputDevices.forEach(device => {
+        console.log(`  - ${device.label || 'Unknown Device'} (${device.deviceId})`);
+      });
+
+      this.availableAudioDevices = audioInputDevices;
+      this.hasMicrophone = audioInputDevices.length > 0;
+
+      // If no devices found, try requesting permission first
+      if (audioInputDevices.length === 0 || audioInputDevices.every(d => !d.label)) {
+        console.log('🔓 Requesting microphone permission to get device labels...');
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Stop the stream immediately, we just needed permission
+          stream.getTracks().forEach(track => track.stop());
+          
+          // Re-enumerate with permission granted
+          const devicesWithLabels = await navigator.mediaDevices.enumerateDevices();
+          const audioInputsWithLabels = devicesWithLabels.filter(device => device.kind === 'audioinput');
+          
+          this.availableAudioDevices = audioInputsWithLabels;
+          this.hasMicrophone = audioInputsWithLabels.length > 0;
+          
+          console.log('📱 Audio devices after permission:', audioInputsWithLabels.length);
+        } catch (permissionError) {
+          console.error('❌ Microphone permission denied:', permissionError);
+          this.hasMicrophone = false;
+        }
+      }
+
+      // Set default device if none selected
+      if (!this.selectedAudioDeviceId && this.availableAudioDevices.length > 0) {
+        this.selectedAudioDeviceId = this.availableAudioDevices[0].deviceId;
+      }
+
+      this.requestUpdate();
+    } catch (error) {
+      console.error('❌ Error enumerating audio devices:', error);
+      this.hasMicrophone = false;
+      this.requestUpdate();
+    }
+  }
+
+  private async selectAudioDevice(deviceId: string) {
+    this.selectedAudioDeviceId = deviceId;
+    this.showMicrophoneSelector = false;
+    
+    // If session is active, reconnect with new device
+    if (this.openAIVoiceSession && this.openAIVoiceSession.connected) {
+      console.log('🔄 Reconnecting with new audio device...');
+      await this.openAIVoiceSession.disconnect();
+      // Small delay to ensure cleanup
+      setTimeout(() => {
+        this.initSession();
+      }, 500);
+    }
+    
+    this.requestUpdate();
+  }
+
+  private toggleMicrophoneSelector() {
+    if (!this.hasMicrophone) {
+      this.status = 'No microphone detected. Please connect a microphone and refresh the page.';
+      return;
+    }
+    
+    this.showMicrophoneSelector = !this.showMicrophoneSelector;
+    if (this.showMicrophoneSelector) {
+      // Refresh device list when opening
+      this.enumerateAudioDevices();
+    }
+  }
+
+  private handleClickOutsideMicSelector(event: MouseEvent) {
+    const target = event.target as Element;
+    const micSelector = this.shadowRoot?.querySelector('.microphone-selector-popup');
+    const micButton = this.shadowRoot?.querySelector('.microphone-selector-button');
+    
+    if (micSelector && micButton && 
+        !micSelector.contains(target) && 
+        !micButton.contains(target)) {
+      this.showMicrophoneSelector = false;
+      this.requestUpdate();
+    }
   }
 
   private initSpeechRecognition() {
@@ -2824,18 +2928,13 @@ In ${this.targetLanguage}:
         this.requestUpdate('isInitializingSession');
       };
 
-      this.openAIVoiceSession.onMicrophoneDevicesFound = (devices) => {
-        this.availableMicrophones = devices;
-        console.log('🎤 Available microphones updated:', devices.length);
-        this.requestUpdate();
-      };
-
       // Connect to OpenAI Voice API
       await this.openAIVoiceSession.connect({
         voice: 'ash', // Choose from 'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer', 'sage', 'ash'
         instructions: systemInstructionText,
         inputAudioFormat: 'pcm16',
-        outputAudioFormat: 'pcm16'
+        outputAudioFormat: 'pcm16',
+        deviceId: this.selectedAudioDeviceId || undefined
         // NOTE: NO turn_detection - we control everything manually like Python
       });
       
@@ -4213,41 +4312,6 @@ In ${this.targetLanguage}:
           ${this.leftPanelMode === 'ai' ? html`
             <!-- AI Mode Interface -->
             <div class="controls">
-              <div class="microphone-controls">
-                <!-- Microphone selector button -->
-                <button 
-                  class="microphone-selector-btn"
-                  @click=${this.toggleMicrophoneSelector}
-                  title="Select microphone device"
-                >
-                  🎤 ${this.availableMicrophones.length > 0 ? this.availableMicrophones.length : '0'}
-                </button>
-                
-                <!-- Microphone dropdown modal -->
-                ${this.showMicrophoneSelector ? html`
-                  <div class="microphone-modal-overlay" @click=${this.toggleMicrophoneSelector}>
-                    <div class="microphone-dropdown" @click=${(e: Event) => e.stopPropagation()}>
-                      <div class="microphone-dropdown-header">
-                        Select Microphone Device
-                        <button class="close-modal-btn" @click=${this.toggleMicrophoneSelector}>×</button>
-                      </div>
-                      ${this.availableMicrophones.length > 0 ? 
-                        this.availableMicrophones.map(device => html`
-                          <button 
-                            class="microphone-option ${this.selectedMicrophoneId === device.deviceId ? 'selected' : ''}"
-                            @click=${() => this.handleMicrophoneSelection(device.deviceId)}
-                          >
-                            ${device.label || `Microphone ${device.deviceId.slice(0, 20)}...`}
-                          </button>
-                        `) : html`
-                          <div class="no-microphones">No microphones detected</div>
-                        `
-                      }
-                    </div>
-                  </div>
-                ` : ''}
-              </div>
-              
               <button 
                 id="recordButton" 
                 @click=${this.isRecording ? this.stopRecording : this.startRecording} 
@@ -4764,6 +4828,9 @@ In ${this.targetLanguage}:
     // Add mouse event listeners for panel dragging
     document.addEventListener('mousemove', this.boundHandlePanelDragMove);
     document.addEventListener('mouseup', this.boundHandlePanelDragEnd);
+    
+    // Add click-outside handler for microphone selector
+    document.addEventListener('click', this.handleClickOutsideMicSelector.bind(this));
   }
 
   disconnectedCallback() {
@@ -4776,6 +4843,9 @@ In ${this.targetLanguage}:
     // Remove mouse event listeners  
     document.removeEventListener('mousemove', this.boundHandlePanelDragMove);
     document.removeEventListener('mouseup', this.boundHandlePanelDragEnd);
+    
+    // Remove click-outside handler for microphone selector
+    document.removeEventListener('click', this.handleClickOutsideMicSelector.bind(this));
     
     // Cleanup session and audio
     if (this.openAIVoiceSession) {
@@ -5839,19 +5909,5 @@ In ${this.targetLanguage}:
       console.error('❌ Error handling ICE candidate:', error);
       // ICE candidate errors are usually non-fatal, so don't change call status
     }
-  }
-
-  // Microphone device selection methods
-  private toggleMicrophoneSelector() {
-    this.showMicrophoneSelector = !this.showMicrophoneSelector;
-  }
-
-  private handleMicrophoneSelection(deviceId: string) {
-    this.selectedMicrophoneId = deviceId;
-    if (this.openAIVoiceSession) {
-      this.openAIVoiceSession.setMicrophoneDevice(deviceId);
-    }
-    this.showMicrophoneSelector = false;
-    console.log('🎤 Selected microphone:', deviceId);
   }
 }
