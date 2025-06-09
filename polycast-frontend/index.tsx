@@ -6,15 +6,15 @@
 
 import { LitElement, css, html} from 'lit';
 import {customElement, state} from 'lit/decorators.js';
-import { OpenAIVoiceSession } from './openai-voice-service.js';
-import './visual-3d';
-import type { GdmLiveAudioVisuals3D } from './visual-3d';
 import { 
+  OpenAIVoiceSession,
   fetchWordDetailsFromApi, 
   fetchWordFrequencyFromApi, 
   fetchExampleSentencesFromApi, 
   fetchEvaluationFromApi 
-} from './gemini-api-service';
+} from './api-client.js';
+import './visual-3d';
+import type { GdmLiveAudioVisuals3D } from './visual-3d';
 import { MicVAD, utils } from '@ricky0123/vad-web';
 import { io, Socket } from 'socket.io-client';
 
@@ -2262,12 +2262,9 @@ export class GdmLiveAudio extends LitElement {
 
     await this.initClient();
     
-    // Preload core vocabulary for the target language
-    import('./gemini-api-service.js').then(module => {
-      module.preloadTargetLanguage(this.targetLanguage.toLowerCase())
-        .then(() => console.log(`✅ Core vocabulary preloaded for ${this.targetLanguage}`))
-        .catch(err => console.warn(`⚠️ Failed to preload vocabulary: ${err}`));
-    }); 
+    // TODO: Preload core vocabulary for the target language via API call
+    // The vocabulary preloading will be handled by the backend service
+    console.log(`📝 TODO: Preload vocabulary for ${this.targetLanguage} via backend API`); 
     
     // Speech recognition is optional - OpenAI handles the voice processing
     if (this.openAIVoiceSession && this.openAIVoiceSession.connected) {
