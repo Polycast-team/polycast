@@ -158,6 +158,8 @@ export class GdmLiveAudio extends LitElement {
   @state() availableAudioDevices: MediaDeviceInfo[] = [];
   @state() selectedAudioDeviceId: string | null = null;
   @state() hasMicrophone = true;
+  @state() microphonePopupX = 0;
+  @state() microphonePopupY = 0;
 
   // Voice selector popup state
   @state() showVoiceSelector = false;
@@ -2191,91 +2193,89 @@ export class GdmLiveAudio extends LitElement {
       color: #ffcccc;
     }
     
-    .microphone-selector-popup {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      z-index: 1000;
+    /* Context Menu Style Microphone Popup */
+    .microphone-context-menu {
+      position: fixed;
+      z-index: 10000;
       background: #2a2139;
-      border: 1px solid #3c3152;
+      border: 1px solid #5a4b73;
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      min-width: 280px;
-      max-width: 400px;
-      margin-top: 4px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      min-width: 220px;
+      max-width: 300px;
       overflow: hidden;
+      animation: contextMenuFadeIn 0.15s ease-out;
     }
     
-    .microphone-selector-header {
-      padding: 12px 16px;
+    @keyframes contextMenuFadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+    
+    .microphone-menu-header {
       background: #3c3152;
-      border-bottom: 1px solid #5a4b73;
+      color: #e0e0e0;
+      padding: 8px 12px;
       font-weight: 600;
-      color: #bca0dc;
-      font-size: 0.9em;
+      font-size: 0.85em;
+      border-bottom: 1px solid #5a4b73;
+      text-align: center;
     }
     
-    .microphone-device-list {
-      max-height: 200px;
-      overflow-y: auto;
+    .microphone-menu-items {
+      padding: 4px 0;
     }
     
-    .microphone-device-item {
-      padding: 12px 16px;
+    .microphone-menu-item {
+      padding: 8px 12px;
       cursor: pointer;
-      border-bottom: 1px solid #3c3152;
-      transition: background 0.2s ease;
+      font-size: 0.85em;
+      color: #e0e0e0;
+      transition: background-color 0.1s ease;
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 10px;
+      line-height: 1.3;
     }
     
-    .microphone-device-item:last-child {
-      border-bottom: none;
-    }
-    
-    .microphone-device-item:hover {
+    .microphone-menu-item:hover:not(.disabled) {
       background: #3c3152;
     }
     
-    .microphone-device-item.selected {
+    .microphone-menu-item.selected {
       background: #4a3d60;
-      color: #bca0dc;
+      color: #8a5cf5;
+    }
+    
+    .microphone-menu-item.disabled {
+      color: #888;
+      cursor: not-allowed;
     }
     
     .microphone-device-name {
       flex: 1;
-      font-size: 0.9em;
-      color: #e0e0e0;
-      word-break: break-word;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 180px;
     }
     
-    .microphone-device-selected-indicator {
-      color: #7c6eb8;
-      font-size: 1.1em;
+    .microphone-selected-check {
+      color: #8a5cf5;
+      font-weight: bold;
+      margin-left: 8px;
     }
     
-    .microphone-no-devices {
-      padding: 16px;
-      text-align: center;
-      color: #a093c4;
-      font-style: italic;
-    }
-    
-    .microphone-refresh-button {
-      padding: 8px 16px;
-      margin: 12px;
-      background: #4a3d60;
-      border: 1px solid #5a4b73;
-      color: #e0e0e0;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.85em;
-      transition: background 0.2s ease;
-    }
-    
-    .microphone-refresh-button:hover {
+    .microphone-menu-separator {
+      height: 1px;
       background: #5a4b73;
+      margin: 4px 0;
     }
 
     .voice-selector {
@@ -2530,30 +2530,45 @@ export class GdmLiveAudio extends LitElement {
     this.requestUpdate();
   }
 
-  private toggleMicrophoneSelector() {
+  private handleMicrophoneButtonClick(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    
     if (!this.hasMicrophone) {
       this.status = 'No microphone detected. Please connect a microphone and refresh the page.';
       return;
     }
     
-    this.showMicrophoneSelector = !this.showMicrophoneSelector;
     if (this.showMicrophoneSelector) {
-      // Refresh device list when opening
-      this.enumerateAudioDevices();
+      this.closeMicrophoneSelector();
+      return;
     }
+    
+    // Position the popup near the cursor
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    this.microphonePopupX = rect.left;
+    this.microphonePopupY = rect.bottom + 8;
+    
+    // Adjust if popup would go off screen
+    const maxX = window.innerWidth - 250; // Estimated popup width
+    const maxY = window.innerHeight - 200; // Estimated popup height
+    
+    if (this.microphonePopupX > maxX) {
+      this.microphonePopupX = maxX;
+    }
+    if (this.microphonePopupY > maxY) {
+      this.microphonePopupY = rect.top - 200; // Show above if no room below
+    }
+    
+    this.showMicrophoneSelector = true;
+    // Refresh device list when opening
+    this.enumerateAudioDevices();
+    this.requestUpdate();
   }
 
-  private handleClickOutsideMicSelector(event: MouseEvent) {
-    const target = event.target as Element;
-    const micSelector = this.shadowRoot?.querySelector('.microphone-selector-popup');
-    const micButton = this.shadowRoot?.querySelector('.microphone-selector-button');
-    
-    if (micSelector && micButton && 
-        !micSelector.contains(target) && 
-        !micButton.contains(target)) {
-      this.showMicrophoneSelector = false;
-      this.requestUpdate();
-    }
+  private closeMicrophoneSelector() {
+    this.showMicrophoneSelector = false;
+    this.requestUpdate();
   }
 
   // Voice selector methods
@@ -4423,7 +4438,7 @@ In ${this.targetLanguage}:
               <div class="audio-controls">
                 <button 
                   class="microphone-selector-button ${this.hasMicrophone ? '' : 'no-microphone'}"
-                  @click=${this.toggleMicrophoneSelector}
+                  @click=${this.handleMicrophoneButtonClick}
                   title="${this.hasMicrophone ? 'Select microphone device' : 'No microphone detected'}"
                   aria-label="Microphone device selector"
                 >
@@ -4443,39 +4458,6 @@ In ${this.targetLanguage}:
                     <option value=${voice}>${voice}</option>
                   `)}
                 </select>
-                
-                ${this.showMicrophoneSelector ? html`
-                  <div class="microphone-selector-popup">
-                    <div class="microphone-selector-header">Select Microphone</div>
-                    ${this.availableAudioDevices.length > 0 ? html`
-                      <div class="microphone-device-list">
-                        ${this.availableAudioDevices.map(device => html`
-                          <div 
-                            class="microphone-device-item ${device.deviceId === this.selectedAudioDeviceId ? 'selected' : ''}"
-                            @click=${() => this.selectAudioDevice(device.deviceId)}
-                          >
-                            <span class="microphone-device-name">
-                              ${device.label?.replace(/^Default - /, '') || 'Unknown Device'}
-                            </span>
-                            ${device.deviceId === this.selectedAudioDeviceId ? html`
-                              <span class="microphone-device-selected-indicator">✓</span>
-                            ` : ''}
-                          </div>
-                        `)}
-                      </div>
-                      <button class="microphone-refresh-button" @click=${this.enumerateAudioDevices}>
-                        🔄 Refresh Devices
-                      </button>
-                    ` : html`
-                      <div class="microphone-no-devices">
-                        No microphone devices found. Please connect a microphone and refresh.
-                      </div>
-                      <button class="microphone-refresh-button" @click=${this.enumerateAudioDevices}>
-                        🔄 Refresh Devices
-                      </button>
-                    `}
-                  </div>
-                ` : ''}
               </div>
             </div>
             <div id="status" role="status" aria-live="polite"> ${this.error || this.status} </div>
@@ -4855,6 +4837,48 @@ In ${this.targetLanguage}:
 
         </div>
       </div>
+
+      ${this.showMicrophoneSelector ? html`
+        <div class="popup-overlay" @click=${this.closeMicrophoneSelector} role="presentation"></div>
+        <div class="microphone-context-menu"
+             style="top: ${this.microphonePopupY}px; left: ${this.microphonePopupX}px;"
+             role="dialog" aria-labelledby="microphone-selector-title" aria-modal="true">
+          <div class="microphone-menu-header" id="microphone-selector-title">
+            Select Microphone
+          </div>
+          ${this.availableAudioDevices.length > 0 ? html`
+            <div class="microphone-menu-items">
+              ${this.availableAudioDevices.map(device => html`
+                <div 
+                  class="microphone-menu-item ${device.deviceId === this.selectedAudioDeviceId ? 'selected' : ''}"
+                  @click=${() => this.selectAudioDevice(device.deviceId)}
+                >
+                  <span class="microphone-device-name">
+                    ${device.label?.replace(/^Default - /, '') || 'Unknown Device'}
+                  </span>
+                  ${device.deviceId === this.selectedAudioDeviceId ? html`
+                    <span class="microphone-selected-check">✓</span>
+                  ` : ''}
+                </div>
+              `)}
+            </div>
+            <div class="microphone-menu-separator"></div>
+            <div class="microphone-menu-item" @click=${this.enumerateAudioDevices}>
+              <span>🔄 Refresh Devices</span>
+            </div>
+          ` : html`
+            <div class="microphone-menu-items">
+              <div class="microphone-menu-item disabled">
+                <span>No microphones found</span>
+              </div>
+            </div>
+            <div class="microphone-menu-separator"></div>
+            <div class="microphone-menu-item" @click=${this.enumerateAudioDevices}>
+              <span>🔄 Refresh Devices</span>
+            </div>
+          `}
+        </div>
+      ` : ''}
 
       ${this.popupData ? html`
         <div class="popup-overlay" @click=${this.closePopup} role="presentation"></div>
