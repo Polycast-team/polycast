@@ -2561,11 +2561,19 @@ export class GdmLiveAudio extends LitElement {
     // Available OpenAI voices
     this.availableVoices = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'];
     
-    // Load saved voice preference
+    // Load saved voice preference for current profile
     const savedVoice = localStorage.getItem(`${this.currentProfile}_selectedVoice`);
     if (savedVoice && this.availableVoices.includes(savedVoice)) {
       this.selectedVoice = savedVoice;
+      console.log('🔊 Loaded saved voice for profile:', this.currentProfile, '→', savedVoice);
+    } else {
+      // Default to 'alloy' and save it
+      this.selectedVoice = 'alloy';
+      localStorage.setItem(`${this.currentProfile}_selectedVoice`, 'alloy');
+      console.log('🔊 Set default voice for profile:', this.currentProfile, '→ alloy');
     }
+    
+    this.requestUpdate();
   }
 
   private toggleVoiceSelector() {
@@ -2574,19 +2582,24 @@ export class GdmLiveAudio extends LitElement {
   }
 
   private selectVoice(voiceName: string) {
+    console.log('🔊 Voice selection changed:', this.selectedVoice, '→', voiceName);
     this.selectedVoice = voiceName;
     
-    // Save preference
+    // Save preference for current profile
     localStorage.setItem(`${this.currentProfile}_selectedVoice`, voiceName);
+    console.log('💾 Saved voice preference for profile:', this.currentProfile);
     
     // If session is active, reconnect with new voice
     if (this.openAIVoiceSession && this.openAIVoiceSession.connected) {
-      console.log('🔄 Reconnecting with new voice:', voiceName);
+      console.log('🔄 Reconnecting OpenAI session with new voice:', voiceName);
       this.openAIVoiceSession.disconnect();
       // Small delay to ensure cleanup
       setTimeout(() => {
+        console.log('🔄 Initializing new session with voice:', voiceName);
         this.initSession();
       }, 500);
+    } else {
+      console.log('ℹ️  Session not active, voice will be used on next connection');
     }
     
     this.requestUpdate();
