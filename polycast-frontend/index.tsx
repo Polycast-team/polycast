@@ -2180,6 +2180,25 @@ export class GdmLiveAudio extends LitElement {
       gap: 8px;
       font-size: 0.9em;
       transition: all 0.2s ease;
+      min-width: 120px;
+      max-width: 200px;
+    }
+
+    .microphone-selector-button .mic-icon {
+      flex-shrink: 0;
+    }
+
+    .microphone-selector-button .mic-label {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .microphone-selector-button .dropdown-arrow {
+      flex-shrink: 0;
+      font-size: 0.7em;
+      opacity: 0.7;
     }
     
     .microphone-selector-button:hover {
@@ -2201,8 +2220,9 @@ export class GdmLiveAudio extends LitElement {
       border: 1px solid #5a4b73;
       border-radius: 8px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      min-width: 220px;
-      max-width: 300px;
+      min-width: 280px;
+      max-width: 350px;
+      width: max-content;
       overflow: hidden;
       animation: contextMenuFadeIn 0.15s ease-out;
     }
@@ -2233,15 +2253,17 @@ export class GdmLiveAudio extends LitElement {
     }
     
     .microphone-menu-item {
-      padding: 8px 12px;
+      padding: 10px 14px;
       cursor: pointer;
-      font-size: 0.85em;
+      font-size: 0.9em;
       color: #e0e0e0;
       transition: background-color 0.1s ease;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      line-height: 1.3;
+      line-height: 1.4;
+      min-height: 40px;
+      gap: 12px;
     }
     
     .microphone-menu-item:hover:not(.disabled) {
@@ -2263,7 +2285,9 @@ export class GdmLiveAudio extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 180px;
+      max-width: 240px;
+      min-width: 0; /* Allow flex item to shrink below content size */
+      line-height: 1.4;
     }
     
     .microphone-selected-check {
@@ -2544,21 +2568,37 @@ export class GdmLiveAudio extends LitElement {
       return;
     }
     
-    // Position the popup near the cursor
+    // Position the popup near the button
     const rect = (event.target as HTMLElement).getBoundingClientRect();
-    this.microphonePopupX = rect.left;
-    this.microphonePopupY = rect.bottom + 8;
+    const popupWidth = 350; // Max popup width
+    const popupHeight = 250; // Estimated popup height
     
-    // Adjust if popup would go off screen
-    const maxX = window.innerWidth - 250; // Estimated popup width
-    const maxY = window.innerHeight - 200; // Estimated popup height
+    // Default to bottom-left of button
+    let x = rect.left;
+    let y = rect.bottom + 8;
     
-    if (this.microphonePopupX > maxX) {
-      this.microphonePopupX = maxX;
+    // Adjust horizontal position if popup would go off the right edge
+    if (x + popupWidth > window.innerWidth) {
+      x = window.innerWidth - popupWidth - 20; // 20px margin from edge
     }
-    if (this.microphonePopupY > maxY) {
-      this.microphonePopupY = rect.top - 200; // Show above if no room below
+    
+    // Ensure minimum left margin
+    if (x < 20) {
+      x = 20;
     }
+    
+    // Adjust vertical position if popup would go off the bottom edge
+    if (y + popupHeight > window.innerHeight) {
+      y = rect.top - popupHeight - 8; // Show above button
+      
+      // If still off screen, position at top with margin
+      if (y < 20) {
+        y = 20;
+      }
+    }
+    
+    this.microphonePopupX = x;
+    this.microphonePopupY = y;
     
     this.showMicrophoneSelector = true;
     // Refresh device list when opening
@@ -4442,9 +4482,12 @@ In ${this.targetLanguage}:
                   title="${this.hasMicrophone ? 'Select microphone device' : 'No microphone detected'}"
                   aria-label="Microphone device selector"
                 >
-                  🎤 ${this.hasMicrophone ? 
-                    (this.availableAudioDevices.find(d => d.deviceId === this.selectedAudioDeviceId)?.label?.replace(/^Default - /, '') || 'Default') 
-                    : 'No Mic'}
+                  <span class="mic-icon">🎤</span>
+                  <span class="mic-label">${this.hasMicrophone ? 
+                    (this.availableAudioDevices.find(d => d.deviceId === this.selectedAudioDeviceId)?.label?.replace(/^Default - /, '').substring(0, 20) + 
+                     (this.availableAudioDevices.find(d => d.deviceId === this.selectedAudioDeviceId)?.label?.replace(/^Default - /, '').length > 20 ? '...' : '') || 'Default') 
+                    : 'No Mic'}</span>
+                  <span class="dropdown-arrow">▼</span>
                 </button>
                 
                 <select 
@@ -6081,6 +6124,34 @@ In ${this.targetLanguage}:
     } catch (error) {
       console.error('❌ Error handling ICE candidate:', error);
       // ICE candidate errors are usually non-fatal, so don't change call status
+    }
+  }
+
+  private handleClickOutsideMicSelector(event: MouseEvent) {
+    const target = event.target as Element;
+    
+    // Check if click is outside microphone popup
+    if (this.showMicrophoneSelector) {
+      // If clicked on the popup overlay, close the popup
+      if (target.classList.contains('popup-overlay')) {
+        this.closeMicrophoneSelector();
+        return;
+      }
+      
+      // If clicked on the microphone button itself, don't close
+      const micButton = target.closest('.microphone-selector-button');
+      if (micButton) {
+        return;
+      }
+      
+      // If clicked on the popup itself, don't close
+      const popup = target.closest('.microphone-context-menu');
+      if (popup) {
+        return;
+      }
+      
+      // Otherwise, close the popup
+      this.closeMicrophoneSelector();
     }
   }
 }
