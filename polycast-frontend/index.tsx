@@ -1508,47 +1508,42 @@ export class GdmLiveAudio extends LitElement {
 
     .microphone-modal-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.6);
+      inset: 0;
+      background: rgba(0,0,0,0.6);
       z-index: 9999;
       display: flex;
       align-items: center;
       justify-content: center;
-      backdrop-filter: blur(5px);
     }
-
     .microphone-dropdown {
-      background: rgba(25, 25, 35, 0.98);
-      border: 2px solid rgba(255, 255, 255, 0.4);
+      background: #23233a;
+      border: 2px solid rgba(255,255,255,0.3);
       border-radius: 16px;
-      padding: 0;
       width: 400px;
-      max-height: 400px;
+      min-width: 260px;
+      max-width: 90vw;
+      max-height: 80vh;
       overflow-y: auto;
-      backdrop-filter: blur(20px);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
-      position: relative;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      word-break: break-word;
+      white-space: normal;
     }
-
     .microphone-dropdown-header {
       padding: 24px 24px 16px 24px;
       font-size: 16px;
       color: #fff;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-      margin-bottom: 0;
+      border-bottom: 1px solid rgba(255,255,255,0.3);
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(255,255,255,0.08);
       border-radius: 16px 16px 0 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-
     .close-modal-btn {
       background: none;
       border: none;
@@ -1564,12 +1559,10 @@ export class GdmLiveAudio extends LitElement {
       border-radius: 50%;
       transition: all 0.2s ease;
     }
-
     .close-modal-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255,255,255,0.1);
       color: #fff;
     }
-
     .microphone-option {
       width: 100%;
       background: none;
@@ -1581,36 +1574,18 @@ export class GdmLiveAudio extends LitElement {
       text-align: left;
       transition: all 0.2s ease;
       line-height: 1.4;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: block;
+      word-break: break-word;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
-
-    .microphone-option:last-child {
-      border-bottom: none;
-      border-radius: 0 0 16px 16px;
-    }
-
-    .microphone-option:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
-    }
-
-    .microphone-option.selected {
-      background: rgba(0, 150, 0, 0.2);
-      color: #90ee90;
-      font-weight: 600;
-    }
-
     .microphone-option.selected::before {
-      content: "✓";
+      content: "✓ ";
       color: #90ee90;
       font-weight: bold;
       font-size: 18px;
-      flex-shrink: 0;
     }
-
     .no-microphones {
       padding: 40px 24px;
       color: #ff9999;
@@ -1618,13 +1593,8 @@ export class GdmLiveAudio extends LitElement {
       text-align: center;
       font-style: italic;
       border-radius: 0 0 16px 16px;
-    }
-
-    .no-microphones::before {
-      content: "⚠️";
-      display: block;
-      font-size: 24px;
-      margin-bottom: 12px;
+      word-break: break-word;
+      white-space: normal;
     }
 
     #status {
