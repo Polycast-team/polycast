@@ -2159,10 +2159,11 @@ export class GdmLiveAudio extends LitElement {
       }
     }
 
-    /* Microphone Selector Styles */
-    .microphone-selector-container {
-      position: relative;
-      display: inline-block;
+    /* Audio Controls Styles */
+    .audio-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
     }
     
     .microphone-selector-button {
@@ -2277,101 +2278,27 @@ export class GdmLiveAudio extends LitElement {
       background: #5a4b73;
     }
 
-    /* Voice Selector Styles */
-    .voice-selector-button {
+    .voice-selector {
       background: #3c3152;
       border: 1px solid #5a4b73;
       color: #e0e0e0;
       padding: 8px 12px;
       border-radius: 6px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
       font-size: 0.9em;
-      transition: all 0.2s ease;
+      min-width: 120px;
+      cursor: pointer;
       text-transform: capitalize;
-      margin-left: 8px;
     }
     
-    .voice-selector-button:hover {
+    .voice-selector:hover {
       background: #4a3d60;
       border-color: #6b5a84;
     }
     
-    .voice-selector-popup {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 2000;
-      background: #2a2139;
-      border: 2px solid #8a5cf5;
-      border-radius: 12px;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
-      min-width: 320px;
-      max-width: 400px;
-      overflow: hidden;
-    }
-    
-    .voice-selector-header {
-      padding: 16px 20px;
+    .voice-selector option {
       background: #3c3152;
-      border-bottom: 1px solid #5a4b73;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    
-    .voice-selector-header span {
-      font-weight: 600;
-      color: #bca0dc;
-      font-size: 1.1em;
-    }
-    
-    .voice-selector-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1px;
-      background: #3c3152;
-      padding: 1px;
-    }
-    
-    .voice-option {
-      padding: 16px;
-      cursor: pointer;
-      background: #2a2139;
-      transition: background 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      min-height: 60px;
-    }
-    
-    .voice-option:hover {
-      background: #3c3152;
-    }
-    
-    .voice-option.selected {
-      background: #4a3d60;
-      color: #bca0dc;
-    }
-    
-    .voice-name {
-      font-size: 1em;
       color: #e0e0e0;
       text-transform: capitalize;
-      font-weight: 500;
-    }
-    
-    .voice-option.selected .voice-name {
-      color: #bca0dc;
-    }
-    
-    .voice-selected-indicator {
-      color: #8a5cf5;
-      font-size: 1.2em;
-      font-weight: bold;
     }
   `;
 
@@ -2648,7 +2575,6 @@ export class GdmLiveAudio extends LitElement {
 
   private selectVoice(voiceName: string) {
     this.selectedVoice = voiceName;
-    this.showVoiceSelector = false;
     
     // Save preference
     localStorage.setItem(`${this.currentProfile}_selectedVoice`, voiceName);
@@ -4480,8 +4406,8 @@ In ${this.targetLanguage}:
                 `}
               </button>
               
-              <!-- Microphone Selector -->
-              <div class="microphone-selector-container">
+              <!-- Audio Controls -->
+              <div class="audio-controls">
                 <button 
                   class="microphone-selector-button ${this.hasMicrophone ? '' : 'no-microphone'}"
                   @click=${this.toggleMicrophoneSelector}
@@ -4493,15 +4419,17 @@ In ${this.targetLanguage}:
                     : 'No Mic'}
                 </button>
                 
-                <!-- Voice Selector -->
-                <button 
-                  class="voice-selector-button"
-                  @click=${this.toggleVoiceSelector}
+                <select 
+                  class="voice-selector"
+                  .value=${this.selectedVoice}
+                  @change=${(e: Event) => this.selectVoice((e.target as HTMLSelectElement).value)}
                   title="Select AI voice"
                   aria-label="AI voice selector"
                 >
-                  🗣️ ${this.selectedVoice}
-                </button>
+                  ${this.availableVoices.map(voice => html`
+                    <option value=${voice}>${voice}</option>
+                  `)}
+                </select>
                 
                 ${this.showMicrophoneSelector ? html`
                   <div class="microphone-selector-popup">
@@ -4914,32 +4842,6 @@ In ${this.targetLanguage}:
 
         </div>
       </div>
-
-      ${this.showVoiceSelector ? html`
-        <div class="popup-overlay" @click=${() => { this.showVoiceSelector = false; this.requestUpdate(); }} role="presentation"></div>
-        <div class="voice-selector-popup"
-             role="dialog" aria-labelledby="voice-selector-title" aria-modal="true">
-          <button @click=${() => { this.showVoiceSelector = false; this.requestUpdate(); }} class="popup-close-btn" aria-label="Close voice selector">&times;</button>
-          
-          <div class="voice-selector-header">
-            <span id="voice-selector-title">Select AI Voice</span>
-          </div>
-          
-          <div class="voice-selector-grid">
-            ${this.availableVoices.map(voice => html`
-              <div 
-                class="voice-option ${voice === this.selectedVoice ? 'selected' : ''}"
-                @click=${() => this.selectVoice(voice)}
-              >
-                <span class="voice-name">${voice}</span>
-                ${voice === this.selectedVoice ? html`
-                  <span class="voice-selected-indicator">✓</span>
-                ` : ''}
-              </div>
-            `)}
-          </div>
-        </div>
-      ` : ''}
 
       ${this.popupData ? html`
         <div class="popup-overlay" @click=${this.closePopup} role="presentation"></div>
