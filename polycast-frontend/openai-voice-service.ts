@@ -35,6 +35,7 @@ export class OpenAIVoiceSession {
   private responseStartTime: number = 0;
   private justInterrupted: boolean = false; // Flag to prevent immediate response after interrupt
   private ignoreAudioUntil: number = 0; // Timestamp to ignore audio deltas after interrupt
+  private selectedDeviceId: string | null = null; // Selected microphone device ID
 
   // Callbacks
   onTranscriptUpdate: (transcript: string, isComplete: boolean) => void = () => {};
@@ -43,11 +44,57 @@ export class OpenAIVoiceSession {
   onConnectionChange: (connected: boolean) => void = () => {};
   onRecordingStateChange: (isRecording: boolean) => void = () => {};
   onError: (error: string) => void = () => {};
+  onMicrophoneDevicesFound: (devices: MediaDeviceInfo[]) => void = () => {};
+
+  // Method to detect available microphones
+  async detectMicrophones(): Promise<MediaDeviceInfo[]> {
+    try {
+      // Request permissions first to get device labels
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Get all audio input devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(device => device.kind === 'audioinput');
+      
+      console.log('🎤 Found microphones:', audioInputs.length);
+      audioInputs.forEach((device, index) => {
+        console.log(`  ${index + 1}. ${device.label || `Microphone ${index + 1}`} (${device.deviceId})`);
+      });
+      
+      this.onMicrophoneDevicesFound(audioInputs);
+      return audioInputs;
+      
+    } catch (error) {
+      console.error('❌ Failed to detect microphones:', error);
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          this.onError('Microphone access denied. Please allow microphone access in your browser.');
+        } else if (error.name === 'NotFoundError') {
+          this.onError('No microphone found. Please connect a microphone and try again.');
+        } else {
+          this.onError(`Microphone detection failed: ${error.message}`);
+        }
+      }
+      return [];
+    }
+  }
+
+  // Method to select a specific microphone device
+  setMicrophoneDevice(deviceId: string): void {
+    this.selectedDeviceId = deviceId;
+    console.log('🎤 Selected microphone device:', deviceId);
+  }
 
   async connect(config: VoiceSessionConfig): Promise<void> {
     try {
       // Store config for later use
       this.config = config;
+      
+      // Detect microphones first
+      const microphones = await this.detectMicrophones();
+      if (microphones.length === 0) {
+        throw new Error('No microphones available');
+      }
       
       // Connect to the OpenAI proxy on the backend service
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -101,14 +148,23 @@ export class OpenAIVoiceSession {
         await this.audioContext.resume();
       }
       
+      // Configure audio constraints with device selection
+      const audioConstraints: MediaTrackConstraints = {
+        sampleRate: 24000,
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: false,
+        autoGainControl: false
+      };
+
+      // Add device ID if one is selected
+      if (this.selectedDeviceId) {
+        audioConstraints.deviceId = { exact: this.selectedDeviceId };
+        console.log('🎤 Using selected microphone device:', this.selectedDeviceId);
+      }
+
       this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          sampleRate: 24000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: false,
-          autoGainControl: false
-        }
+        audio: audioConstraints
       });
 
       console.log('🎤 Microphone access granted');
