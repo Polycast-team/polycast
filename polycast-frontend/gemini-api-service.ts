@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
-import type { FlashcardExampleSentence, EvaluationData, TranscriptMessage } from './index'; // Assuming index.tsx exports these
+import type { FlashcardExampleSentence, EvaluationData, TranscriptMessage } from './index.js'; // Fixed import extension
 
 const MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
 
