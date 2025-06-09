@@ -4981,7 +4981,7 @@ In ${this.targetLanguage}:
         console.log('🌐 [VIDEO] Using automatic language detection');
       }
       
-      const response = await fetch('http://localhost:3001/api/transcribe', {
+      const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData,
       });
