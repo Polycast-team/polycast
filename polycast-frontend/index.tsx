@@ -4328,6 +4328,53 @@ In ${this.targetLanguage}:
                   </svg>
                 `}
               </button>
+              
+              <!-- Microphone Selector -->
+              <div class="microphone-selector-container">
+                <button 
+                  class="microphone-selector-button ${this.hasMicrophone ? '' : 'no-microphone'}"
+                  @click=${this.toggleMicrophoneSelector}
+                  title="${this.hasMicrophone ? 'Select microphone device' : 'No microphone detected'}"
+                  aria-label="Microphone device selector"
+                >
+                  🎤 ${this.hasMicrophone ? 
+                    (this.availableAudioDevices.find(d => d.deviceId === this.selectedAudioDeviceId)?.label?.replace(/^Default - /, '') || 'Default') 
+                    : 'No Mic'}
+                </button>
+                
+                ${this.showMicrophoneSelector ? html`
+                  <div class="microphone-selector-popup">
+                    <div class="microphone-selector-header">Select Microphone</div>
+                    ${this.availableAudioDevices.length > 0 ? html`
+                      <div class="microphone-device-list">
+                        ${this.availableAudioDevices.map(device => html`
+                          <div 
+                            class="microphone-device-item ${device.deviceId === this.selectedAudioDeviceId ? 'selected' : ''}"
+                            @click=${() => this.selectAudioDevice(device.deviceId)}
+                          >
+                            <span class="microphone-device-name">
+                              ${device.label?.replace(/^Default - /, '') || 'Unknown Device'}
+                            </span>
+                            ${device.deviceId === this.selectedAudioDeviceId ? html`
+                              <span class="microphone-device-selected-indicator">✓</span>
+                            ` : ''}
+                          </div>
+                        `)}
+                      </div>
+                      <button class="microphone-refresh-button" @click=${this.enumerateAudioDevices}>
+                        🔄 Refresh Devices
+                      </button>
+                    ` : html`
+                      <div class="microphone-no-devices">
+                        No microphone devices found. Please connect a microphone and refresh.
+                      </div>
+                      <button class="microphone-refresh-button" @click=${this.enumerateAudioDevices}>
+                        🔄 Refresh Devices
+                      </button>
+                    `}
+                  </div>
+                ` : ''}
+              </div>
             </div>
             <div id="status" role="status" aria-live="polite"> ${this.error || this.status} </div>
             <gdm-live-audio-visuals-3d .inputNode=${this.inputNode} .outputNode=${this.outputNode}></gdm-live-audio-visuals-3d>

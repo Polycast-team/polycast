@@ -326,6 +326,7 @@ export class OpenAIVoiceSession {
 
       case 'input_audio_buffer.committed':
         console.log('✅ Audio buffer committed - user speech captured');
+        console.log('📤 Expecting user transcription to start...');
         break;
 
       case 'input_audio_buffer.cleared':
@@ -348,11 +349,17 @@ export class OpenAIVoiceSession {
           console.log('👤 User Speech:', message.transcript);
           console.log('👤 ==========================================');
           this.onUserTranscriptUpdate(message.transcript);
+        } else {
+          console.log('⚠️ User transcription completed but no transcript provided');
+          // Still update with empty transcript to replace placeholder
+          this.onUserTranscriptUpdate('(No speech detected)');
         }
         break;
 
       case 'conversation.item.input_audio_transcription.failed':
-        console.log('❌ User speech transcription failed');
+        console.log('❌ User speech transcription failed:', message);
+        // Replace placeholder with error message
+        this.onUserTranscriptUpdate('(Speech transcription failed)');
         break;
 
       case 'error':
