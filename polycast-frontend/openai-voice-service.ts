@@ -49,10 +49,10 @@ export class OpenAIVoiceSession {
       // Store config for later use
       this.config = config;
       
-      // Connect to the OpenAI proxy via Vite's proxy
-      const currentHost = window.location.host;
+      // Connect to the OpenAI proxy on the backend service
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const url = `${protocol}//${currentHost}/openai-proxy`;
+      const backendHost = 'polycast-server.onrender.com';
+      const url = `${protocol}//${backendHost}/openai-proxy`;
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
