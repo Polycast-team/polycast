@@ -9,13 +9,13 @@ import type { FlashcardExampleSentence, EvaluationData, TranscriptMessage } from
 const MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
 
 // Initialize the GoogleGenAI client for this service
-// API_KEY will be sourced from process.env by the execution environment
+// GEMINI_API_KEY will be sourced from process.env by the execution environment
 let ai: GoogleGenAI;
 try {
-    ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 } catch (e) {
     console.error("Failed to initialize GoogleGenAI in service:", e);
-    // Handle cases where API_KEY might not be available or client init fails
+    // Handle cases where GEMINI_API_KEY might not be available or client init fails
     // For now, functions will check if 'ai' is initialized.
 }
 
