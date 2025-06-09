@@ -13,9 +13,76 @@ import { dirname, join } from 'path';
 import OpenAI from 'openai';
 import multer from 'multer';
 import fs from 'fs';
+import pg from 'pg';
 
 // Load environment variables from .env.local
 dotenv.config({ path: '.env.local' });
+
+// Database connection
+const { Pool } = pg;
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL || 'postgresql://data_5rgr_user:3mDZqEEuOVr3SzkyO1M8UvvAvTdkdNQI@dpg-d0jn3fvfte5s7380vqs0-a.oregon-postgres.render.com/data_5rgr',
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+// Test database connection
+pool.connect((err, client, release) => {
+    if (err) {
+        console.error('❌ Error connecting to database:', err);
+    } else {
+        console.log('✅ Database connected successfully');
+        release();
+    }
+});
+
+// Initialize database tables
+async function initializeTables() {
+    try {
+        // Create word_frequencies table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS word_frequencies (
+                id SERIAL PRIMARY KEY,
+                language VARCHAR(10) NOT NULL,
+                word VARCHAR(100) NOT NULL,
+                frequency DECIMAL(4,2) NOT NULL,
+                rank INTEGER NOT NULL,
+                user_frequency INTEGER NOT NULL,
+                tier VARCHAR(20) NOT NULL,
+                UNIQUE(language, word)
+            )
+        `);
+
+        // Create verb_conjugations table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS verb_conjugations (
+                id SERIAL PRIMARY KEY,
+                infinitive VARCHAR(200) NOT NULL,
+                form VARCHAR(200) NOT NULL,
+                tense VARCHAR(100),
+                person VARCHAR(50),
+                language VARCHAR(10) DEFAULT 'es'
+            )
+        `);
+
+        // Create indexes for performance
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_word_freq_lang_word ON word_frequencies(language, word)
+        `);
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_word_freq_lang_rank ON word_frequencies(language, rank)
+        `);
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_conjugations_form ON verb_conjugations(form)
+        `);
+
+        console.log('✅ Database tables initialized');
+    } catch (error) {
+        console.error('❌ Error initializing database tables:', error);
+    }
+}
+
+// Initialize tables on startup
+initializeTables();
 
 // Verify API key is loaded
 const apiKey = process.env.OPENAI_API_KEY;
@@ -200,6 +267,113 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
             error: 'Transcription failed', 
             details: error.message 
         });
+    }
+});
+
+// Word frequency API endpoints
+app.get('/api/word-frequency/:language/:word', async (req, res) => {
+    try {
+        const { language, word } = req.params;
+        console.log(`🔍 Looking up word: "${word}" in language: ${language}`);
+        
+        const result = await pool.query(
+            'SELECT frequency, rank, user_frequency FROM word_frequencies WHERE language = $1 AND word = $2',
+            [language.toLowerCase(), word.toLowerCase()]
+        );
+        
+        if (result.rows.length > 0) {
+            console.log(`✅ Found word: ${word} with frequency: ${result.rows[0].frequency}`);
+            res.json({
+                frequency: parseFloat(result.rows[0].frequency),
+                userFrequency: result.rows[0].user_frequency,
+                rank: result.rows[0].rank
+            });
+        } else {
+            console.log(`❌ Word not found: ${word}`);
+            res.json(null);
+        }
+    } catch (error) {
+        console.error('❌ Error looking up word frequency:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+app.get('/api/word-range/:language/:startRank/:endRank', async (req, res) => {
+    try {
+        const { language, startRank, endRank } = req.params;
+        console.log(`📊 Getting word range: ${startRank}-${endRank} for ${language}`);
+        
+        const result = await pool.query(
+            'SELECT word, frequency, rank, user_frequency FROM word_frequencies WHERE language = $1 AND rank BETWEEN $2 AND $3 ORDER BY rank',
+            [language.toLowerCase(), parseInt(startRank), parseInt(endRank)]
+        );
+        
+        const words = result.rows.map(row => ({
+            word: row.word,
+            frequency: parseFloat(row.frequency),
+            rank: row.rank,
+            userFrequency: row.user_frequency
+        }));
+        
+        console.log(`✅ Found ${words.length} words in range`);
+        res.json(words);
+    } catch (error) {
+        console.error('❌ Error getting word range:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+app.get('/api/conjugations/:form', async (req, res) => {
+    try {
+        const { form } = req.params;
+        console.log(`🔄 Looking up conjugation: "${form}"`);
+        
+        const result = await pool.query(
+            'SELECT infinitive, tense, person FROM verb_conjugations WHERE form = $1',
+            [form.toLowerCase()]
+        );
+        
+        console.log(`✅ Found ${result.rows.length} conjugation matches`);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('❌ Error looking up conjugation:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// Batch word lookup for better performance
+app.post('/api/words-batch', async (req, res) => {
+    try {
+        const { language, words } = req.body;
+        
+        if (!Array.isArray(words) || words.length === 0) {
+            return res.status(400).json({ error: 'Words array is required' });
+        }
+        
+        console.log(`📦 Batch lookup for ${words.length} words in ${language}`);
+        
+        // Create placeholders for the IN query
+        const placeholders = words.map((_, index) => `$${index + 2}`).join(',');
+        const result = await pool.query(
+            `SELECT word, frequency, rank, user_frequency FROM word_frequencies WHERE language = $1 AND word IN (${placeholders})`,
+            [language.toLowerCase(), ...words.map(w => w.toLowerCase())]
+        );
+        
+        // Convert to map for easy lookup
+        const wordMap = {};
+        result.rows.forEach(row => {
+            wordMap[row.word] = {
+                frequency: parseFloat(row.frequency),
+                userFrequency: row.user_frequency,
+                rank: row.rank
+            };
+        });
+        
+        console.log(`✅ Found ${result.rows.length}/${words.length} words in batch`);
+        res.json(wordMap);
+    } catch (error) {
+        console.error('❌ Error in batch word lookup:', error);
+        res.status(500).json({ error: 'Database error' });
     }
 });
 

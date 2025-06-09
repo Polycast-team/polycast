@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "signaling": "cd signaling-server && npm start"
+    "signaling": "cd signaling-server && npm start",
+    "migrate": "node migrate-to-db.js"
   },
   "dependencies": {
     "@google/genai": "^0.9.0",
@@ -17,6 +18,7 @@
     "http-proxy-middleware": "^2.0.6",
     "multer": "^1.4.5-lts.1",
     "openai": "^4.103.0",
+    "pg": "^8.11.3",
     "socket.io-client": "^4.7.5",
     "ws": "^8.14.2"
   },

@@ -1,27 +1,29 @@
 /**
- * Smart tiered wordfreq loading service
- * Only loads the target language, and loads tiers on-demand
+ * Database-powered wordfreq service
+ * Uses backend APIs instead of loading JSON files
  */
 
-interface TierLoadState {
-  core: boolean;
-  extended: boolean;
-  complete: boolean;
-}
-
-interface LanguageCache {
-  core: Map<string, number>;
-  extended: Map<string, number>;
-  complete: Map<string, number>;
-  loadState: TierLoadState;
-  metadata?: any;
-}
-
-// Cache for loaded wordfreq data by language
-const languageCache = new Map<string, LanguageCache>();
+// Cache for recent word lookups to avoid redundant API calls
+const wordCache = new Map<string, { frequency: number; userFrequency: number; rank?: number }>();
+const batchCache = new Map<string, Map<string, { frequency: number; userFrequency: number; rank: number }>>();
 
 // Currently supported languages
 const SUPPORTED_LANGUAGES = ['english', 'spanish', 'portuguese'];
+
+// Convert language name to API code
+function getLanguageCode(language: string): string {
+  const langMap: { [key: string]: string } = {
+    'english': 'en',
+    'spanish': 'es', 
+    'portuguese': 'pt'
+  };
+  return langMap[language.toLowerCase()] || language.toLowerCase().substring(0, 2);
+}
+
+// Cache key generator
+function getCacheKey(word: string, language: string): string {
+  return `${getLanguageCode(language)}_${word.toLowerCase()}`;
+}
 
 // Convert internal 1-10 decimal scale to user-friendly 1-5 scale
 export function convertToUserScale(internalFreq: number): number {
@@ -38,279 +40,287 @@ export function convertToUserScale(internalFreq: number): number {
   }
 }
 
-// Get the cache for a language, creating it if needed
-function getLanguageCache(language: string): LanguageCache {
-  const langKey = language.toLowerCase();
-  
-  if (!languageCache.has(langKey)) {
-    languageCache.set(langKey, {
-      core: new Map<string, number>(),
-      extended: new Map<string, number>(),
-      complete: new Map<string, number>(),
-      loadState: {
-        core: false,
-        extended: false,
-        complete: false
-      }
-    });
-  }
-  
-  return languageCache.get(langKey)!;
-}
-
-// Load a specific tier for a language
-async function loadTier(language: string, tier: 'core' | 'extended' | 'complete'): Promise<boolean> {
-  const langKey = language.toLowerCase();
-  
-  if (!SUPPORTED_LANGUAGES.includes(langKey)) {
-    console.warn(`Language ${language} not supported for wordfreq`);
-    return false;
-  }
-  
-  const cache = getLanguageCache(langKey);
-  
-  // Skip if already loaded
-  if (cache.loadState[tier]) {
-    return true;
-  }
-  
-  try {
-    console.log(`📥 Loading ${tier} wordfreq data for ${language}...`);
-    
-    const response = await fetch(`/wordfreq-tiers/${langKey}-${tier}.json`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to load ${tier} data: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // Load into the appropriate tier cache from the new ranked format
-    if (data.lookup) {
-      // New format with lookup object
-      if (!wordRankCache.has(langKey)) {
-        wordRankCache.set(langKey, new Map());
-      }
-      const rankCache = wordRankCache.get(langKey)!;
-      
-      for (const [word, wordData] of Object.entries(data.lookup)) {
-        const typedWordData = wordData as { frequency: number; rank: number; user_frequency: number };
-        cache[tier].set(word.toLowerCase(), typedWordData.frequency);
-        rankCache.set(word.toLowerCase(), {
-          frequency: typedWordData.frequency,
-          rank: typedWordData.rank,
-          userFrequency: typedWordData.user_frequency
-        });
-      }
-    } else {
-      // Fallback for old format
-      for (const [word, frequency] of Object.entries(data)) {
-        cache[tier].set(word.toLowerCase(), frequency as number);
-      }
-    }
-    
-    cache.loadState[tier] = true;
-    
-    console.log(`✅ Loaded ${tier} tier for ${language}: ${Object.keys(data).length} words`);
-    return true;
-    
-  } catch (error) {
-    console.error(`Failed to load ${tier} tier for ${language}:`, error);
-    cache.loadState[tier] = false;
-    return false;
-  }
-}
-
-// Load metadata for a language
-async function loadMetadata(language: string): Promise<any> {
-  const langKey = language.toLowerCase();
-  const cache = getLanguageCache(langKey);
-  
-  if (cache.metadata) {
-    return cache.metadata;
-  }
-  
-  try {
-    const response = await fetch(`/wordfreq-tiers/${langKey}-metadata.json`);
-    if (response.ok) {
-      cache.metadata = await response.json();
-      return cache.metadata;
-    }
-  } catch (error) {
-    console.warn(`Could not load metadata for ${language}:`, error);
-  }
-  
-  return null;
-}
-
-// Store word rank data for easy access
-const wordRankCache = new Map<string, Map<string, { frequency: number; rank: number; userFrequency: number }>>();
-
-// Smart word frequency lookup with tiered loading
+// Main word frequency lookup function - now uses database API
 export async function getWordFrequency(word: string, language: string): Promise<{ frequency: number; userFrequency: number; rank?: number } | null> {
-  const langKey = language.toLowerCase();
+  const langCode = getLanguageCode(language);
   const wordKey = word.toLowerCase();
+  const cacheKey = getCacheKey(word, language);
   
-  if (!SUPPORTED_LANGUAGES.includes(langKey)) {
+  if (!SUPPORTED_LANGUAGES.includes(language.toLowerCase())) {
     console.warn(`Language ${language} not supported for wordfreq`);
     return null;
   }
-  
-  const cache = getLanguageCache(langKey);
-  
-  // Step 1: Check core tier (load if not loaded)
-  if (!cache.loadState.core) {
-    const loaded = await loadTier(langKey, 'core');
-    if (!loaded) return null;
+
+  // Check cache first
+  if (wordCache.has(cacheKey)) {
+    console.log(`🎯 Cache hit for word: ${word}`);
+    return wordCache.get(cacheKey)!;
   }
-  
-  let frequency = cache.core.get(wordKey);
-  if (frequency !== undefined) {
-    const rankData = wordRankCache.get(langKey)?.get(wordKey);
-    return {
-      frequency,
-      userFrequency: convertToUserScale(frequency),
-      rank: rankData?.rank
-    };
+
+  try {
+    console.log(`🔍 Looking up word: "${word}" in language: ${language}`);
+    
+    const response = await fetch(`/api/word-frequency/${langCode}/${encodeURIComponent(wordKey)}`);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result) {
+      // Cache the result
+      wordCache.set(cacheKey, result);
+      console.log(`✅ Found word: ${word} with frequency: ${result.frequency}, rank: ${result.rank}`);
+      return result;
+    } else {
+      console.log(`❌ Word not found: ${word}`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`❌ Error looking up word ${word}:`, error);
+    return null;
   }
-  
-  // Step 2: Check extended tier (load if not loaded)
-  if (!cache.loadState.extended) {
-    console.log(`🔍 Word "${word}" not in core, loading extended tier...`);
-    const loaded = await loadTier(langKey, 'extended');
-    if (!loaded) return null;
-  }
-  
-  frequency = cache.extended.get(wordKey);
-  if (frequency !== undefined) {
-    const rankData = wordRankCache.get(langKey)?.get(wordKey);
-    return {
-      frequency,
-      userFrequency: convertToUserScale(frequency),
-      rank: rankData?.rank
-    };
-  }
-  
-  // Step 3: Check complete tier (load if not loaded)
-  if (!cache.loadState.complete) {
-    console.log(`🔍 Word "${word}" not in extended, loading complete tier...`);
-    const loaded = await loadTier(langKey, 'complete');
-    if (!loaded) return null;
-  }
-  
-  frequency = cache.complete.get(wordKey);
-  if (frequency !== undefined) {
-    const rankData = wordRankCache.get(langKey)?.get(wordKey);
-    return {
-      frequency,
-      userFrequency: convertToUserScale(frequency),
-      rank: rankData?.rank
-    };
-  }
-  
-  // Word not found in any tier
-  console.log(`⚠️ Word "${word}" not found in any ${language} tier`);
-  return null;
 }
 
-// Preload core tier for a language (call when user selects target language)
-export async function preloadCoreLanguage(language: string): Promise<boolean> {
-  console.log(`🚀 Preloading core vocabulary for ${language}...`);
-  
-  const success = await loadTier(language.toLowerCase(), 'core');
-  
-  if (success) {
-    // Also load metadata in background
-    loadMetadata(language.toLowerCase()).catch(err => 
-      console.warn('Failed to load metadata:', err)
-    );
-  }
-  
-  return success;
-}
-
-// Get loading status for a language
-export function getLoadingStatus(language: string): TierLoadState {
-  const cache = getLanguageCache(language.toLowerCase());
-  return { ...cache.loadState };
-}
-
-// Get cache statistics
-export function getCacheStats(): { [language: string]: { 
-  coreWords: number; 
-  extendedWords: number; 
-  completeWords: number;
-  totalWords: number;
-  loadState: TierLoadState;
-}} {
-  const stats: any = {};
-  
-  for (const [lang, cache] of languageCache.entries()) {
-    stats[lang] = {
-      coreWords: cache.core.size,
-      extendedWords: cache.extended.size,
-      completeWords: cache.complete.size,
-      totalWords: cache.core.size + cache.extended.size + cache.complete.size,
-      loadState: { ...cache.loadState }
-    };
-  }
-  
-  return stats;
-}
-
-// Get words by rank range (useful for flashcard generation)
+// Get words by rank range - now uses database API
 export async function getWordsByRankRange(
   language: string, 
   startRank: number, 
   endRank: number
 ): Promise<Array<{ word: string; frequency: number; rank: number; userFrequency: number }> | null> {
-  const langKey = language.toLowerCase();
+  const langCode = getLanguageCode(language);
   
-  if (!SUPPORTED_LANGUAGES.includes(langKey)) {
+  if (!SUPPORTED_LANGUAGES.includes(language.toLowerCase())) {
     console.warn(`Language ${language} not supported for wordfreq`);
     return null;
   }
 
-  // Determine which tiers we need to load
-  const neededTiers: Array<'core' | 'extended' | 'complete'> = [];
-  
-  if (startRank <= 15000) neededTiers.push('core');
-  if (startRank <= 65000 && endRank > 15000) neededTiers.push('extended');
-  if (endRank > 65000) neededTiers.push('complete');
-
-  // Load required tiers
-  for (const tier of neededTiers) {
-    await loadTier(langKey, tier);
+  // Check batch cache
+  const batchKey = `${langCode}_${startRank}_${endRank}`;
+  if (batchCache.has(batchKey)) {
+    console.log(`🎯 Batch cache hit for range: ${startRank}-${endRank}`);
+    const cachedData = batchCache.get(batchKey)!;
+    return Array.from(cachedData.entries()).map(([word, data]) => ({
+      word,
+      frequency: data.frequency,
+      rank: data.rank,
+      userFrequency: data.userFrequency
+    }));
   }
 
-  // Get rank cache
-  const rankCache = wordRankCache.get(langKey);
-  if (!rankCache) return null;
-
-  // Filter words by rank range
-  const words: Array<{ word: string; frequency: number; rank: number; userFrequency: number }> = [];
-  
-  for (const [word, data] of rankCache.entries()) {
-    if (data.rank >= startRank && data.rank <= endRank) {
-      words.push({
-        word,
-        frequency: data.frequency,
-        rank: data.rank,
-        userFrequency: data.userFrequency
-      });
+  try {
+    console.log(`📊 Getting word range: ${startRank}-${endRank} for ${language}`);
+    
+    const response = await fetch(`/api/word-range/${langCode}/${startRank}/${endRank}`);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
     }
+    
+    const words = await response.json();
+    
+    // Cache the batch result
+    const batchCacheData = new Map<string, { frequency: number; userFrequency: number; rank: number }>();
+    words.forEach((wordData: any) => {
+      batchCacheData.set(wordData.word, {
+        frequency: wordData.frequency,
+        userFrequency: wordData.userFrequency,
+        rank: wordData.rank
+      });
+      
+      // Also cache individual words
+      const cacheKey = getCacheKey(wordData.word, language);
+      wordCache.set(cacheKey, {
+        frequency: wordData.frequency,
+        userFrequency: wordData.userFrequency,
+        rank: wordData.rank
+      });
+    });
+    batchCache.set(batchKey, batchCacheData);
+    
+    console.log(`✅ Found ${words.length} words in range ${startRank}-${endRank}`);
+    return words;
+  } catch (error) {
+    console.error(`❌ Error getting word range ${startRank}-${endRank}:`, error);
+    return null;
   }
-
-  // Sort by rank
-  words.sort((a, b) => a.rank - b.rank);
-  
-  return words;
 }
 
-// Clear cache for a language (useful for memory management)
+// Batch word lookup for better performance when looking up multiple words
+export async function getWordsBatch(words: string[], language: string): Promise<{ [word: string]: { frequency: number; userFrequency: number; rank: number } } | null> {
+  const langCode = getLanguageCode(language);
+  
+  if (!SUPPORTED_LANGUAGES.includes(language.toLowerCase())) {
+    console.warn(`Language ${language} not supported for wordfreq`);
+    return null;
+  }
+
+  if (!Array.isArray(words) || words.length === 0) {
+    return {};
+  }
+
+  // Filter out words already in cache
+  const wordsToLookup = words.filter(word => {
+    const cacheKey = getCacheKey(word, language);
+    return !wordCache.has(cacheKey);
+  });
+
+  // Get cached words
+  const result: { [word: string]: { frequency: number; userFrequency: number; rank: number } } = {};
+  words.forEach(word => {
+    const cacheKey = getCacheKey(word, language);
+    if (wordCache.has(cacheKey)) {
+      const cached = wordCache.get(cacheKey)!;
+      if (cached.rank !== undefined) {
+        result[word] = {
+          frequency: cached.frequency,
+          userFrequency: cached.userFrequency,
+          rank: cached.rank
+        };
+      }
+    }
+  });
+
+  // If all words were cached, return early
+  if (wordsToLookup.length === 0) {
+    console.log(`🎯 All ${words.length} words found in cache`);
+    return result;
+  }
+
+  try {
+    console.log(`📦 Batch lookup for ${wordsToLookup.length} words in ${language}`);
+    
+    const response = await fetch('/api/words-batch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        language: langCode,
+        words: wordsToLookup
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Batch API request failed: ${response.status}`);
+    }
+    
+    const batchResult = await response.json();
+    
+    // Cache and merge results
+    Object.entries(batchResult).forEach(([word, data]: [string, any]) => {
+      const cacheKey = getCacheKey(word, language);
+      wordCache.set(cacheKey, data);
+      result[word] = data;
+    });
+    
+    console.log(`✅ Batch lookup complete: ${Object.keys(batchResult).length}/${wordsToLookup.length} words found`);
+    return result;
+  } catch (error) {
+    console.error(`❌ Error in batch word lookup:`, error);
+    return null;
+  }
+}
+
+// Get conjugation information for a verb form
+export async function getConjugation(form: string): Promise<Array<{ infinitive: string; tense: string; person: string }> | null> {
+  try {
+    console.log(`🔄 Looking up conjugation: "${form}"`);
+    
+    const response = await fetch(`/api/conjugations/${encodeURIComponent(form.toLowerCase())}`);
+    
+    if (!response.ok) {
+      throw new Error(`Conjugation API request failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    console.log(`✅ Found ${result.length} conjugation matches for: ${form}`);
+    return result;
+  } catch (error) {
+    console.error(`❌ Error looking up conjugation for ${form}:`, error);
+    return null;
+  }
+}
+
+// Preload core vocabulary for a language (now loads common words proactively)
+export async function preloadCoreLanguage(language: string): Promise<boolean> {
+  console.log(`🚀 Preloading core vocabulary for ${language}...`);
+  
+  try {
+    // Load the most common 1000 words
+    const coreWords = await getWordsByRankRange(language, 1, 1000);
+    
+    if (coreWords && coreWords.length > 0) {
+      console.log(`✅ Preloaded ${coreWords.length} core words for ${language}`);
+      return true;
+    } else {
+      console.warn(`⚠️ No core words found for ${language}`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`❌ Error preloading core vocabulary for ${language}:`, error);
+    return false;
+  }
+}
+
+// Get cache statistics
+export function getCacheStats(): { 
+  individualWords: number; 
+  batchEntries: number;
+  languages: string[];
+} {
+  const languages = new Set<string>();
+  
+  // Extract languages from cache keys
+  wordCache.forEach((_, key) => {
+    const lang = key.split('_')[0];
+    languages.add(lang);
+  });
+  
+  return {
+    individualWords: wordCache.size,
+    batchEntries: batchCache.size,
+    languages: Array.from(languages)
+  };
+}
+
+// Clear cache for memory management
+export function clearCache(): void {
+  wordCache.clear();
+  batchCache.clear();
+  console.log(`🧹 Cleared all wordfreq caches`);
+}
+
+// Clear cache for a specific language
 export function clearLanguageCache(language: string): void {
-  const langKey = language.toLowerCase();
-  languageCache.delete(langKey);
-  wordRankCache.delete(langKey);
-  console.log(`🧹 Cleared cache for ${language}`);
+  const langCode = getLanguageCode(language);
+  
+  // Remove individual word cache entries for this language
+  const keysToDelete: string[] = [];
+  wordCache.forEach((_, key) => {
+    if (key.startsWith(`${langCode}_`)) {
+      keysToDelete.push(key);
+    }
+  });
+  keysToDelete.forEach(key => wordCache.delete(key));
+  
+  // Remove batch cache entries for this language
+  const batchKeysToDelete: string[] = [];
+  batchCache.forEach((_, key) => {
+    if (key.startsWith(`${langCode}_`)) {
+      batchKeysToDelete.push(key);
+    }
+  });
+  batchKeysToDelete.forEach(key => batchCache.delete(key));
+  
+  console.log(`🧹 Cleared cache for ${language} (${keysToDelete.length} words, ${batchKeysToDelete.length} batches)`);
+}
+
+// Legacy compatibility functions (these now just call the new implementations)
+export function getLoadingStatus(language: string): { core: boolean; extended: boolean; complete: boolean } {
+  // Since we're using database, all tiers are always "loaded"
+  return { core: true, extended: true, complete: true };
+} 
 } 
