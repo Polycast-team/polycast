@@ -1506,31 +1506,68 @@ export class GdmLiveAudio extends LitElement {
       background: rgba(255, 255, 255, 0.2);
     }
 
-    .microphone-dropdown {
-      position: absolute;
-      top: -120px; /* Position above the button instead of below */
+    .microphone-modal-overlay {
+      position: fixed;
+      top: 0;
       left: 0;
-      margin-top: 5px;
-      background: rgba(20, 20, 20, 0.98);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 12px;
-      padding: 12px 0;
-      z-index: 2000;
-      min-width: 300px;
-      max-width: 400px;
-      backdrop-filter: blur(15px);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+
+    .microphone-dropdown {
+      background: rgba(25, 25, 35, 0.98);
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 16px;
+      padding: 0;
+      width: 400px;
+      max-height: 400px;
+      overflow-y: auto;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+      position: relative;
     }
 
     .microphone-dropdown-header {
-      padding: 12px 16px;
-      font-size: 13px;
-      color: #bbb;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-      margin-bottom: 8px;
+      padding: 24px 24px 16px 24px;
+      font-size: 16px;
+      color: #fff;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+      margin-bottom: 0;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 16px 16px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .close-modal-btn {
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.2s ease;
+    }
+
+    .close-modal-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
     }
 
     .microphone-option {
@@ -1538,46 +1575,56 @@ export class GdmLiveAudio extends LitElement {
       background: none;
       border: none;
       color: white;
-      padding: 14px 16px;
-      font-size: 15px;
+      padding: 16px 24px;
+      font-size: 16px;
       cursor: pointer;
       text-align: left;
       transition: all 0.2s ease;
-      line-height: 1.3;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: block;
+      line-height: 1.4;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .microphone-option:last-child {
+      border-bottom: none;
+      border-radius: 0 0 16px 16px;
     }
 
     .microphone-option:hover {
-      background: rgba(255, 255, 255, 0.15);
-      transform: translateX(2px);
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
     }
 
     .microphone-option.selected {
-      background: rgba(100, 200, 100, 0.25);
+      background: rgba(0, 150, 0, 0.2);
       color: #90ee90;
       font-weight: 600;
     }
 
     .microphone-option.selected::before {
-      content: "✓ ";
+      content: "✓";
       color: #90ee90;
       font-weight: bold;
+      font-size: 18px;
+      flex-shrink: 0;
     }
 
     .no-microphones {
-      padding: 20px 16px;
-      color: #ff7b7b;
-      font-size: 15px;
+      padding: 40px 24px;
+      color: #ff9999;
+      font-size: 16px;
       text-align: center;
       font-style: italic;
+      border-radius: 0 0 16px 16px;
     }
 
     .no-microphones::before {
-      content: "⚠️ ";
-      margin-right: 8px;
+      content: "⚠️";
+      display: block;
+      font-size: 24px;
+      margin-bottom: 12px;
     }
 
     #status {
@@ -4206,22 +4253,27 @@ In ${this.targetLanguage}:
                   🎤 ${this.availableMicrophones.length > 0 ? this.availableMicrophones.length : '0'}
                 </button>
                 
-                <!-- Microphone dropdown -->
+                <!-- Microphone dropdown modal -->
                 ${this.showMicrophoneSelector ? html`
-                  <div class="microphone-dropdown">
-                    <div class="microphone-dropdown-header">Select Microphone:</div>
-                    ${this.availableMicrophones.length > 0 ? 
-                      this.availableMicrophones.map(device => html`
-                        <button 
-                          class="microphone-option ${this.selectedMicrophoneId === device.deviceId ? 'selected' : ''}"
-                          @click=${() => this.handleMicrophoneSelection(device.deviceId)}
-                        >
-                          ${device.label || `Microphone ${device.deviceId.slice(0, 8)}...`}
-                        </button>
-                      `) : html`
-                        <div class="no-microphones">No microphones detected</div>
-                      `
-                    }
+                  <div class="microphone-modal-overlay" @click=${this.toggleMicrophoneSelector}>
+                    <div class="microphone-dropdown" @click=${(e: Event) => e.stopPropagation()}>
+                      <div class="microphone-dropdown-header">
+                        Select Microphone Device
+                        <button class="close-modal-btn" @click=${this.toggleMicrophoneSelector}>×</button>
+                      </div>
+                      ${this.availableMicrophones.length > 0 ? 
+                        this.availableMicrophones.map(device => html`
+                          <button 
+                            class="microphone-option ${this.selectedMicrophoneId === device.deviceId ? 'selected' : ''}"
+                            @click=${() => this.handleMicrophoneSelection(device.deviceId)}
+                          >
+                            ${device.label || `Microphone ${device.deviceId.slice(0, 20)}...`}
+                          </button>
+                        `) : html`
+                          <div class="no-microphones">No microphones detected</div>
+                        `
+                      }
+                    </div>
                   </div>
                 ` : ''}
               </div>
