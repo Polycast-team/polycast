@@ -96,7 +96,40 @@ export class OpenAIVoiceSession {
 
   private async initializeAudio(): Promise<void> {
     try {
-      this.audioContext = new AudioContext({ sampleRate: 24000 });
+      // First get the media stream to determine the actual sample rate
+      const tempConstraints: MediaTrackConstraints = {
+        sampleRate: 24000,
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: false,
+        autoGainControl: false
+      };
+      
+      // Add device ID if specified
+      if (this.config?.deviceId) {
+        tempConstraints.deviceId = { exact: this.config.deviceId };
+        console.log('🎤 Using specific audio device:', this.config.deviceId);
+      }
+      
+      const tempStream = await navigator.mediaDevices.getUserMedia({ 
+        audio: tempConstraints
+      });
+      
+      // Get the actual sample rate from the media stream
+      const audioTrack = tempStream.getAudioTracks()[0];
+      const settings = audioTrack.getSettings();
+      const actualSampleRate = settings.sampleRate || 24000;
+      
+      console.log('🔧 MediaStream DEBUG:');
+      console.log('  - Sample Rate:', settings.sampleRate);
+      console.log('  - Channel Count:', settings.channelCount);
+      console.log('  - Echo Cancellation:', settings.echoCancellation);
+      
+      // Stop the temporary stream
+      tempStream.getTracks().forEach(track => track.stop());
+      
+      // Create AudioContext with the same sample rate as the media stream
+      this.audioContext = new AudioContext({ sampleRate: actualSampleRate });
       
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
@@ -107,10 +140,11 @@ export class OpenAIVoiceSession {
       console.log('  - Sample Rate:', this.audioContext.sampleRate);
       console.log('  - State:', this.audioContext.state);
       console.log('  - Base Latency:', this.audioContext.baseLatency);
+      console.log('  - ✅ Sample rates now match!');
       
-      // Set up audio constraints with optional device ID
+      // Set up audio constraints with the same sample rate
       const audioConstraints: MediaTrackConstraints = {
-        sampleRate: 24000,
+        sampleRate: actualSampleRate,
         channelCount: 1,
         echoCancellation: true,
         noiseSuppression: false,
@@ -128,14 +162,6 @@ export class OpenAIVoiceSession {
       });
 
       console.log('🎤 Microphone access granted');
-      
-      // DEBUG: Verify media stream settings
-      const audioTrack = this.mediaStream.getAudioTracks()[0];
-      const settings = audioTrack.getSettings();
-      console.log('🔧 MediaStream DEBUG:');
-      console.log('  - Sample Rate:', settings.sampleRate);
-      console.log('  - Channel Count:', settings.channelCount);
-      console.log('  - Echo Cancellation:', settings.echoCancellation);
       
       const source = this.audioContext.createMediaStreamSource(this.mediaStream);
       
@@ -166,20 +192,34 @@ export class OpenAIVoiceSession {
           }
           
           if (hasAudio) {
-            // Accumulate audio instead of sending immediately
-            const pcm16 = this.float32ToPCM16(inputData);
+            // Resample to 24kHz if necessary for OpenAI compatibility
+            const targetSampleRate = 24000;
+            const currentSampleRate = this.audioContext?.sampleRate || 24000;
+            
+            let processedData = inputData;
+            if (currentSampleRate !== targetSampleRate) {
+              processedData = this.resampleAudio(inputData, currentSampleRate, targetSampleRate);
+            }
+            
+            // Accumulate audio after processing
+            const pcm16 = this.float32ToPCM16(processedData);
             this.audioBuffer.push(pcm16);
             
             // DEBUG: Log audio statistics for first chunk
             if (this.audioBuffer.length === 1) {
               console.log('🎤 Recording and capturing audio...');
               console.log('🔧 Audio Data DEBUG:');
-              console.log('  - Buffer Size:', inputData.length);
-              console.log('  - Sample Rate (Context):', this.audioContext?.sampleRate);
+              console.log('  - Original Buffer Size:', inputData.length);
+              console.log('  - Original Sample Rate:', currentSampleRate);
+              console.log('  - Processed Buffer Size:', processedData.length);
+              console.log('  - Target Sample Rate:', targetSampleRate);
               console.log('  - Non-zero samples:', nonZeroSamples);
               console.log('  - Min value:', minValue.toFixed(6));
               console.log('  - Max value:', maxValue.toFixed(6));
               console.log('  - PCM16 byte length:', pcm16.byteLength);
+              if (currentSampleRate !== targetSampleRate) {
+                console.log('  - ✅ Audio resampled from', currentSampleRate, 'Hz to', targetSampleRate, 'Hz');
+              }
             }
           }
         }
@@ -241,6 +281,33 @@ export class OpenAIVoiceSession {
       float32[i] = int16 < 0 ? int16 / 0x8000 : int16 / 0x7FFF;
     }
     return float32;
+  }
+
+  private resampleAudio(inputBuffer: Float32Array, inputSampleRate: number, outputSampleRate: number): Float32Array {
+    if (inputSampleRate === outputSampleRate) {
+      return inputBuffer;
+    }
+    
+    const ratio = inputSampleRate / outputSampleRate;
+    const outputLength = Math.round(inputBuffer.length / ratio);
+    const output = new Float32Array(outputLength);
+    
+    // Simple linear interpolation resampling
+    for (let i = 0; i < outputLength; i++) {
+      const sourceIndex = i * ratio;
+      const index = Math.floor(sourceIndex);
+      const fraction = sourceIndex - index;
+      
+      if (index + 1 < inputBuffer.length) {
+        // Linear interpolation between samples
+        output[i] = inputBuffer[index] * (1 - fraction) + inputBuffer[index + 1] * fraction;
+      } else {
+        // Use last sample if we're at the end
+        output[i] = inputBuffer[inputBuffer.length - 1];
+      }
+    }
+    
+    return output;
   }
 
   private config: VoiceSessionConfig | null = null;
@@ -504,7 +571,7 @@ export class OpenAIVoiceSession {
     if (this.isConnected && !this.isAIResponding && this.audioBuffer.length > 0) {
       console.log('📤 Processing and sending accumulated audio...');
       
-      // DEBUG: Calculate total audio statistics
+      // DEBUG: Calculate total audio statistics  
       let totalBytes = 0;
       let totalDurationMs = 0;
       const sampleRate = this.audioContext?.sampleRate || 24000;
@@ -516,6 +583,14 @@ export class OpenAIVoiceSession {
       // Calculate duration: bytes / 2 (16-bit) / sample_rate * 1000 (ms)
       const totalSamples = totalBytes / 2;
       totalDurationMs = (totalSamples / sampleRate) * 1000;
+      
+      // Additional debug for sample rate alignment
+      console.log('🔧 Sample Rate Alignment:');
+      console.log('  - AudioContext sample rate:', sampleRate);
+      console.log('  - Expected 24kHz duration:', (totalSamples / 24000 * 1000).toFixed(2) + 'ms');
+      if (sampleRate !== 24000) {
+        console.log('  - ⚠️ Sample rate differs from 24kHz - audio will be resampled for OpenAI');
+      }
       
       console.log('🔧 Audio Send DEBUG:');
       console.log('  - Total chunks:', this.audioBuffer.length);
