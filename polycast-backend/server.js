@@ -59,7 +59,9 @@ async function initializeTables() {
                 infinitive VARCHAR(200) NOT NULL,
                 form VARCHAR(200) NOT NULL,
                 tense VARCHAR(100),
-                person VARCHAR(50),
+                person VARCHAR(100),
+                mood VARCHAR(100),
+                translation VARCHAR(200),
                 language VARCHAR(10) DEFAULT 'es'
             )
         `);
@@ -329,7 +331,7 @@ app.get('/api/conjugations/:form', async (req, res) => {
         console.log(`🔄 Looking up conjugation: "${form}"`);
         
         const result = await pool.query(
-            'SELECT infinitive, tense, person FROM verb_conjugations WHERE form = $1',
+            'SELECT infinitive, form, tense, person, mood, translation, language FROM verb_conjugations WHERE form = $1',
             [form.toLowerCase()]
         );
         

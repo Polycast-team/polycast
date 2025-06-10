@@ -49,7 +49,9 @@ async function createTables() {
                 infinitive VARCHAR(200) NOT NULL,
                 form VARCHAR(200) NOT NULL,
                 tense VARCHAR(100),
-                person VARCHAR(50),
+                person VARCHAR(100),
+                mood VARCHAR(100),
+                translation VARCHAR(200),
                 language VARCHAR(10) DEFAULT 'es'
             )
         `);
@@ -166,10 +168,10 @@ async function migrateTierData() {
 async function migrateConjugationData() {
     console.log('\n🔄 Starting conjugation data migration...');
     
-    const conjugationFile = path.join(__dirname, '..', 'polycast-frontend', 'public', 'Conjugations', 'Spanish', 'Spanish Conjugations.json');
+    const byLetterDir = path.join(__dirname, '..', 'polycast-frontend', 'public', 'Conjugations', 'Spanish', 'by-letter');
     
-    if (!fs.existsSync(conjugationFile)) {
-        console.log('⚠️ Spanish conjugations file not found, skipping...');
+    if (!fs.existsSync(byLetterDir)) {
+        console.log('⚠️ Spanish by-letter conjugations directory not found, skipping...');
         return;
     }
     
@@ -178,38 +180,51 @@ async function migrateConjugationData() {
         console.log('🧹 Clearing existing conjugation data...');
         await pool.query('DELETE FROM verb_conjugations');
         
-        console.log('📥 Loading Spanish conjugations...');
-        const data = JSON.parse(fs.readFileSync(conjugationFile, 'utf8'));
+        console.log('📥 Loading Spanish conjugations from by-letter files...');
         
         let totalConjugations = 0;
         const batchSize = 1000;
         let batch = [];
         
-        // Process conjugation data
-        for (const [infinitive, conjugationData] of Object.entries(data)) {
-            if (typeof conjugationData === 'object' && conjugationData !== null) {
-                for (const [tense, tenseData] of Object.entries(conjugationData)) {
-                    if (typeof tenseData === 'object' && tenseData !== null) {
-                        for (const [person, form] of Object.entries(tenseData)) {
-                            if (typeof form === 'string' && form.trim() !== '') {
-                                batch.push({
-                                    infinitive: infinitive,
-                                    form: form.toLowerCase(),
-                                    tense: tense,
-                                    person: person,
-                                    language: 'es'
-                                });
-                                
-                                if (batch.length >= batchSize) {
-                                    await insertConjugationBatch(batch);
-                                    totalConjugations += batch.length;
-                                    console.log(`    ✅ Inserted ${totalConjugations.toLocaleString()} conjugations...`);
-                                    batch = [];
-                                }
+        // Read all JSON files in the by-letter directory
+        const files = fs.readdirSync(byLetterDir).filter(file => file.endsWith('.json') && !file.includes('.backup'));
+        
+        for (const filename of files) {
+            const filepath = path.join(byLetterDir, filename);
+            console.log(`  📄 Processing ${filename}...`);
+            
+            try {
+                const data = JSON.parse(fs.readFileSync(filepath, 'utf8'));
+                
+                // Process each conjugated form
+                for (const [form, conjugationData] of Object.entries(data)) {
+                    // Handle both single objects and arrays
+                    const conjugations = Array.isArray(conjugationData) ? conjugationData : [conjugationData];
+                    
+                    for (const conj of conjugations) {
+                        if (conj && conj.infinitive && typeof conj.infinitive === 'string') {
+                            batch.push({
+                                infinitive: conj.infinitive,
+                                form: form.toLowerCase(),
+                                tense: conj.tense || null,
+                                person: conj.performer || null,
+                                language: 'es',
+                                mood: conj.mood || null,
+                                translation: conj.translation || null
+                            });
+                            
+                            if (batch.length >= batchSize) {
+                                await insertConjugationBatch(batch);
+                                totalConjugations += batch.length;
+                                console.log(`    ✅ Inserted ${totalConjugations.toLocaleString()} conjugations...`);
+                                batch = [];
                             }
                         }
                     }
                 }
+                
+            } catch (error) {
+                console.error(`    ❌ Error processing ${filename}:`, error.message);
             }
         }
         
@@ -233,19 +248,21 @@ async function insertConjugationBatch(batch) {
     let paramIndex = 1;
     
     batch.forEach(conj => {
-        placeholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`);
+        placeholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`);
         values.push(
             conj.infinitive,
             conj.form,
             conj.tense,
             conj.person,
+            conj.mood,
+            conj.translation,
             conj.language
         );
-        paramIndex += 5;
+        paramIndex += 7;
     });
     
     const query = `
-        INSERT INTO verb_conjugations (infinitive, form, tense, person, language)
+        INSERT INTO verb_conjugations (infinitive, form, tense, person, mood, translation, language)
         VALUES ${placeholders.join(', ')}
     `;
     
