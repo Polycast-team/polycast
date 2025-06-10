@@ -322,5 +322,4 @@ export function clearLanguageCache(language: string): void {
 export function getLoadingStatus(language: string): { core: boolean; extended: boolean; complete: boolean } {
   // Since we're using database, all tiers are always "loaded"
   return { core: true, extended: true, complete: true };
-} 
-} 
+}
