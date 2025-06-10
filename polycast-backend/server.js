@@ -405,7 +405,32 @@ wss.on('connection', (ws) => {
         if (openaiWs.readyState === WebSocket.OPEN) {
             // Convert Buffer to string if necessary before sending to OpenAI
             const messageStr = Buffer.isBuffer(message) ? message.toString('utf8') : message;
-            console.log('Forwarding message to OpenAI:', typeof messageStr);
+            
+            // DEBUG: Parse and log audio messages
+            try {
+                const parsed = JSON.parse(messageStr);
+                if (parsed.type === 'input_audio_buffer.append' && parsed.audio) {
+                    console.log('🔧 AUDIO DEBUG - Client to OpenAI:');
+                    console.log('  - Message type:', parsed.type);
+                    console.log('  - Base64 audio length:', parsed.audio.length);
+                    console.log('  - Audio starts with:', parsed.audio.substring(0, 50) + '...');
+                    
+                    // Decode base64 to check byte size
+                    try {
+                        const audioBytes = Buffer.from(parsed.audio, 'base64');
+                        console.log('  - Decoded audio bytes:', audioBytes.length);
+                        console.log('  - Expected samples (16-bit):', audioBytes.length / 2);
+                        console.log('  - Duration at 24kHz (ms):', (audioBytes.length / 2 / 24000 * 1000).toFixed(2));
+                    } catch (decodeError) {
+                        console.error('  - ❌ Failed to decode base64 audio:', decodeError.message);
+                    }
+                } else if (parsed.type && !parsed.type.includes('delta')) {
+                    console.log('Forwarding message to OpenAI:', parsed.type);
+                }
+            } catch (parseError) {
+                console.log('Forwarding non-JSON message to OpenAI:', typeof messageStr);
+            }
+            
             openaiWs.send(messageStr);
         }
     });
@@ -417,20 +442,31 @@ wss.on('connection', (ws) => {
 
     // Handle messages from OpenAI
     openaiWs.on('message', (message) => {
-        console.log('Received message from OpenAI, type:', typeof message, 'isBuffer:', Buffer.isBuffer(message), 'length:', message.length);
+        let messageStr = Buffer.isBuffer(message) ? message.toString('utf8') : message;
+        
+        // DEBUG: Parse and log important messages from OpenAI
+        try {
+            const parsed = JSON.parse(messageStr);
+            if (parsed.type === 'conversation.item.input_audio_transcription.failed') {
+                console.log('🔧 TRANSCRIPTION FAILURE DEBUG - OpenAI to Client:');
+                console.log('  - Message type:', parsed.type);
+                console.log('  - Event ID:', parsed.event_id);
+                console.log('  - Item ID:', parsed.item_id);
+                console.log('  - Content Index:', parsed.content_index);
+                console.log('  - Error details:', JSON.stringify(parsed.error, null, 2));
+            } else if (parsed.type === 'input_audio_buffer.committed') {
+                console.log('✅ Audio buffer committed successfully by OpenAI');
+            } else if (parsed.type === 'input_audio_buffer.cleared') {
+                console.log('🗑️ Audio buffer cleared by OpenAI');
+            } else if (parsed.type && !parsed.type.includes('delta') && !parsed.type.includes('transcript')) {
+                console.log('Received from OpenAI:', parsed.type);
+            }
+        } catch (parseError) {
+            console.log('Received non-JSON message from OpenAI, length:', messageStr.length);
+        }
         
         if (ws.readyState === WebSocket.OPEN) {
-            // Ensure we're sending text, not binary data
-            if (Buffer.isBuffer(message)) {
-                // Convert Buffer to string
-                const messageStr = message.toString('utf8');
-                console.log('Converting buffer to string, first 100 chars:', messageStr.substring(0, 100));
-                ws.send(messageStr);
-            } else {
-                // Already a string
-                console.log('Sending string message, first 100 chars:', message.substring(0, 100));
-                ws.send(message);
-            }
+            ws.send(messageStr);
         }
     });
 

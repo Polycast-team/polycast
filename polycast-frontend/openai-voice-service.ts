@@ -102,6 +102,12 @@ export class OpenAIVoiceSession {
         await this.audioContext.resume();
       }
       
+      // DEBUG: Verify actual audio context settings
+      console.log('🔧 AudioContext DEBUG:');
+      console.log('  - Sample Rate:', this.audioContext.sampleRate);
+      console.log('  - State:', this.audioContext.state);
+      console.log('  - Base Latency:', this.audioContext.baseLatency);
+      
       // Set up audio constraints with optional device ID
       const audioConstraints: MediaTrackConstraints = {
         sampleRate: 24000,
@@ -122,6 +128,15 @@ export class OpenAIVoiceSession {
       });
 
       console.log('🎤 Microphone access granted');
+      
+      // DEBUG: Verify media stream settings
+      const audioTrack = this.mediaStream.getAudioTracks()[0];
+      const settings = audioTrack.getSettings();
+      console.log('🔧 MediaStream DEBUG:');
+      console.log('  - Sample Rate:', settings.sampleRate);
+      console.log('  - Channel Count:', settings.channelCount);
+      console.log('  - Echo Cancellation:', settings.echoCancellation);
+      
       const source = this.audioContext.createMediaStreamSource(this.mediaStream);
       
       // Use ScriptProcessorNode for simpler, more reliable audio capture
@@ -134,13 +149,20 @@ export class OpenAIVoiceSession {
         if (this.isRecording && !this.isAIResponding) {
           const inputData = event.inputBuffer.getChannelData(0);
           
-          // Check for actual audio content
+          // DEBUG: Check audio data statistics
+          let minValue = Infinity;
+          let maxValue = -Infinity;
           let hasAudio = false;
+          let nonZeroSamples = 0;
+          
           for (let i = 0; i < inputData.length; i++) {
-            if (Math.abs(inputData[i]) > 0.005) {
+            const sample = inputData[i];
+            if (Math.abs(sample) > 0.005) {
               hasAudio = true;
-              break;
+              nonZeroSamples++;
             }
+            minValue = Math.min(minValue, sample);
+            maxValue = Math.max(maxValue, sample);
           }
           
           if (hasAudio) {
@@ -148,9 +170,16 @@ export class OpenAIVoiceSession {
             const pcm16 = this.float32ToPCM16(inputData);
             this.audioBuffer.push(pcm16);
             
-            // Only log first chunk to avoid console spam
+            // DEBUG: Log audio statistics for first chunk
             if (this.audioBuffer.length === 1) {
               console.log('🎤 Recording and capturing audio...');
+              console.log('🔧 Audio Data DEBUG:');
+              console.log('  - Buffer Size:', inputData.length);
+              console.log('  - Sample Rate (Context):', this.audioContext?.sampleRate);
+              console.log('  - Non-zero samples:', nonZeroSamples);
+              console.log('  - Min value:', minValue.toFixed(6));
+              console.log('  - Max value:', maxValue.toFixed(6));
+              console.log('  - PCM16 byte length:', pcm16.byteLength);
             }
           }
         }
@@ -170,10 +199,35 @@ export class OpenAIVoiceSession {
     const pcm16 = new ArrayBuffer(float32Array.length * 2);
     const view = new DataView(pcm16);
     
+    // DEBUG: Track conversion statistics
+    let clippedSamples = 0;
+    let minInt16 = Infinity;
+    let maxInt16 = -Infinity;
+    
     for (let i = 0; i < float32Array.length; i++) {
-      const sample = Math.max(-1, Math.min(1, float32Array[i]));
+      const originalSample = float32Array[i];
+      const sample = Math.max(-1, Math.min(1, originalSample));
+      
+      if (originalSample !== sample) {
+        clippedSamples++;
+      }
+      
       const int16Value = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-      view.setInt16(i * 2, Math.round(int16Value), true);
+      const roundedValue = Math.round(int16Value);
+      
+      minInt16 = Math.min(minInt16, roundedValue);
+      maxInt16 = Math.max(maxInt16, roundedValue);
+      
+      view.setInt16(i * 2, roundedValue, true);
+    }
+    
+    // DEBUG: Log conversion statistics occasionally
+    if (this.audioBuffer.length === 0) { // Only for first conversion
+      console.log('🔧 PCM16 Conversion DEBUG:');
+      console.log('  - Input samples:', float32Array.length);
+      console.log('  - Output bytes:', pcm16.byteLength);
+      console.log('  - Clipped samples:', clippedSamples);
+      console.log('  - Int16 range:', minInt16, 'to', maxInt16);
     }
     
     return pcm16;
@@ -450,14 +504,44 @@ export class OpenAIVoiceSession {
     if (this.isConnected && !this.isAIResponding && this.audioBuffer.length > 0) {
       console.log('📤 Processing and sending accumulated audio...');
       
+      // DEBUG: Calculate total audio statistics
+      let totalBytes = 0;
+      let totalDurationMs = 0;
+      const sampleRate = this.audioContext?.sampleRate || 24000;
+      
+      for (const chunk of this.audioBuffer) {
+        totalBytes += chunk.byteLength;
+      }
+      
+      // Calculate duration: bytes / 2 (16-bit) / sample_rate * 1000 (ms)
+      const totalSamples = totalBytes / 2;
+      totalDurationMs = (totalSamples / sampleRate) * 1000;
+      
+      console.log('🔧 Audio Send DEBUG:');
+      console.log('  - Total chunks:', this.audioBuffer.length);
+      console.log('  - Total bytes:', totalBytes);
+      console.log('  - Total samples:', totalSamples);
+      console.log('  - Duration (ms):', totalDurationMs.toFixed(2));
+      console.log('  - Sample rate:', sampleRate);
+      
       // Immediately add placeholder for user speech to maintain conversation order
       this.onUserTranscriptUpdate("Processing your speech...");
       
       // Send all accumulated audio at once
       console.log(`📤 Sending ${this.audioBuffer.length} accumulated audio chunks`);
       
-      for (const audioChunk of this.audioBuffer) {
+      for (let i = 0; i < this.audioBuffer.length; i++) {
+        const audioChunk = this.audioBuffer[i];
         const base64Audio = this.arrayBufferToBase64(audioChunk);
+        
+        // DEBUG: Log base64 info for first chunk
+        if (i === 0) {
+          console.log('🔧 Base64 DEBUG (first chunk):');
+          console.log('  - Original bytes:', audioChunk.byteLength);
+          console.log('  - Base64 length:', base64Audio.length);
+          console.log('  - Base64 start:', base64Audio.substring(0, 50) + '...');
+        }
+        
         this.sendMessage({
           type: 'input_audio_buffer.append',
           audio: base64Audio
