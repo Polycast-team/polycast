@@ -32,7 +32,7 @@ export class OpenAIVoiceSession {
   private isAIResponding = false;
   private lastAudioSendTime = 0;
   private audioBuffer: ArrayBuffer[] = []; // Accumulate audio chunks
-  private responseTimeout: number | null = null;
+  private responseTimeout: NodeJS.Timeout | null = null;
   private responseStartTime: number = 0;
   private justInterrupted: boolean = false; // Flag to prevent immediate response after interrupt
   private ignoreAudioUntil: number = 0; // Timestamp to ignore audio deltas after interrupt
@@ -107,8 +107,8 @@ export class OpenAIVoiceSession {
         sampleRate: 24000,
         channelCount: 1,
         echoCancellation: true,
-        noiseSuppression: true,  // Enable noise suppression for better transcription
-        autoGainControl: true    // Enable auto gain control for consistent levels
+        noiseSuppression: false,
+        autoGainControl: false
       };
       
       // Add device ID if specified
@@ -134,14 +134,12 @@ export class OpenAIVoiceSession {
         if (this.isRecording && !this.isAIResponding) {
           const inputData = event.inputBuffer.getChannelData(0);
           
-          // Check for actual meaningful audio content (not just noise)
+          // Check for actual audio content
           let hasAudio = false;
-          let audioLevel = 0;
           for (let i = 0; i < inputData.length; i++) {
-            const sample = Math.abs(inputData[i]);
-            audioLevel = Math.max(audioLevel, sample);
-            if (sample > 0.02) { // Higher threshold for meaningful speech
+            if (Math.abs(inputData[i]) > 0.005) {
               hasAudio = true;
+              break;
             }
           }
           
@@ -152,7 +150,7 @@ export class OpenAIVoiceSession {
             
             // Only log first chunk to avoid console spam
             if (this.audioBuffer.length === 1) {
-              console.log('🎤 Recording and capturing meaningful audio...');
+              console.log('🎤 Recording and capturing audio...');
             }
           }
         }
@@ -450,21 +448,7 @@ export class OpenAIVoiceSession {
 
   private processAccumulatedAudio(): void {
     if (this.isConnected && !this.isAIResponding && this.audioBuffer.length > 0) {
-      // Calculate total audio duration (each chunk is 4096 samples at 24kHz)
-      const samplesPerChunk = 4096;
-      const sampleRate = 24000;
-      const totalSamples = this.audioBuffer.length * samplesPerChunk;
-      const audioDurationMs = (totalSamples / sampleRate) * 1000;
-      
-      console.log(`📤 Processing accumulated audio: ${this.audioBuffer.length} chunks, ${audioDurationMs.toFixed(0)}ms duration`);
-      
-      // Require minimum 250ms of audio for meaningful transcription
-      if (audioDurationMs < 250) {
-        console.log('⚠️ Audio too short for transcription (< 250ms), ignoring');
-        this.audioBuffer = [];
-        this.onUserTranscriptUpdate("(Too brief to transcribe)");
-        return;
-      }
+      console.log('📤 Processing and sending accumulated audio...');
       
       // Immediately add placeholder for user speech to maintain conversation order
       this.onUserTranscriptUpdate("Processing your speech...");

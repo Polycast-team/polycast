@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Ngrok files
+ngrok.exe
+ngrok
+ngrok.yml
