@@ -14,8 +14,8 @@ const SUPPORTED_LANGUAGES = ['english', 'spanish', 'portuguese'];
 function getLanguageCode(language: string): string {
   const langMap: { [key: string]: string } = {
     'english': 'en',
-    'spanish': 'es', 
-    'portuguese': 'pt'
+    'spanish': 'sp', 
+    'portuguese': 'po'
   };
   return langMap[language.toLowerCase()] || language.toLowerCase().substring(0, 2);
 }
