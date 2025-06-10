@@ -112,7 +112,9 @@ export async function getWordsByRankRange(
   try {
     console.log(`📊 Getting word range: ${startRank}-${endRank} for ${language}`);
     
-    const response = await fetch(`/api/word-range/${langCode}/${startRank}/${endRank}`);
+    // Use backend service URL for deployed environment
+    const backendHost = window.location.hostname === 'localhost' ? '' : 'https://polycast-server.onrender.com';
+    const response = await fetch(`${backendHost}/api/word-range/${langCode}/${startRank}/${endRank}`);
     
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status}`);
@@ -191,7 +193,9 @@ export async function getWordsBatch(words: string[], language: string): Promise<
   try {
     console.log(`📦 Batch lookup for ${wordsToLookup.length} words in ${language}`);
     
-    const response = await fetch('/api/words-batch', {
+    // Use backend service URL for deployed environment
+    const backendHost = window.location.hostname === 'localhost' ? '' : 'https://polycast-server.onrender.com';
+    const response = await fetch(`${backendHost}/api/words-batch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -228,7 +232,9 @@ export async function getConjugation(form: string): Promise<Array<{ infinitive: 
   try {
     console.log(`🔄 Looking up conjugation: "${form}"`);
     
-    const response = await fetch(`/api/conjugations/${encodeURIComponent(form.toLowerCase())}`);
+    // Use backend service URL for deployed environment
+    const backendHost = window.location.hostname === 'localhost' ? '' : 'https://polycast-server.onrender.com';
+    const response = await fetch(`${backendHost}/api/conjugations/${encodeURIComponent(form.toLowerCase())}`);
     
     if (!response.ok) {
       throw new Error(`Conjugation API request failed: ${response.status}`);
