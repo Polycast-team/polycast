@@ -5436,11 +5436,39 @@ In ${this.targetLanguage}:
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        // Try to parse as JSON, but handle cases where response is not JSON
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          // Response is not JSON, try to get text instead
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          } catch (textError) {
+            // If both fail, use status code
+            console.error('❌ [VIDEO] Failed to parse error response:', textError);
+          }
+        }
+        throw new Error(errorMessage);
       }
       
-      const data = await response.json();
+      // Try to parse successful response as JSON
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('❌ [VIDEO] Failed to parse response as JSON:', jsonError);
+        // Try to get the response as text to see what we actually received
+        try {
+          const responseText = await response.text();
+          console.error('❌ [VIDEO] Response text:', responseText);
+          throw new Error('Invalid JSON response from server. Check API quota or server status.');
+        } catch (textError) {
+          throw new Error('Failed to parse response and unable to read response text');
+        }
+      }
       const transcribedText = data.text?.trim();
       
       if (transcribedText) {
