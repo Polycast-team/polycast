@@ -379,6 +379,86 @@ app.post('/api/words-batch', async (req, res) => {
     }
 });
 
+// Audio processing functions for backend
+class AudioProcessor {
+    static resampleAudio(inputBuffer, inputSampleRate, outputSampleRate) {
+        if (inputSampleRate === outputSampleRate) {
+            return inputBuffer;
+        }
+        
+        const ratio = inputSampleRate / outputSampleRate;
+        const outputLength = Math.round(inputBuffer.length / ratio);
+        const output = new Float32Array(outputLength);
+        
+        // Simple linear interpolation resampling
+        for (let i = 0; i < outputLength; i++) {
+            const sourceIndex = i * ratio;
+            const index = Math.floor(sourceIndex);
+            const fraction = sourceIndex - index;
+            
+            if (index + 1 < inputBuffer.length) {
+                output[i] = inputBuffer[index] * (1 - fraction) + inputBuffer[index + 1] * fraction;
+            } else {
+                output[i] = inputBuffer[inputBuffer.length - 1];
+            }
+        }
+        
+        return output;
+    }
+    
+    static float32ToPCM16(float32Array) {
+        const pcm16 = new ArrayBuffer(float32Array.length * 2);
+        const view = new DataView(pcm16);
+        
+        for (let i = 0; i < float32Array.length; i++) {
+            const sample = Math.max(-1, Math.min(1, float32Array[i]));
+            const int16Value = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+            view.setInt16(i * 2, Math.round(int16Value), true);
+        }
+        
+        return pcm16;
+    }
+    
+    static arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return Buffer.from(binary, 'binary').toString('base64');
+    }
+    
+    static processRawAudio(audioData, inputSampleRate) {
+        console.log('🔧 Backend Audio Processing:');
+        console.log('  - Input samples:', audioData.length);
+        console.log('  - Input sample rate:', inputSampleRate, 'Hz');
+        
+        const targetSampleRate = 24000; // OpenAI expects 24kHz
+        
+        // Convert array to Float32Array if needed
+        const float32Data = audioData instanceof Float32Array ? audioData : new Float32Array(audioData);
+        
+        // Resample to 24kHz if needed
+        let processedData = float32Data;
+        if (inputSampleRate !== targetSampleRate) {
+            processedData = AudioProcessor.resampleAudio(float32Data, inputSampleRate, targetSampleRate);
+            console.log('  - Resampled to:', targetSampleRate, 'Hz');
+            console.log('  - Output samples:', processedData.length);
+        }
+        
+        // Convert to PCM16
+        const pcm16Buffer = AudioProcessor.float32ToPCM16(processedData);
+        console.log('  - PCM16 bytes:', pcm16Buffer.byteLength);
+        
+        // Convert to base64 for OpenAI
+        const base64Audio = AudioProcessor.arrayBufferToBase64(pcm16Buffer);
+        console.log('  - Base64 length:', base64Audio.length);
+        console.log('  - Duration (ms):', (pcm16Buffer.byteLength / 2 / targetSampleRate * 1000).toFixed(2));
+        
+        return base64Audio;
+    }
+}
+
 // Create HTTP server
 const server = http.createServer(app);
 
@@ -400,38 +480,113 @@ wss.on('connection', (ws) => {
     
     console.log('Attempting to connect to OpenAI...');
 
+    // Store accumulated raw audio chunks for processing
+    let audioBuffer = [];
+    
     // Handle messages from client
     ws.on('message', (message) => {
         if (openaiWs.readyState === WebSocket.OPEN) {
-            // Convert Buffer to string if necessary before sending to OpenAI
+            // Convert Buffer to string if necessary
             const messageStr = Buffer.isBuffer(message) ? message.toString('utf8') : message;
             
-            // DEBUG: Parse and log audio messages
             try {
                 const parsed = JSON.parse(messageStr);
-                if (parsed.type === 'input_audio_buffer.append' && parsed.audio) {
-                    console.log('🔧 AUDIO DEBUG - Client to OpenAI:');
-                    console.log('  - Message type:', parsed.type);
-                    console.log('  - Base64 audio length:', parsed.audio.length);
-                    console.log('  - Audio starts with:', parsed.audio.substring(0, 50) + '...');
+                
+                // NEW: Handle raw audio chunks from frontend
+                if (parsed.type === 'raw_audio_chunk') {
+                    console.log('🎤 Received raw audio chunk from frontend');
+                    console.log('  - Samples:', parsed.audioData.length);
+                    console.log('  - Sample rate:', parsed.sampleRate, 'Hz');
                     
-                    // Decode base64 to check byte size
-                    try {
-                        const audioBytes = Buffer.from(parsed.audio, 'base64');
-                        console.log('  - Decoded audio bytes:', audioBytes.length);
-                        console.log('  - Expected samples (16-bit):', audioBytes.length / 2);
-                        console.log('  - Duration at 24kHz (ms):', (audioBytes.length / 2 / 24000 * 1000).toFixed(2));
-                    } catch (decodeError) {
-                        console.error('  - ❌ Failed to decode base64 audio:', decodeError.message);
+                    // Accumulate raw audio data
+                    audioBuffer.push({
+                        data: parsed.audioData,
+                        sampleRate: parsed.sampleRate
+                    });
+                    
+                    // Don't forward to OpenAI yet - wait for commit
+                    return;
+                }
+                
+                // NEW: Handle audio buffer commit - process all accumulated audio
+                if (parsed.type === 'raw_audio_commit') {
+                    console.log('📤 Processing accumulated raw audio...');
+                    console.log('  - Total chunks:', audioBuffer.length);
+                    
+                    if (audioBuffer.length > 0) {
+                        // Combine all audio chunks
+                        const firstChunk = audioBuffer[0];
+                        const sampleRate = firstChunk.sampleRate;
+                        
+                        // Flatten all audio data into one array
+                        let totalSamples = 0;
+                        audioBuffer.forEach(chunk => totalSamples += chunk.data.length);
+                        
+                        const combinedAudio = new Float32Array(totalSamples);
+                        let offset = 0;
+                        
+                        audioBuffer.forEach(chunk => {
+                            combinedAudio.set(chunk.data, offset);
+                            offset += chunk.data.length;
+                        });
+                        
+                        console.log('  - Combined samples:', combinedAudio.length);
+                        console.log('  - Duration (ms):', (combinedAudio.length / sampleRate * 1000).toFixed(2));
+                        
+                        // Process audio on backend
+                        const processedBase64 = AudioProcessor.processRawAudio(combinedAudio, sampleRate);
+                        
+                        // Send processed audio to OpenAI
+                        const audioMessage = {
+                            type: 'input_audio_buffer.append',
+                            audio: processedBase64
+                        };
+                        
+                        console.log('📤 Sending processed audio to OpenAI');
+                        openaiWs.send(JSON.stringify(audioMessage));
+                        
+                        // Clear buffer
+                        audioBuffer = [];
                     }
-                } else if (parsed.type && !parsed.type.includes('delta')) {
+                    
+                    // Forward the commit message to OpenAI
+                    const commitMessage = {
+                        type: 'input_audio_buffer.commit'
+                    };
+                    openaiWs.send(JSON.stringify(commitMessage));
+                    return;
+                }
+                
+                // Handle regular buffer clear
+                if (parsed.type === 'raw_audio_clear' || parsed.type === 'input_audio_buffer.clear') {
+                    console.log('🗑️ Clearing audio buffer');
+                    audioBuffer = [];
+                    
+                    // Forward clear to OpenAI
+                    const clearMessage = {
+                        type: 'input_audio_buffer.clear'
+                    };
+                    openaiWs.send(JSON.stringify(clearMessage));
+                    return;
+                }
+                
+                // OLD: Handle pre-processed audio (for backward compatibility)
+                if (parsed.type === 'input_audio_buffer.append' && parsed.audio) {
+                    console.log('⚠️ Received pre-processed audio (old format)');
+                    console.log('  - Base64 length:', parsed.audio.length);
+                    // Forward as-is for now (deprecated path)
+                }
+                
+                // Forward all other messages to OpenAI
+                if (!parsed.type.includes('delta')) {
                     console.log('Forwarding message to OpenAI:', parsed.type);
                 }
+                openaiWs.send(messageStr);
+                
             } catch (parseError) {
                 console.log('Forwarding non-JSON message to OpenAI:', typeof messageStr);
+                openaiWs.send(messageStr);
             }
-            
-            openaiWs.send(messageStr);
         }
     });
 
