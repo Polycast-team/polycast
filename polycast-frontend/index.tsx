@@ -254,7 +254,7 @@ export class GdmLiveAudio extends LitElement {
 
   private openAIVoiceSession: OpenAIVoiceSession | null = null;
   private inputAudioContext = new (window.AudioContext ||
-    (window as any).webkitAudioContext)({sampleRate: 16000});
+    (window as any).webkitAudioContext)({sampleRate: 24000});
   private outputAudioContext = new (window.AudioContext ||
     (window as any).webkitAudioContext)({sampleRate: 24000});
   @state() inputNode = this.inputAudioContext.createGain();
