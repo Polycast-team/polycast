@@ -132,6 +132,14 @@ if (!fs.existsSync('uploads')) {
 app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     try {
         console.log('📤 Received transcription request');
+        console.log('📋 Request body:', req.body);
+        console.log('📋 Request file info:', req.file ? { 
+            originalname: req.file.originalname, 
+            mimetype: req.file.mimetype, 
+            size: req.file.size,
+            path: req.file.path 
+        } : 'No file');
+        
         const audioFile = req.file;
         const language = req.body.language; // Don't default to 'en' anymore
         
@@ -172,11 +180,14 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
             transcriptionParams.language = language;
         }
         
+        console.log('🔄 Calling OpenAI transcription API...');
         const transcription = await openai.audio.transcriptions.create(transcriptionParams);
+        console.log('✅ OpenAI API call completed');
         
         console.log('📊 Transcription details:');
         console.log(`  Text: "${transcription.text}"`);
         console.log(`  Language: ${transcription.language || 'auto-detected'}`);
+        console.log(`  Raw transcription object:`, JSON.stringify(transcription, null, 2));
         
         // Filter out likely hallucinations using probability thresholds
         let finalText = transcription.text;
@@ -245,8 +256,13 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
         // Clean up uploaded file (with new name)
         fs.unlinkSync(webmPath);
         
+        // Debug: Check what we're about to send
+        const responseData = { text: finalText };
+        console.log('📤 Sending response to frontend:', JSON.stringify(responseData));
+        console.log('📤 Response data type check:', typeof responseData.text, 'length:', responseData.text ? responseData.text.length : 'undefined');
+        
         // Return transcription
-        res.json({ text: finalText });
+        res.json(responseData);
         
     } catch (error) {
         console.error('❌ Transcription error:', error);
