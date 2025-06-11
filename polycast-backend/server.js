@@ -803,15 +803,20 @@ io.on('connection', (socket) => {
     socket.on('transcript-message', (data) => {
         const { text } = data;
         // Find active call involving this socket
+        let relayed = false;
         for (const [code, call] of activeCalls.entries()) {
             if (call.hostSocketId === socket.id || call.joinerSocketId === socket.id) {
                 const targetSocketId = call.hostSocketId === socket.id ? call.joinerSocketId : call.hostSocketId;
                 if (targetSocketId) {
                     io.to(targetSocketId).emit('transcript-message', { text });
                     console.log(`📝 Relayed transcript from ${socket.id} to ${targetSocketId}: ${text}`);
+                    relayed = true;
                 }
                 break;
             }
+        }
+        if (!relayed) {
+            console.log(`⚠️ Transcript relay failed: no active call found for socket ${socket.id}`);
         }
     });
 
