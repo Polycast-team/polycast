@@ -5238,14 +5238,16 @@ In ${this.targetLanguage}:
 
     // During video calls, always use two-screen layout regardless of PiP setting
     if (this.callStatus !== 'idle') {
+      console.log('🎥 [RENDER] Video call active, using two-screen layout. Call status:', this.callStatus);
       return html`
         ${waitingScreen}
         ${webcamScreen}
       `;
     }
     
-    if (this.videoLayout === 'pip') {
-      // Waiting screen is main, webcam is PiP (no subtitles in PiP)
+    // Only show PiP layout when NOT in a call and layout is set to pip
+    if (this.videoLayout === 'pip' && this.callStatus === 'idle') {
+      console.log('🎥 [RENDER] No call active, using PiP layout');
       return html`
         ${waitingScreen}
         <div 
@@ -5257,7 +5259,8 @@ In ${this.targetLanguage}:
         </div>
       `;
     } else {
-      // Regular layouts (horizontal, vertical)
+      // Regular layouts (horizontal, vertical) or fallback when call is active
+      console.log('🎥 [RENDER] Using regular two-screen layout. Video layout:', this.videoLayout, 'Call status:', this.callStatus);
       return html`
         ${waitingScreen}
         ${webcamScreen}
@@ -5839,9 +5842,16 @@ In ${this.targetLanguage}:
   private async handleHostCall() {
     if (this.callStatus !== 'idle') return;
     
+    console.log('📞 [HOST] Starting host call process');
+    console.log('📞 [HOST] Previous call status:', this.callStatus);
+    console.log('📞 [HOST] Previous video layout:', this.videoLayout);
+    
     this.isHostingCall = true;
     this.callStatus = 'hosting';
     this.callError = null;
+    
+    console.log('📞 [HOST] New call status:', this.callStatus);
+    console.log('📞 [HOST] Triggering re-render...');
     
     try {
       // Connect to signaling server if not already connected
