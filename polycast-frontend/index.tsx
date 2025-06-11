@@ -5435,17 +5435,24 @@ In ${this.targetLanguage}:
         body: formData,
       });
       
+      console.log('🔍 [VIDEO] Response status:', response.status, response.statusText);
+      console.log('🔍 [VIDEO] Response headers:', Object.fromEntries(response.headers.entries() || []));
+      
       if (!response.ok) {
+        console.error('❌ [VIDEO] API request failed with status:', response.status);
         // Try to parse as JSON, but handle cases where response is not JSON
-        let errorMessage = `HTTP ${response.status}`;
+        let errorMessage = `HTTP ${response.status} - ${response.statusText}`;
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
+          console.error('❌ [VIDEO] Error data:', errorData);
         } catch (jsonError) {
+          console.error('❌ [VIDEO] Failed to parse error as JSON:', jsonError);
           // Response is not JSON, try to get text instead
           try {
             const errorText = await response.text();
             errorMessage = errorText || errorMessage;
+            console.error('❌ [VIDEO] Error text:', errorText);
           } catch (textError) {
             // If both fail, use status code
             console.error('❌ [VIDEO] Failed to parse error response:', textError);
@@ -5454,20 +5461,20 @@ In ${this.targetLanguage}:
         throw new Error(errorMessage);
       }
       
-      // Try to parse successful response as JSON
+      // Get the response as text first to debug what we're actually getting
+      const responseText = await response.text();
+      console.log('🔍 [VIDEO] Raw response text length:', responseText.length);
+      console.log('🔍 [VIDEO] Raw response text (first 200 chars):', responseText.substring(0, 200));
+      
+      // Try to parse as JSON
       let data;
       try {
-        data = await response.json();
+        data = JSON.parse(responseText);
+        console.log('✅ [VIDEO] Successfully parsed JSON response:', data);
       } catch (jsonError) {
         console.error('❌ [VIDEO] Failed to parse response as JSON:', jsonError);
-        // Try to get the response as text to see what we actually received
-        try {
-          const responseText = await response.text();
-          console.error('❌ [VIDEO] Response text:', responseText);
-          throw new Error('Invalid JSON response from server. Check API quota or server status.');
-        } catch (textError) {
-          throw new Error('Failed to parse response and unable to read response text');
-        }
+        console.error('❌ [VIDEO] Full response text:', responseText);
+        throw new Error(`Invalid JSON response from server. Response: "${responseText.substring(0, 100)}..."`);
       }
       const transcribedText = data.text?.trim();
       
