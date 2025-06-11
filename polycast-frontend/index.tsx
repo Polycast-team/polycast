@@ -3265,6 +3265,45 @@ In ${this.targetLanguage}:
       }, 100);
     }
 
+    // Set up local video elements for video calling when localStream becomes available or call status changes
+    if ((changedProperties.has('localStream') && this.localStream) || 
+        (changedProperties.has('callStatus') && this.callStatus !== 'idle')) {
+      
+      // Wait for DOM to update then set up local video
+      setTimeout(() => {
+        const localVideo = this.shadowRoot?.querySelector('#local-video') as HTMLVideoElement;
+        const localVideoFallback = this.shadowRoot?.querySelector('#local-video-fallback') as HTMLVideoElement;
+        
+        console.log('🎥 [UPDATE] Setting up local video display');
+        console.log('🎥 [UPDATE] Local video element found:', !!localVideo);
+        console.log('🎥 [UPDATE] Local video fallback element found:', !!localVideoFallback);
+        console.log('🎥 [UPDATE] Local stream available:', !!this.localStream);
+        console.log('🎥 [UPDATE] Video stream available:', !!this.videoStream);
+        console.log('🎥 [UPDATE] Call status:', this.callStatus);
+        
+        // Try to set localStream first, then fall back to videoStream
+        const streamToUse = this.localStream || this.videoStream;
+        
+        if (localVideo && streamToUse && !localVideo.srcObject) {
+          localVideo.srcObject = streamToUse;
+          localVideo.muted = true;
+          localVideo.onloadedmetadata = () => {
+            localVideo.play().catch(console.error);
+          };
+          console.log('✅ [UPDATE] Local video stream set to local-video element');
+        } else if (localVideoFallback && streamToUse && !localVideoFallback.srcObject) {
+          localVideoFallback.srcObject = streamToUse;
+          localVideoFallback.muted = true;
+          localVideoFallback.onloadedmetadata = () => {
+            localVideoFallback.play().catch(console.error);
+          };
+          console.log('✅ [UPDATE] Local video stream set to local-video-fallback element');
+        } else {
+          console.warn('⚠️ [UPDATE] Could not set up local video display');
+        }
+      }, 100);
+    }
+
     if (changedProperties.has('transcriptHistory') && this.activeTab === 'transcript') {
       const container = this.shadowRoot?.getElementById('transcriptMessagesContainer');
       if (container) {
@@ -5155,37 +5194,39 @@ In ${this.targetLanguage}:
 
     // Local video for video calling
     const renderLocalVideo = () => html`
-      <div class="local-video-container">
-        ${this.localStream ? html`
-          <video 
-            id="local-video" 
-            class="local-video" 
-            autoplay 
-            muted 
-            playsinline
-          ></video>
-          <div class="video-label local-label">You</div>
-        ` : this.videoStream ? html`
-          <video 
-            id="local-video-fallback" 
-            class="local-video" 
-            autoplay 
-            muted 
-            playsinline
-          ></video>
-          <div class="video-label local-label">You</div>
-        ` : html`
-          <div class="local-video-placeholder">
-            <span>Camera off</span>
-          </div>
-        `}
-        
-        <!-- Video call subtitles -->
-        ${this.videoInterimTranscript ? html`
-          <div class="video-call-subtitle-overlay">
-            <div class="video-call-subtitle-text">${this.videoInterimTranscript}</div>
-          </div>
-        ` : ''}
+      <div class="video-call-container">
+        <div class="local-video-container">
+          ${this.localStream ? html`
+            <video 
+              id="local-video" 
+              class="local-video" 
+              autoplay 
+              muted 
+              playsinline
+            ></video>
+            <div class="video-label local-label">You</div>
+          ` : this.videoStream ? html`
+            <video 
+              id="local-video-fallback" 
+              class="local-video" 
+              autoplay 
+              muted 
+              playsinline
+            ></video>
+            <div class="video-label local-label">You</div>
+          ` : html`
+            <div class="local-video-placeholder">
+              <span>Camera off</span>
+            </div>
+          `}
+          
+          <!-- Video call subtitles -->
+          ${this.videoInterimTranscript ? html`
+            <div class="video-call-subtitle-overlay">
+              <div class="video-call-subtitle-text">${this.videoInterimTranscript}</div>
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
 
@@ -5195,6 +5236,14 @@ In ${this.targetLanguage}:
       </div>
     `;
 
+    // During video calls, always use two-screen layout regardless of PiP setting
+    if (this.callStatus !== 'idle') {
+      return html`
+        ${waitingScreen}
+        ${webcamScreen}
+      `;
+    }
+    
     if (this.videoLayout === 'pip') {
       // Waiting screen is main, webcam is PiP (no subtitles in PiP)
       return html`
@@ -5204,7 +5253,7 @@ In ${this.targetLanguage}:
           style="left: ${this.pipPosition.x}px; top: ${this.pipPosition.y}px;"
           @mousedown=${this.handlePipDragStart}
         >
-          ${this.callStatus !== 'idle' ? renderLocalVideo() : renderWebcamWithSubtitles(true)}
+          ${renderWebcamWithSubtitles(true)}
         </div>
       `;
     } else {
@@ -6076,11 +6125,26 @@ In ${this.targetLanguage}:
       });
       
       // Set up local video display
+      this.requestUpdate();
       this.updateComplete.then(() => {
         const localVideo = this.shadowRoot?.querySelector('#local-video') as HTMLVideoElement;
-        if (localVideo) {
+        const localVideoFallback = this.shadowRoot?.querySelector('#local-video-fallback') as HTMLVideoElement;
+        
+        console.log('🎥 Setting up local video display');
+        console.log('🎥 Local video element found:', !!localVideo);
+        console.log('🎥 Local video fallback element found:', !!localVideoFallback);
+        console.log('🎥 Local stream available:', !!this.localStream);
+        
+        if (localVideo && this.localStream) {
           localVideo.srcObject = this.localStream;
           localVideo.muted = true; // Mute local audio to prevent feedback
+          console.log('✅ Local video stream set to local-video element');
+        } else if (localVideoFallback && this.localStream) {
+          localVideoFallback.srcObject = this.localStream;
+          localVideoFallback.muted = true; // Mute local audio to prevent feedback
+          console.log('✅ Local video stream set to local-video-fallback element');
+        } else {
+          console.warn('⚠️ Could not set up local video display');
         }
       });
       
