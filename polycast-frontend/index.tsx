@@ -962,11 +962,12 @@ export class GdmLiveAudio extends LitElement {
       position: relative;
     }
 
-    .webcam-video {
+    .webcam-video,
+    .remote-video {
       width: 100%;
       height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1); /* Mirror the video */
+      object-fit: contain; /* Preserve aspect ratio with black bars */
+      background: black;
     }
 
     .video-loading {
@@ -2323,6 +2324,14 @@ export class GdmLiveAudio extends LitElement {
       background: #3c3152;
       color: #e0e0e0;
       text-transform: capitalize;
+    }
+
+    /* Add at end of style section */
+    .local-video.full {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #2a2438;
     }
   `;
 
@@ -5193,24 +5202,43 @@ In ${this.targetLanguage}:
     `;
 
     // Local video for video calling
-    const renderLocalVideo = () => html`
-      <div class="video-call-container">
+    const renderLocalVideo = () => {
+      // Call active & layout NOT pip -> full size video fits container
+      if (this.callStatus !== 'idle' && this.videoLayout !== 'pip') {
+        return html`
+          <video
+            id="local-video"
+            class="webcam-video"
+            autoplay
+            muted
+            playsinline
+          ></video>
+          ${this.videoInterimTranscript ? html`
+            <div class="video-call-subtitle-overlay">
+              <div class="video-call-subtitle-text">${this.videoInterimTranscript}</div>
+            </div>
+          ` : ''}
+        `;
+      }
+
+      // Otherwise (idle or pip layout) -> small overlay container
+      return html`
         <div class="local-video-container">
           ${this.localStream ? html`
-            <video 
-              id="local-video" 
-              class="local-video" 
-              autoplay 
-              muted 
+            <video
+              id="local-video"
+              class="local-video"
+              autoplay
+              muted
               playsinline
             ></video>
             <div class="video-label local-label">You</div>
           ` : this.videoStream ? html`
-            <video 
-              id="local-video-fallback" 
-              class="local-video" 
-              autoplay 
-              muted 
+            <video
+              id="local-video-fallback"
+              class="local-video"
+              autoplay
+              muted
               playsinline
             ></video>
             <div class="video-label local-label">You</div>
@@ -5219,16 +5247,9 @@ In ${this.targetLanguage}:
               <span>Camera off</span>
             </div>
           `}
-          
-          <!-- Video call subtitles -->
-          ${this.videoInterimTranscript ? html`
-            <div class="video-call-subtitle-overlay">
-              <div class="video-call-subtitle-text">${this.videoInterimTranscript}</div>
-            </div>
-          ` : ''}
         </div>
-      </div>
-    `;
+      `;
+    };
 
     const webcamScreen = html`
       <div class="video-screen ${this.videoLayout === 'pip' ? 'main' : ''} webcam-screen">
