@@ -128,6 +128,12 @@ if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
 
+// Add simple test endpoint
+app.get('/api/test', (req, res) => {
+    console.log('📱 Test endpoint hit');
+    res.json({ status: 'Backend is working!', timestamp: new Date().toISOString() });
+});
+
 // Add Whisper transcription endpoint
 app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     try {
