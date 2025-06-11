@@ -5567,7 +5567,7 @@ In ${this.targetLanguage}:
           console.log('📨 [VIDEO] Sent transcript-message to peer');
         }
         
-        // Use the passed placeholder ID, with fallbacks
+        // Use the passed placeholder ID, or fall back to currentVideoPlaceholderId
         const targetPlaceholderId = placeholderId || this.currentVideoPlaceholderId;
         
         if (targetPlaceholderId) {
