@@ -799,6 +799,22 @@ io.on('connection', (socket) => {
         });
     });
 
+    // Transcript message relay
+    socket.on('transcript-message', (data) => {
+        const { text } = data;
+        // Find active call involving this socket
+        for (const [code, call] of activeCalls.entries()) {
+            if (call.hostSocketId === socket.id || call.joinerSocketId === socket.id) {
+                const targetSocketId = call.hostSocketId === socket.id ? call.joinerSocketId : call.hostSocketId;
+                if (targetSocketId) {
+                    io.to(targetSocketId).emit('transcript-message', { text });
+                    console.log(`📝 Relayed transcript from ${socket.id} to ${targetSocketId}: ${text}`);
+                }
+                break;
+            }
+        }
+    });
+
     // End call
     socket.on('end-call', () => {
         handleCallEnd(socket.id, 'Call ended by user');

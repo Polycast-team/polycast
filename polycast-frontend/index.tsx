@@ -34,7 +34,7 @@ interface WordPopupData {
 }
 
 export interface TranscriptMessage {
-  speaker: 'user' | 'model';
+  speaker: 'user' | 'model' | 'partner';
   text: string;
   id: string;
 }
@@ -5561,6 +5561,11 @@ In ${this.targetLanguage}:
       
       if (transcribedText) {
         console.log('✅ [VIDEO] Transcription received:', transcribedText);
+        // Broadcast transcript to peer if in a call
+        if (this.callStatus !== 'idle' && this.signalingSocket?.connected) {
+          this.signalingSocket.emit('transcript-message', { text: transcribedText });
+          console.log('📨 [VIDEO] Sent transcript-message to peer');
+        }
         
         // Use the passed placeholder ID, with fallbacks
         const targetPlaceholderId = placeholderId || this.currentVideoPlaceholderId;
@@ -6087,6 +6092,23 @@ In ${this.targetLanguage}:
     this.signalingSocket.on('joiner-left', (data: any) => {
       console.log(`👋 ${data.joinerProfile} left the call`);
       this.handleEndCall();
+    });
+
+    // Transcript message received from peer
+    this.signalingSocket.on('transcript-message', (data: any) => {
+      console.log('📝 Received transcript-message from peer:', data.text);
+      const transcriptMessage: TranscriptMessage = {
+        speaker: 'partner',
+        text: data.text,
+        id: `partner_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      };
+      this.transcriptHistory = [...this.transcriptHistory, transcriptMessage];
+      this.videoTranscriptHistory = [...this.videoTranscriptHistory, transcriptMessage];
+      this.requestUpdate();
+      setTimeout(() => {
+        const container = this.shadowRoot?.querySelector('.transcript-messages-container');
+        if (container) container.scrollTop = container.scrollHeight;
+      }, 100);
     });
   }
   
