@@ -7,6 +7,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import cors from 'cors';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import { Server as SocketIOServer } from 'socket.io';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -673,6 +674,165 @@ wss.on('connection', (ws) => {
         }
     });
 });
+
+// Set up Socket.IO server for video calling signaling
+const io = new SocketIOServer(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
+// Store active calls and profiles
+const activeCalls = new Map(); // Map<code, {hostSocketId, hostProfile, ...}>
+const connectedProfiles = new Map(); // Map<socketId, {profile, ...}>
+
+// Generate random 5-digit code
+function generateCallCode() {
+    return Math.floor(10000 + Math.random() * 90000).toString();
+}
+
+io.on('connection', (socket) => {
+    console.log(`📞 Socket.IO client connected: ${socket.id}`);
+
+    // Register profile
+    socket.on('register-profile', (data) => {
+        connectedProfiles.set(socket.id, {
+            profile: data.profile,
+            nativeLanguage: data.nativeLanguage,
+            targetLanguage: data.targetLanguage
+        });
+        console.log(`👤 Profile registered: ${data.profile} (${socket.id})`);
+    });
+
+    // Host a call
+    socket.on('host-call', () => {
+        const profile = connectedProfiles.get(socket.id);
+        if (!profile) {
+            socket.emit('error', { message: 'Profile not registered' });
+            return;
+        }
+
+        const code = generateCallCode();
+        activeCalls.set(code, {
+            hostSocketId: socket.id,
+            hostProfile: profile.profile,
+            nativeLanguage: profile.nativeLanguage,
+            targetLanguage: profile.targetLanguage,
+            joinerSocketId: null
+        });
+
+        console.log(`🏠 Call hosted: ${code} by ${profile.profile} (${socket.id})`);
+        socket.emit('call-hosted', { code });
+    });
+
+    // Join a call
+    socket.on('join-call', (data) => {
+        const { code } = data;
+        const profile = connectedProfiles.get(socket.id);
+        
+        if (!profile) {
+            socket.emit('error', { message: 'Profile not registered' });
+            return;
+        }
+
+        const call = activeCalls.get(code);
+        if (!call) {
+            console.log(`❌ Call not found: ${code}`);
+            socket.emit('call-not-found', { code });
+            return;
+        }
+
+        if (call.joinerSocketId) {
+            socket.emit('error', { message: 'Call is already full' });
+            return;
+        }
+
+        // Update call with joiner info
+        call.joinerSocketId = socket.id;
+        call.joinerProfile = profile.profile;
+
+        console.log(`🤝 ${profile.profile} (${socket.id}) joined call ${code}`);
+
+        // Notify both parties
+        socket.emit('call-found', { 
+            hostSocketId: call.hostSocketId,
+            hostProfile: call.hostProfile 
+        });
+        
+        io.to(call.hostSocketId).emit('call-join-request', {
+            joinerSocketId: socket.id,
+            joinerProfile: profile.profile
+        });
+    });
+
+    // WebRTC signaling - Forward offer from joiner to host
+    socket.on('webrtc-offer', (data) => {
+        const { offer, targetSocketId } = data;
+        console.log(`📡 Forwarding WebRTC offer from ${socket.id} to ${targetSocketId}`);
+        
+        io.to(targetSocketId).emit('webrtc-offer', {
+            offer,
+            callerSocketId: socket.id
+        });
+    });
+
+    // WebRTC signaling - Forward answer from host to joiner
+    socket.on('webrtc-answer', (data) => {
+        const { answer, targetSocketId } = data;
+        console.log(`📡 Forwarding WebRTC answer from ${socket.id} to ${targetSocketId}`);
+        
+        io.to(targetSocketId).emit('webrtc-answer', {
+            answer,
+            answererSocketId: socket.id
+        });
+    });
+
+    // WebRTC signaling - Forward ICE candidates
+    socket.on('webrtc-ice-candidate', (data) => {
+        const { candidate, targetSocketId } = data;
+        console.log(`🧊 Forwarding ICE candidate from ${socket.id} to ${targetSocketId}`);
+        
+        io.to(targetSocketId).emit('webrtc-ice-candidate', {
+            candidate,
+            senderSocketId: socket.id
+        });
+    });
+
+    // End call
+    socket.on('end-call', () => {
+        handleCallEnd(socket.id, 'Call ended by user');
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', (reason) => {
+        console.log(`📞 Socket.IO client disconnected: ${socket.id} (${reason})`);
+        handleCallEnd(socket.id, 'User disconnected');
+        connectedProfiles.delete(socket.id);
+    });
+
+    // Helper function to handle call cleanup
+    function handleCallEnd(socketId, reason) {
+        // Find and clean up any active calls involving this socket
+        for (const [code, call] of activeCalls.entries()) {
+            if (call.hostSocketId === socketId || call.joinerSocketId === socketId) {
+                console.log(`📞 Ending call ${code}: ${reason}`);
+                
+                // Notify the other party
+                const otherSocketId = call.hostSocketId === socketId ? call.joinerSocketId : call.hostSocketId;
+                if (otherSocketId) {
+                    io.to(otherSocketId).emit('call-ended', { reason });
+                }
+                
+                // Remove the call
+                activeCalls.delete(code);
+                break;
+            }
+        }
+    }
+});
+
+console.log('📞 Socket.IO signaling server initialized');
 
 // Start server
 server.listen(PORT, () => {
