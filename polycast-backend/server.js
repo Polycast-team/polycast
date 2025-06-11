@@ -16,13 +16,15 @@ import multer from 'multer';
 import fs from 'fs';
 import pg from 'pg';
 
-// Load environment variables from .env.local
-dotenv.config({ path: '.env.local' });
+// Load environment variables from .env.local if present
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, '.env.local') });
 
 // Database connection
 const { Pool } = pg;
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || 'postgresql://data_5rgr_user:3mDZqEEuOVr3SzkyO1M8UvvAvTdkdNQI@dpg-d0jn3fvfte5s7380vqs0-a.oregon-postgres.render.com/data_5rgr',
+    connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
@@ -90,16 +92,12 @@ initializeTables();
 // Verify API key is loaded
 const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) {
-    console.error('ERROR: OPENAI_API_KEY not found in .env.local file');
+    console.error('ERROR: OPENAI_API_KEY not set');
     process.exit(1);
 } else {
     console.log('✓ OpenAI API key loaded successfully');
     console.log('API key starts with:', apiKey.substring(0, 10) + '...');
 }
-
-// Setup __dirname equivalent for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const PORT = process.env.PORT || 3001;
 

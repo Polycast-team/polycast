@@ -7,8 +7,8 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
+node_modules/
+dist/
 dist-ssr
 *.local
 
@@ -23,7 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 
-# Ngrok files
-ngrok.exe
-ngrok
-ngrok.yml
+# Environment files
+.env*
+
+# Binary/private keys
+*.pem
+*.exe
+ngrok*
+*.zip
+*.tar.gz
