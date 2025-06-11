@@ -5890,9 +5890,13 @@ In ${this.targetLanguage}:
   private async connectToSignalingServer(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        // Connect through the /signaling proxy to avoid mixed content issues
-        // This routes through the same HTTPS ngrok tunnel as the frontend
-        this.signalingSocket = io('/signaling', {
+        // Connect to the signaling server on the backend
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const backendHost = 'polycast-server.onrender.com';
+        const signalingUrl = `${window.location.protocol}//${backendHost}`;
+        
+        this.signalingSocket = io(signalingUrl, {
+          path: '/socket.io',
           transports: ['polling'], // Force polling transport initially
           forceNew: true,
           timeout: 10000
