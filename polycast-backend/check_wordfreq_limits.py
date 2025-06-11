@@ -10,8 +10,8 @@ def check_language_limits():
     """Check how many words are available for each language."""
     languages = {
         'English': 'en',
-        'Spanish': 'es', 
-        'Portuguese': 'pt'
+        'Spanish': 'sp',
+        'Portuguese': 'po'
     }
     
     print("Checking wordfreq limits for each language...")

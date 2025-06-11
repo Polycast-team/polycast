@@ -63,7 +63,7 @@ async function initializeTables() {
                 person VARCHAR(100),
                 mood VARCHAR(100),
                 translation VARCHAR(200),
-                language VARCHAR(10) DEFAULT 'es'
+                language VARCHAR(10) DEFAULT 'sp'
             )
         `);
 

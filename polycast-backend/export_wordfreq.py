@@ -85,8 +85,8 @@ def main():
     
     languages = {
         'English': 'en',
-        'Spanish': 'es', 
-        'Portuguese': 'pt'
+        'Spanish': 'sp',
+        'Portuguese': 'po'
     }
     
     total_words = 0

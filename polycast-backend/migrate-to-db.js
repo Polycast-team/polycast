@@ -52,7 +52,7 @@ async function createTables() {
                 person VARCHAR(100),
                 mood VARCHAR(100),
                 translation VARCHAR(200),
-                language VARCHAR(10) DEFAULT 'es'
+                language VARCHAR(10) DEFAULT 'sp'
             )
         `);
 
@@ -88,7 +88,7 @@ async function migrateTierData() {
         await pool.query('DELETE FROM word_frequencies');
         
         for (const language of languages) {
-            const langCode = language.substring(0, 2); // en, es, pt
+            const langCode = language.substring(0, 2); // en, sp, po
             console.log(`\n📚 Processing ${language} (${langCode})...`);
             
             for (const tier of tiers) {
@@ -208,7 +208,7 @@ async function migrateConjugationData() {
                                 form: form.toLowerCase(),
                                 tense: conj.tense || null,
                                 person: conj.performer || null,
-                                language: 'es',
+                                language: 'sp',
                                 mood: conj.mood || null,
                                 translation: conj.translation || null
                             });

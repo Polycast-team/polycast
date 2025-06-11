@@ -11,8 +11,8 @@ const API_BASE = 'http://localhost:3001/api';
 // Test words for each language
 const testWords = {
     en: ['the', 'hello', 'world', 'beautiful', 'computer'],
-    es: ['el', 'hola', 'mundo', 'hermoso', 'computadora'], 
-    pt: ['o', 'olá', 'mundo', 'bonito', 'computador']
+    sp: ['el', 'hola', 'mundo', 'hermoso', 'computadora'],
+    po: ['o', 'olá', 'mundo', 'bonito', 'computador']
 };
 
 // Colors for console output
@@ -153,7 +153,7 @@ async function runTests() {
     
     // Test word frequency lookups for each language
     for (const [langCode, words] of Object.entries(testWords)) {
-        const langName = langCode === 'en' ? 'English' : langCode === 'es' ? 'Spanish' : 'Portuguese';
+        const langName = langCode === 'en' ? 'English' : langCode === 'sp' ? 'Spanish' : 'Portuguese';
         log(colors.blue, `\n📚 Testing ${langName} (${langCode}) - Word Frequency API:`);
         
         for (const word of words) {
@@ -165,8 +165,8 @@ async function runTests() {
     
     // Test word range API for each language
     log(colors.blue, '\n📊 Testing Word Range API:');
-    for (const langCode of ['en', 'es', 'pt']) {
-        const langName = langCode === 'en' ? 'English' : langCode === 'es' ? 'Spanish' : 'Portuguese';
+    for (const langCode of ['en', 'sp', 'po']) {
+        const langName = langCode === 'en' ? 'English' : langCode === 'sp' ? 'Spanish' : 'Portuguese';
         log(colors.cyan, `\n  ${langName} (${langCode}):`);
         
         totalTests++;
@@ -177,7 +177,7 @@ async function runTests() {
     // Test batch word API
     log(colors.blue, '\n📦 Testing Batch Words API:');
     for (const [langCode, words] of Object.entries(testWords)) {
-        const langName = langCode === 'en' ? 'English' : langCode === 'es' ? 'Spanish' : 'Portuguese';
+        const langName = langCode === 'en' ? 'English' : langCode === 'sp' ? 'Spanish' : 'Portuguese';
         log(colors.cyan, `\n  ${langName} (${langCode}):`);
         
         totalTests++;
