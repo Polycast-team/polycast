@@ -6,12 +6,15 @@ The error "An API Key must be set when running in a browser" occurs because the 
 
 ### For Local Development:
 
-1. Create a `.env.local` file in the `polycast-frontend/` directory:
+1. Create a `.env.local` file in both `polycast-frontend/` and `polycast-backend/` directories with:
    ```
    GEMINI_API_KEY=your_actual_gemini_api_key_here
+   OPENAI_API_KEY=your_openai_api_key_here
+   DATABASE_URL=your_database_url_here
    ```
+   These files contain sensitive keys and **should not be committed to git**.
 
-2. Get your API key from: https://aistudio.google.com/app/apikey
+2. Get your Gemini API key from: https://aistudio.google.com/app/apikey
 
 ### For Render Deployment:
 

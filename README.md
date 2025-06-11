@@ -9,6 +9,12 @@ This contains everything you need to run your app locally.
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Create a `.env.local` file in this directory and add your keys:
+   ```
+   GEMINI_API_KEY=your_gemini_api_key
+   OPENAI_API_KEY=your_openai_api_key
+   DATABASE_URL=your_database_url
+   ```
+   **Do not commit this file or any `.env*` files to git.**
 3. Run the app:
    `npm run dev`
