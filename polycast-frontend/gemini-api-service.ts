@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
-import type { FlashcardExampleSentence, EvaluationData, TranscriptMessage } from './index.js'; // Fixed import extension
+import type { FlashcardExampleSentence, EvaluationData, TranscriptMessage } from './types.js';
 
 const MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
 

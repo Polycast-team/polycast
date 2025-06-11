@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { LitElement, css, html} from 'lit';
-import {customElement, state} from 'lit/decorators.js';
+import { LitElement, css, html } from 'lit';
+import { customElement, state } from 'lit/decorators.js';
 import { OpenAIVoiceSession } from './openai-voice-service.js';
 import './visual-3d';
+import './transcript-viewer';
+import './dictionary-popup';
+import './flashcard-manager';
 import type { GdmLiveAudioVisuals3D } from './visual-3d';
 import { 
   fetchWordDetailsFromApi, 
@@ -18,67 +21,10 @@ import {
 import { MicVAD, utils } from '@ricky0123/vad-web';
 import { io, Socket } from 'socket.io-client';
 
+import type { WordPopupData, TranscriptMessage, DictionaryEntry, Flashcard, FlashcardExampleSentence, EvaluationData } from './types.js';
+
 const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-interface WordPopupData {
-  word: string;
-  sentence: string;
-  translation: string;
-  definition: string;
-  partOfSpeech: string;
-  lemmatizedWord?: string; // The infinitive/singular form
-  displayWord?: string; // The properly formatted word with articles
-  x: number;
-  y: number;
-  targetWidth: number;
-}
-
-export interface TranscriptMessage {
-  speaker: 'user' | 'model' | 'partner';
-  text: string;
-  id: string;
-}
-
-interface DictionaryEntry {
-  word: string; // Original cased word for display (in Target Language)
-  translation: string; // To Native Language
-  definition: string; // In Native Language
-  partOfSpeech: string; // Relative to Target Language
-  sentenceContext: string; // In Target Language
-  frequency: number | null;
-  rank: number | null; // Frequency rank (1 = most common)
-  dateAdded: number;
-}
-
-export interface FlashcardExampleSentence {
-  english: string; // Stores Target Language sentence
-  portugueseTranslation: string; // Stores Native Language translation
-}
-
-interface Flashcard {
-  id: string; // e.g., "wordkey_flashcard"
-  originalWordKey: string; // lowercase, trimmed word (in Target Language)
-  dictionaryEntry: DictionaryEntry;
-  exampleSentences: FlashcardExampleSentence[];
-  status: 'new' | 'learning' | 'review'; // Anki-style status
-  correctCount: number; // Number of times answered correctly
-  incorrectCount: number; // Number of times answered incorrectly
-  interval: number; // Days until next review
-  easeFactor: number; // Anki ease factor (default 2.5)
-  dueDate: number; // Timestamp when card is due for review
-  lastReviewed: number; // Timestamp of last review
-  learningStep: number; // For learning cards: 0=1min, 1=10min, 2=graduated
-}
-
-export interface EvaluationSuggestion {
-  category: string; // In Target Language
-  description: string; // In Native Language
-}
-
-export interface EvaluationData {
-  improvementAreas: EvaluationSuggestion[]; // Renamed from suggestions
-  cefrLevel: string;
-}
 
 
 const SUPPORTED_LANGUAGES = ['English', 'Spanish', 'Portuguese'];
@@ -4723,27 +4669,12 @@ In ${this.targetLanguage}:
           </div>
 
           ${this.activeTab === 'transcript' ? html`
-            <div class="transcript-header" id="transcript-content" role="tabpanel" aria-labelledby="transcript-tab-button">
-              <span class="transcript-title ${this.isDiagnosticSessionActive ? 'diagnostic' : ''}">
-                ${this.isDiagnosticSessionActive ? 'DIAGNOSTIC SESSION' : `${this.leftPanelMode.toUpperCase()} TRANSCRIPT (${this.currentProfile} | ${this.targetLanguage})`}
-              </span>
-              <div class="font-controls">
-                <button class="font-size-button" @click=${this.decreaseFontSize} aria-label="Decrease font size">-</button>
-                <button class="font-size-button" @click=${this.increaseFontSize} aria-label="Increase font size">+</button>
-              </div>
-            </div>
-            <div class="transcript-messages-container" id="transcriptMessagesContainer">
-              <div class="transcript-messages">
-                ${this.transcriptHistory.map((msg, index, arr) => html`
-                  <p class="transcript-message ${msg.speaker === 'user' ? 'user' : ''} ${index === arr.length - 1 ? 'latest' : ''}"
-                     style="font-size: var(--transcript-font-size, ${this.transcriptFontSize}px);"
-                     data-speaker="${msg.speaker}">
-                    ${this.renderMessageWithClickableWords(msg.text)}
-                  </p>
-                `)}
-              </div>
-              <p id="word-interaction-desc" class="sr-only">Click on a word to see its translation and definition. Known words are highlighted in blue.</p>
-            </div>
+            <transcript-viewer
+              .transcriptHistory=${this.transcriptHistory}
+              .transcriptFontSize=${this.transcriptFontSize}
+              .knownWordForms=${this.knownWordForms}
+              @word-click=${(e: CustomEvent<{ word: string; sentence: string; event: MouseEvent }>) => this.handleWordClick(e.detail.event, e.detail.word, e.detail.sentence)}
+            ></transcript-viewer>
           ` : ''}
 
           ${this.activeTab === 'dictionary' ? html`
@@ -4819,77 +4750,17 @@ In ${this.targetLanguage}:
           ` : ''}
 
           ${this.activeTab === 'flashcards' ? html`
-            <div class="flashcards-content" id="flashcards-content" role="tabpanel" aria-labelledby="flashcards-tab-button">
-              ${this.flashcardQueue.length === 0 ? html`
-                <p class="no-flashcards-message">Add words to your dictionary (${this.currentProfile}) to generate flashcards!</p>
-              ` : html`
-                <div class="flashcard-viewer">
-                  <div class="flashcard-scene" @click=${() => this.handleFlashcardFlip(currentCardId)} role="button" tabindex="0" aria-label="Flip card. Front: ${this.targetLanguage} sentence with blank. Back: Full ${this.targetLanguage} sentence.">
-                    <div class="flashcard-container ${isFlipped ? 'flipped' : ''} ${this.flashcardAnimationState !== 'idle' ? this.flashcardAnimationState : ''}">
-                      <div class="flashcard card-front">
-                        ${currentFlashcard ? html`
-                          <div class="flashcard-due-info ${this.getDueStatus(currentFlashcard.dueDate)}">
-                            📅 ${this.formatDueDate(currentFlashcard.dueDate)}
-                          </div>
-                        ` : ''}
-                        <div class="flashcard-content-area" lang="${this.mapLanguageToBcp47(this.targetLanguage)}">${flashcardFrontContent}</div>
-                      </div>
-                      <div class="flashcard card-back">
-                        <button 
-                          class="flashcard-tts-button" 
-                          @click=${(e: Event) => { 
-                            e.stopPropagation(); 
-                            this.speakFlashcardText(currentFlashcard?.exampleSentences?.[((currentInterval - 1) % (currentFlashcard?.exampleSentences?.length || 1))]?.english || '', true);
-                          }}
-                          title="Listen to pronunciation in ${this.targetLanguage}"
-                          aria-label="Speak sentence in ${this.targetLanguage}">
-                          🔊
-                        </button>
-                        <div class="flashcard-content-area" lang="${this.mapLanguageToBcp47(this.targetLanguage)}">${flashcardBackContent}</div>
-                        <div class="flashcard-interval">Interval: ${currentInterval}</div>
-                        <div class="flashcard-actions">
-                          <button class="incorrect-btn" @click=${(e: Event) => { e.stopPropagation(); this.handleFlashcardAnswer(currentCardId!, false); }} aria-label="Mark as incorrect">Incorrect</button>
-                          <button 
-                            class="correct-btn" 
-                            @click=${(e: Event) => { e.stopPropagation(); this.handleFlashcardAnswer(currentCardId!, true); }} 
-                            aria-label="Mark as correct"
-                            title="${currentFlashcard ? `Next review: ${this.calculateNextDueDateIfCorrect(currentFlashcard)}` : 'Mark as correct'}">
-                            Correct
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="flashcard-nav">
-                    <button @click=${() => this.navigateFlashcard('prev')} ?disabled=${this.flashcardQueue.length <= 1} aria-label="Previous card">◄</button>
-                    <span class="card-count">
-                      ${(() => {
-                        const counts = this.getFlashcardStatusCounts();
-                        return html`<span style="color: #60a5fa;">${counts.new}</span> + <span style="color: #f97316;">${counts.learning}</span> + <span style="color: #22c55e;">${counts.review}</span>`;
-                      })()}
-                    </span>
-                    <button @click=${() => this.navigateFlashcard('next')} ?disabled=${this.flashcardQueue.length <= 1} aria-label="Next card">►</button>
-                  </div>
-                  
-                  ${this.flashcards.length > 0 ? html`
-                    <div class="calendar-view">
-                      <div class="calendar-header">
-                        📅 Upcoming Reviews
-                      </div>
-                      ${this.getUpcomingReviews().map(review => html`
-                        <div class="calendar-entry">
-                          <span class="calendar-date">${review.dateString}</span>
-                          <span class="calendar-word">${review.words.join(', ')}</span>
-                        </div>
-                      `)}
-                      ${this.getUpcomingReviews().length === 0 ? html`
-                        <div class="calendar-entry">All reviews complete for now! 🎉</div>
-                      ` : ''}
-                    </div>
-                  ` : ''}
-                </div>
-              `}
-            </div>
+            <flashcard-manager
+              .flashcards=${this.flashcards}
+              .flashcardQueue=${this.flashcardQueue}
+              .currentIndex=${this.currentFlashcardQueueIndex}
+              .flipState=${this.flashcardFlipState}
+              .intervals=${this.flashcardIntervals}
+              .targetLanguage=${this.targetLanguage}
+              @prev-card=${() => this.navigateFlashcard('prev')}
+              @next-card=${() => this.navigateFlashcard('next')}
+              @answer-card=${(e: CustomEvent<{ correct: boolean }>) => this.handleFlashcardAnswer(this.flashcardQueue[this.currentFlashcardQueueIndex], e.detail.correct)}
+            ></flashcard-manager>
           ` : ''}
 
           ${this.activeTab === 'evaluate' ? html`
@@ -4975,54 +4846,17 @@ In ${this.targetLanguage}:
       ` : ''}
 
       ${this.popupData ? html`
-        <div class="popup-overlay" @click=${this.closePopup} role="presentation"></div>
-        <div class="word-popup"
-             style="top: ${this.popupData.y}px; left: ${this.popupData.x}px;"
-             role="dialog" aria-labelledby="popup-selected-word-title" aria-describedby="popup-details" aria-modal="true" aria-live="assertive">
-          <button @click=${this.closePopup} class="popup-close-btn" aria-label="Close word details popup">&times;</button>
-          
-          <div class="word-popup-header">
-            <span id="popup-selected-word-title" class="popup-selected-word">${this.popupData.displayWord || this.popupData.word}</span>
-            <button
-              class="dictionary-toggle-btn ${isWordInPopupDictionary ? 'added' : ''}"
-              @click=${() => this.handleToggleDictionary(this.popupData!)}
-              title="${isWordInPopupDictionary ? 'Remove from Dictionary' : 'Add to Dictionary'}"
-              aria-label="${isWordInPopupDictionary ? 'Remove ' + (this.popupData.displayWord || this.popupData.word) + ' from Dictionary (' + this.currentProfile + ')' : 'Add ' + (this.popupData.displayWord || this.popupData.word) + ' to Dictionary (' + this.currentProfile + ')'}"
-              aria-pressed="${isWordInPopupDictionary ? 'true' : 'false'}"
-              ?disabled=${dictionaryButtonDisabledState}
-            >
-              ${isWordInPopupDictionary ?
-                html`<svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>` :
-                (this.isPopupLoading && (!this.popupData || !this.popupData.definition)) ? 
-                  html`<div class="loading-spinner" style="width:14px; height:14px; border-width:2px;"></div>` :
-                  html`<svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>`
-              }
-            </button>
-          </div>
-
-          ${!this.isPopupLoading && this.popupData.partOfSpeech && this.popupData.partOfSpeech !== 'N/A' ? html`
-            <div class="popup-part-of-speech">${this.popupData.partOfSpeech} (in ${this.targetLanguage})</div>
-          ` : ''}
-
-          <div id="popup-details">
-            ${this.isPopupLoading && !this.popupData.definition ? html`<p class="loading-message">Loading details...</p>` : ''}
-            ${this.popupError && !this.isPopupLoading ? html`<p class="error-message">${this.popupError}</p>` : ''}
-            
-            ${!this.isPopupLoading && !this.popupError && this.popupData.translation && this.popupData.translation !== 'N/A' ? html`
-              <div>
-                <span class="popup-label">Translation (to ${this.nativeLanguage})</span>
-                <span class="popup-content-text">${this.popupData.translation}</span>
-              </div>
-            ` : ''}
-            
-            ${!this.isPopupLoading && !this.popupError && this.popupData.definition && this.popupData.definition !== 'N/A' ? html`
-              <div>
-                <span class="popup-label">Definition (in ${this.nativeLanguage})</span>
-                <span class="popup-content-text">${this.popupData.definition}</span>
-              </div>
-            ` : ''}
-          </div>
-        </div>
+        <dictionary-popup
+          .popupData=${this.popupData}
+          .loading=${this.isPopupLoading}
+          .error=${this.popupError}
+          .inDictionary=${isWordInPopupDictionary}
+          .nativeLanguage=${this.nativeLanguage}
+          .targetLanguage=${this.targetLanguage}
+          .disableToggle=${dictionaryButtonDisabledState}
+          @close-popup=${this.closePopup}
+          @toggle-dictionary=${(e: CustomEvent<WordPopupData>) => this.handleToggleDictionary(e.detail)}
+        ></dictionary-popup>
       ` : ''}
     `;
   }
