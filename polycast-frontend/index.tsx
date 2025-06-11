@@ -5430,7 +5430,12 @@ In ${this.targetLanguage}:
         console.log('🌐 [VIDEO] Using automatic language detection');
       }
       
-      const response = await fetch('/api/transcribe', {
+      // Use the same backend host as the WebSocket connection
+      const protocol = window.location.protocol;
+      const backendHost = 'polycast-server.onrender.com';
+      const transcribeUrl = `${protocol}//${backendHost}/api/transcribe`;
+      
+      const response = await fetch(transcribeUrl, {
         method: 'POST',
         body: formData,
       });
