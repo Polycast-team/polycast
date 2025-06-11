@@ -5295,6 +5295,20 @@ In ${this.targetLanguage}:
       return;
     }
     
+    // If VAD was previously initialized and merely paused (e.g., due to mute),
+    // simply resume it instead of re-initialising the whole pipeline.
+    if (this.isVADInitialized && this.micVAD) {
+      try {
+        console.log('🎙️ [VIDEO] Resuming paused WebRTC VAD');
+        this.micVAD.start();
+        this.videoConnectionStatus = 'connected';
+        this.isVideoSpeechActive = true;
+        return; // Nothing else to do – early exit.
+      } catch (error) {
+        console.error('🎙️ [VIDEO] Failed to resume VAD, falling back to re-initialisation:', error);
+        // If resuming fails, fall through to full initialisation logic below.
+      }
+    }
     console.log('🎙️ [VIDEO] ========== INITIALIZING WebRTC VAD SPEECH RECOGNITION ==========');
     
     try {
