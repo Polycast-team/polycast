@@ -4484,8 +4484,11 @@ In ${this.targetLanguage}:
                 >
                   <span class="mic-icon">🎤</span>
                   <span class="mic-label">${this.hasMicrophone ? 
-                    (this.availableAudioDevices.find(d => d.deviceId === this.selectedAudioDeviceId)?.label?.replace(/^Default - /, '').substring(0, 20) + 
-                     (this.availableAudioDevices.find(d => d.deviceId === this.selectedAudioDeviceId)?.label?.replace(/^Default - /, '').length > 20 ? '...' : '') || 'Default') 
+                    (() => {
+                      const device = this.availableAudioDevices.find(d => d.deviceId === this.selectedAudioDeviceId);
+                      const label = device?.label?.replace(/^Default - /, '') || 'Default';
+                      return label.length > 20 ? label.substring(0, 20) + '...' : label;
+                    })() 
                     : 'No Mic'}</span>
                   <span class="dropdown-arrow">▼</span>
                 </button>
@@ -5077,9 +5080,49 @@ In ${this.targetLanguage}:
     const waitingScreen = html`
       <div class="video-screen waiting-screen">
         <div class="waiting-content">
-          <div class="ai-visual-placeholder">
-            <gdm-live-audio-visuals-3d .inputNode=${this.inputNode} .outputNode=${this.outputNode}></gdm-live-audio-visuals-3D>
-          </div>
+          ${this.callStatus !== 'idle' ? html`
+            <!-- Remote video area during calls -->
+            <div class="remote-video-container">
+              ${this.remoteVideoStream ? html`
+                <video 
+                  id="remote-video" 
+                  class="remote-video" 
+                  autoplay 
+                  playsinline
+                ></video>
+                <div class="video-label remote-label">Remote User</div>
+              ` : html`
+                <div class="video-placeholder remote-placeholder">
+                  <div class="placeholder-content">
+                    ${this.callStatus === 'hosting' ? html`
+                      <div class="call-status">
+                        <div class="call-code-display">
+                          <span class="call-code-label">Share this code:</span>
+                          <span class="call-code-value">${this.callCode}</span>
+                        </div>
+                        <div class="waiting-text">Waiting for someone to join...</div>
+                      </div>
+                    ` : this.callStatus === 'joining' ? html`
+                      <div class="call-status">
+                        <div class="connecting-text">Connecting to call...</div>
+                      </div>
+                    ` : this.callStatus === 'connected' ? html`
+                      <div class="call-status">
+                        <div class="connecting-text">Establishing video connection...</div>
+                      </div>
+                    ` : html`
+                      <div class="no-call-text">No active call</div>
+                    `}
+                  </div>
+                </div>
+              `}
+            </div>
+          ` : html`
+            <!-- AI sphere when no call is active -->
+            <div class="ai-visual-placeholder">
+              <gdm-live-audio-visuals-3d .inputNode=${this.inputNode} .outputNode=${this.outputNode}></gdm-live-audio-visuals-3D>
+            </div>
+          `}
         </div>
       </div>
     `;
@@ -5110,72 +5153,32 @@ In ${this.targetLanguage}:
       `}
     `;
 
-    // Video calling displays
-    const renderVideoCall = () => html`
-      <div class="video-call-container">
-        <!-- Remote video (main display) -->
-        <div class="remote-video-container">
-          ${this.remoteVideoStream ? html`
-            <video 
-              id="remote-video" 
-              class="remote-video" 
-              autoplay 
-              playsinline
-            ></video>
-            <div class="video-label remote-label">Remote User</div>
-          ` : html`
-            <div class="video-placeholder remote-placeholder">
-              <div class="placeholder-content">
-                ${this.callStatus === 'hosting' ? html`
-                  <div class="call-status">
-                    <div class="call-code-display">
-                      <span class="call-code-label">Share this code:</span>
-                      <span class="call-code-value">${this.callCode}</span>
-                    </div>
-                    <div class="waiting-text">Waiting for someone to join...</div>
-                  </div>
-                ` : this.callStatus === 'joining' ? html`
-                  <div class="call-status">
-                    <div class="connecting-text">Connecting to call...</div>
-                  </div>
-                ` : this.callStatus === 'connected' ? html`
-                  <div class="call-status">
-                    <div class="connecting-text">Establishing video connection...</div>
-                  </div>
-                ` : html`
-                  <div class="no-call-text">No active call</div>
-                `}
-              </div>
-            </div>
-          `}
-        </div>
-        
-        <!-- Local video (picture-in-picture style) -->
-        <div class="local-video-container">
-          ${this.localStream ? html`
-            <video 
-              id="local-video" 
-              class="local-video" 
-              autoplay 
-              muted 
-              playsinline
-            ></video>
-            <div class="video-label local-label">You</div>
-          ` : this.videoStream ? html`
-            <video 
-              id="local-video-fallback" 
-              class="local-video" 
-              autoplay 
-              muted 
-              playsinline
-            ></video>
-            <div class="video-label local-label">You</div>
-          ` : html`
-            <div class="local-video-placeholder">
-              <span>Camera off</span>
-            </div>
-          `}
-        </div>
+    // Local video for video calling
+    const renderLocalVideo = () => html`
+      <div class="local-video-container">
+        ${this.localStream ? html`
+          <video 
+            id="local-video" 
+            class="local-video" 
+            autoplay 
+            muted 
+            playsinline
+          ></video>
+          <div class="video-label local-label">You</div>
+        ` : this.videoStream ? html`
+          <video 
+            id="local-video-fallback" 
+            class="local-video" 
+            autoplay 
+            muted 
+            playsinline
+          ></video>
+          <div class="video-label local-label">You</div>
+        ` : html`
+          <div class="local-video-placeholder">
+            <span>Camera off</span>
+          </div>
+        `}
         
         <!-- Video call subtitles -->
         ${this.videoInterimTranscript ? html`
@@ -5188,7 +5191,7 @@ In ${this.targetLanguage}:
 
     const webcamScreen = html`
       <div class="video-screen ${this.videoLayout === 'pip' ? 'main' : ''} webcam-screen">
-        ${this.callStatus !== 'idle' ? renderVideoCall() : renderWebcamWithSubtitles(false)}
+        ${this.callStatus !== 'idle' ? renderLocalVideo() : renderWebcamWithSubtitles(false)}
       </div>
     `;
 
@@ -5201,7 +5204,7 @@ In ${this.targetLanguage}:
           style="left: ${this.pipPosition.x}px; top: ${this.pipPosition.y}px;"
           @mousedown=${this.handlePipDragStart}
         >
-          ${this.callStatus !== 'idle' ? renderVideoCall() : renderWebcamWithSubtitles(true)}
+          ${this.callStatus !== 'idle' ? renderLocalVideo() : renderWebcamWithSubtitles(true)}
         </div>
       `;
     } else {
@@ -5916,7 +5919,6 @@ In ${this.targetLanguage}:
         this.signalingSocket.on('connect_error', (error) => {
           console.error('❌ Signaling server connection error:', error);
           console.error('❌ Error details:', {
-            message: error.message,
             stack: error.stack,
             ...error
           });
