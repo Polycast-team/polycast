@@ -713,59 +713,80 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
         </div>
       )}
       
-      {/* Header - always visible */}
-      <div className="app-container">
-        <div className="top-bar">
-          <div className="app-title">
-            <h1>PolyCast</h1>
-            {roomSetup && (
-              <div className="room-info">
-                <span className="room-label">{roomSetup?.isHost ? 'Host' : 'Student'}</span>
-                <span className="room-code">Room: {roomSetup?.roomCode || 'Not Connected'}</span>
-              </div>
-            )}
-            {/* Debug info - remove later */}
-            {console.log('Debug - userRole:', userRole, 'roomSetup:', roomSetup)}
-            {userRole === 'student' && !roomSetup && (
-              <button 
-                onClick={() => setShowJoinRoomModal(true)}
-                style={{
-                  padding: '8px 16px',
-                  fontSize: 14,
-                  borderRadius: 4,
-                  background: '#10b981',
-                  color: '#fff',
-                  border: 'none',
-                  cursor: 'pointer',
-                  marginLeft: 16
-                }}
-              >
-                Join Room
-              </button>
-            )}
-            {/* Temporary always-show button for debugging */}
-            {userRole === 'student' && (
-              <button 
-                onClick={() => setShowJoinRoomModal(true)}
-                style={{
-                  padding: '8px 16px',
-                  fontSize: 14,
-                  borderRadius: 4,
-                  background: '#ff6b6b',
-                  color: '#fff',
-                  border: 'none',
-                  cursor: 'pointer',
-                  marginLeft: 16
-                }}
-              >
-                DEBUG Join Room
-              </button>
-            )}
+      {/* Header with room buttons - positioned above toolbar */}
+      <div style={{ 
+        position: 'absolute', 
+        top: '20px', 
+        right: '20px', 
+        zIndex: 100,
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center'
+      }}>
+        {roomSetup && (
+          <div style={{ 
+            fontSize: 14, 
+            color: '#fff', 
+            marginRight: 16,
+            background: 'rgba(0,0,0,0.3)',
+            padding: '8px 12px',
+            borderRadius: 4
+          }}>
+            <span>{roomSetup?.isHost ? 'Host' : 'Student'}</span>
+            <span style={{ marginLeft: 8, opacity: 0.8 }}>Room: {roomSetup?.roomCode}</span>
           </div>
-          <button onClick={onReset} className="reset-button">
-            Exit Room
+        )}
+        
+        {/* Debug info - remove later */}
+        {console.log('Debug - userRole:', userRole, 'roomSetup:', roomSetup)}
+        {userRole === 'student' && !roomSetup && (
+          <button 
+            onClick={() => setShowJoinRoomModal(true)}
+            style={{
+              padding: '8px 16px',
+              fontSize: 14,
+              borderRadius: 4,
+              background: '#10b981',
+              color: '#fff',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            Join Room
           </button>
-        </div>
+        )}
+        {/* Temporary always-show button for debugging */}
+        {userRole === 'student' && (
+          <button 
+            onClick={() => setShowJoinRoomModal(true)}
+            style={{
+              padding: '8px 16px',
+              fontSize: 14,
+              borderRadius: 4,
+              background: '#ff6b6b',
+              color: '#fff',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            DEBUG Join Room
+          </button>
+        )}
+        
+        <button 
+          onClick={onReset}
+          style={{
+            padding: '8px 16px',
+            fontSize: 14,
+            borderRadius: 4,
+            background: '#444',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+        >
+          Exit Room
+        </button>
       </div>
       
       {/* Error messages */}
