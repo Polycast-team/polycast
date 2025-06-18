@@ -456,20 +456,40 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                     <div className="flashcard-content">
                       <div style={{fontWeight:'bold', fontSize:'22px', color:'#e3e36b', marginBottom:8}}>Interval: {interval}</div>
                       
-                      {/* Display the generated examples in their entirety */}
+                      {/* Display the sentence corresponding to current interval */}
                       <div className="flashcard-generated-examples">
                         {currentCardData.exampleSentencesGenerated ? (
-                          <div style={{ 
-                            backgroundColor: '#2a2a3e', 
-                            padding: '15px', 
-                            borderRadius: '8px', 
-                            marginBottom: '15px',
-                            fontSize: '16px',
-                            lineHeight: '1.6',
-                            whiteSpace: 'pre-wrap'
-                          }}>
-                            {currentCardData.exampleSentencesGenerated}
-                          </div>
+                          (() => {
+                            // Parse the sentences separated by "//"
+                            const sentences = currentCardData.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+                            
+                            // Get the sentence for the current interval (1-based, so interval 1 = sentence 0)
+                            const sentenceIndex = Math.max(0, Math.min(interval - 1, sentences.length - 1));
+                            const currentSentence = sentences[sentenceIndex] || sentences[0] || 'No example available';
+                            
+                            return (
+                              <div style={{ 
+                                backgroundColor: '#2a2a3e', 
+                                padding: '15px', 
+                                borderRadius: '8px', 
+                                marginBottom: '15px',
+                                fontSize: '16px',
+                                lineHeight: '1.6'
+                              }}>
+                                <div style={{ 
+                                  color: '#e3e36b', 
+                                  fontSize: '14px', 
+                                  marginBottom: '8px',
+                                  fontWeight: 'bold'
+                                }}>
+                                  Example {Math.min(interval, sentences.length)}:
+                                </div>
+                                <div>
+                                  {currentSentence}
+                                </div>
+                              </div>
+                            );
+                          })()
                         ) : (
                           <div style={{ 
                             color: '#888', 
