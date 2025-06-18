@@ -74,7 +74,8 @@ function App({ targetLanguages, onReset, roomSetup }) {
 
   // Construct the WebSocket URL for Render backend, including room information
   const wsBaseUrl = `wss://polycast-server.onrender.com`;
-  const socketUrl = `${wsBaseUrl}/?targetLangs=${languagesQueryParam}&roomCode=${roomSetup.roomCode}&isHost=${roomSetup.isHost}`;
+  // Only connect to WebSocket if we have room setup (for hosts or students who joined a room)
+  const socketUrl = roomSetup ? `${wsBaseUrl}/?targetLangs=${languagesQueryParam}&roomCode=${roomSetup.roomCode}&isHost=${roomSetup.isHost}` : null;
   console.log("Constructed WebSocket URL:", socketUrl);
 
   const [messageHistory, setMessageHistory] = useState([]);
@@ -282,6 +283,8 @@ function App({ targetLanguages, onReset, roomSetup }) {
   const maxReconnectAttempts = 3; // Limit reconnection attempts
   
   const { sendMessage, lastMessage, readyState } = useWebSocket(socketUrl, {
+    // Skip connection if no socketUrl (for students not in a room)
+    skip: !socketUrl,
     onOpen: () => {
       console.log('WebSocket connection opened with URL:', socketUrl);
       // Reset reconnection attempts on successful connection
@@ -564,7 +567,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
             transform: 'translateX(-50%)',
           }}
         >
-          {roomSetup.isHost ? 'Host' : 'Student'} • Room: {roomSetup.roomCode}
+          {roomSetup?.isHost ? 'Host' : 'Student'} • Room: {roomSetup?.roomCode || 'Not Connected'}
         </div>
       )}
       <div className="controls-container" style={{ marginBottom: 4 }}>
@@ -678,8 +681,8 @@ function App({ targetLanguages, onReset, roomSetup }) {
               <h1>PolyCast</h1>
               {roomSetup && (
                 <div className="room-info">
-                  <span className="room-label">{roomSetup.isHost ? 'Host' : 'Student'}</span>
-                  <span className="room-code">Room: {roomSetup.roomCode}</span>
+                  <span className="room-label">{roomSetup?.isHost ? 'Host' : 'Student'}</span>
+                  <span className="room-code">Room: {roomSetup?.roomCode || 'Not Connected'}</span>
                 </div>
               )}
             </div>
@@ -826,7 +829,7 @@ App.propTypes = {
     roomSetup: PropTypes.shape({
         isHost: PropTypes.bool.isRequired,
         roomCode: PropTypes.string.isRequired
-    }).isRequired
+    }) // Made optional for students not in a room
 };
 
 // Define backend port in a config object or hardcode if simple
