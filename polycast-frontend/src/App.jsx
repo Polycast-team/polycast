@@ -684,7 +684,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             transform: 'translateX(-50%)',
           }}
         >
-          {roomSetup?.isHost ? 'Host' : 'Student'} • Room: {roomSetup?.roomCode || 'Not Connected'}
+          {roomSetup?.isHost ? `Room: ${roomSetup?.roomCode || 'Not Connected'}` : `Student • Room: ${roomSetup?.roomCode || 'Not Connected'}`}
         </div>
       )}
       <div className="controls-container" style={{ marginBottom: 4 }}>
