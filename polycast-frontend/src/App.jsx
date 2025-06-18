@@ -68,8 +68,8 @@ function App({ targetLanguages, onReset, roomSetup }) {
   useEffect(() => {
     fetchProfileData(selectedProfile);
   }, [selectedProfile, fetchProfileData]);
-  // For students, always use Spanish regardless of what the host selected
-  const effectiveLanguages = roomSetup && !roomSetup.isHost ? ['Spanish'] : targetLanguages;
+  // Students use the same languages as the host
+  const effectiveLanguages = targetLanguages;
   const languagesQueryParam = effectiveLanguages.map(encodeURIComponent).join(',');
 
   // Construct the WebSocket URL for Render backend, including room information

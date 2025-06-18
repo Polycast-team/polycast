@@ -78,12 +78,10 @@ export function createFlashcardEntry(wordLower, wordSenseId, contextSentence, de
     ? definition 
     : (definition?.definition || definition?.text || JSON.stringify(definition));
     
-  // Create placeholder image URL
-  const imageUrl = 'https://placehold.co/300x200/1a1a2e/CCCCCC?text=Placeholder+Image';
-  
+  // No placeholder image
   return {
     word: wordLower,
-    imageUrl: imageUrl,
+    imageUrl: null,
     wordSenseId: wordSenseId,
     contextSentence: contextSentence,
     // Store definitions in multiple formats to ensure compatibility

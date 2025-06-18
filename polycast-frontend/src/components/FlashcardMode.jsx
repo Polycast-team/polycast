@@ -263,15 +263,12 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
   useEffect(() => {
     if (availableCards.length === 0) return;
     
-    // Use the same iguana image for all flashcards as requested
-    const iguanaImageUrl = 'https://www.anywhere.com/img-a/flora-fauna/reptile/iguana-verde/green-iguana2.jpg?q=95&w=650';
-    
-    // Create a new object with all sense IDs mapped to the iguana image
+    // Create image map (no default images)
     const newImageMap = {};
     
-    // Set all cards to use the same iguana image
+    // Cards start without images
     availableCards.forEach(senseId => {
-      newImageMap[senseId] = iguanaImageUrl;
+      newImageMap[senseId] = null;
     });
     
     // Set all images at once

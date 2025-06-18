@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 function LanguageSelectorScreen({ onLanguageSelected }) {
     const [numLanguages, setNumLanguages] = useState(1); // Default to 1 language
     // Initialize languages array based on numLanguages
-    const [languages, setLanguages] = useState(Array(1).fill('Spanish')); 
+    const [languages, setLanguages] = useState(Array(1).fill('')); 
 
     const handleNumChange = (event) => {
         const count = parseInt(event.target.value, 10) || 1;
@@ -14,9 +14,8 @@ function LanguageSelectorScreen({ onLanguageSelected }) {
         setLanguages(prevLangs => {
             const newLangs = Array(newCount).fill('');
             for (let i = 0; i < Math.min(prevLangs.length, newCount); i++) {
-                newLangs[i] = prevLangs[i] || (i === 0 ? 'Spanish' : ''); // Keep existing, default first to Spanish
+                newLangs[i] = prevLangs[i] || ''; // Keep existing values
             }
-            if (newLangs[0] === '' && newCount > 0) newLangs[0] = 'Spanish'; // Ensure first is always defaulted
             return newLangs;
         });
     };
