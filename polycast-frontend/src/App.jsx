@@ -372,6 +372,43 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     reconnectInterval: (attemptNumber) => Math.min(3000 * Math.pow(1.5, attemptNumber), 30000), // Exponential backoff with 30s max
   });
 
+  // Function for students to generate their own translations
+  const generateStudentTranslation = async (englishText, targetLanguage) => {
+    try {
+      const response = await fetch('https://polycast-server.onrender.com/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: englishText,
+          targetLanguage: targetLanguage
+        })
+      });
+      
+      if (response.ok) {
+        const translationData = await response.json();
+        console.log(`Received ${targetLanguage} translation:`, translationData);
+        
+        // Update translations state with the student's translation
+        setTranslations(prevTranslations => {
+          const newTranslations = { ...prevTranslations };
+          const currentLangSegments = newTranslations[targetLanguage] || [];
+          const updatedSegments = [
+            ...currentLangSegments.map(seg => ({ ...seg, isNew: false })),
+            { text: translationData.translation || translationData.data, isNew: true }
+          ];
+          newTranslations[targetLanguage] = updatedSegments.slice(-3);
+          return newTranslations;
+        });
+      } else {
+        console.error(`Failed to translate to ${targetLanguage}:`, response.statusText);
+      }
+    } catch (error) {
+      console.error(`Error generating ${targetLanguage} translation:`, error);
+    }
+  };
+
   // Handle incoming messages
   useEffect(() => {
     if (lastMessage !== null) {
@@ -390,6 +427,12 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             ...prevSegments.map(seg => ({ ...seg, isNew: false })),
             { text: parsedData.data, isNew: true }
           ]);
+          
+          // For students: generate their own translation when receiving host's transcript
+          if (userRole === 'student' && studentHomeLanguage && parsedData.data) {
+            console.log(`Student generating ${studentHomeLanguage} translation for: "${parsedData.data}"`);
+            generateStudentTranslation(parsedData.data, studentHomeLanguage);
+          }
         } else if (parsedData.type === 'recognizing_interim') { 
            // Only update if toggle is on
            if (showLiveTranscript) {
