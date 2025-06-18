@@ -737,8 +737,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
           </div>
         )}
         
-        {/* Debug info - remove later */}
-        {console.log('Debug - userRole:', userRole, 'roomSetup:', roomSetup)}
+        {/* Join Room button - only for students not in a room */}
         {userRole === 'student' && !roomSetup && (
           <button 
             onClick={() => setShowJoinRoomModal(true)}
@@ -755,38 +754,24 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             Join Room
           </button>
         )}
-        {/* Temporary always-show button for debugging */}
-        {userRole === 'student' && (
+        
+        {/* Exit Room button - only when in a room */}
+        {roomSetup && (
           <button 
-            onClick={() => setShowJoinRoomModal(true)}
+            onClick={onReset}
             style={{
               padding: '8px 16px',
               fontSize: 14,
               borderRadius: 4,
-              background: '#ff6b6b',
+              background: '#444',
               color: '#fff',
               border: 'none',
               cursor: 'pointer'
             }}
           >
-            DEBUG Join Room
+            Exit Room
           </button>
         )}
-        
-        <button 
-          onClick={onReset}
-          style={{
-            padding: '8px 16px',
-            fontSize: 14,
-            borderRadius: 4,
-            background: '#444',
-            color: '#fff',
-            border: 'none',
-            cursor: 'pointer'
-          }}
-        >
-          Exit Room
-        </button>
       </div>
       
       {/* Error messages */}
