@@ -1679,9 +1679,9 @@ async function generateTextWithGemini(prompt, temperature = 0.7) {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(config.googleApiKey);
         
-        // Configure the model - using stable Gemini 2.5 Flash
+        // Configure the model - using stable Gemini 2.0 Flash-Lite
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash-lite",
             systemInstruction: "You're helping language learners understand words in context."
         });
         

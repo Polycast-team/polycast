@@ -16,7 +16,7 @@ function initializeLLM() {
         console.log('[LLM Service] Initializing Google Generative AI...');
         genAI = new GoogleGenerativeAI(config.googleApiKey);
         model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.0-flash-lite',
             // Safety settings can be adjusted if needed
             // safetySettings: [
             //     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
