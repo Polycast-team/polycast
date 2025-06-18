@@ -14,7 +14,7 @@ if (hasRedisConfig) {
         console.error('[Redis] Error initializing Redis client:', error);
     }
 } else {
-    console.warn('[Redis] Environment variable REDIS_URL is missing. Running in memory-only mode.');
+    console.log('[Redis] No REDIS_URL configured. Running in memory-only mode (rooms won\'t persist across restarts).');
 }
 
 // Room prefix to organize keys
