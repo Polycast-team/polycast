@@ -70,9 +70,13 @@ function Main() {
       setRoomSetup(null);
       setSelectedLanguages(null);
     },
-    roomSetup: roomSetup?.isHost ? roomSetup : null, // Only pass room setup for hosts
+    roomSetup: roomSetup, // Pass room setup for both hosts and students in rooms
     userRole: roomSetup?.isHost ? 'host' : 'student',
-    studentHomeLanguage: roomSetup?.isHost ? null : selectedLanguages?.[0]
+    studentHomeLanguage: roomSetup?.isHost ? null : selectedLanguages?.[0],
+    onJoinRoom: (roomCode) => {
+      // Update roomSetup to connect student to the room
+      setRoomSetup({ isHost: false, roomCode: roomCode });
+    }
   };
   
   console.log('Props being passed to AppRouter:', JSON.stringify(propsToPass, null, 2));

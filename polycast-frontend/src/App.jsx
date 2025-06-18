@@ -12,7 +12,7 @@ import DictionaryTable from './components/DictionaryTable';
 import FlashcardMode from './components/FlashcardMode';
 
 // App now receives an array of target languages and room setup as props
-function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguage }) {
+function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom }) {
   // Debug logging
   console.log('App component received props:', { targetLanguages, roomSetup, userRole, studentHomeLanguage });
   
@@ -306,8 +306,15 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
         throw new Error(data.message || 'Room not found');
       }
       
-      // Update URL to reconnect WebSocket with room code
-      window.location.href = `/?roomCode=${cleanedRoomCode}&isHost=false`;
+      // Join the room by updating the app state
+      if (onJoinRoom) {
+        onJoinRoom(cleanedRoomCode);
+        setShowJoinRoomModal(false);
+        setJoinRoomCode('');
+        setJoinRoomError('');
+      } else {
+        throw new Error('Join room callback not available');
+      }
     } catch (error) {
       console.error('Error joining room:', error);
       setJoinRoomError(`Failed to join room: ${error.message}`);
@@ -1012,7 +1019,8 @@ App.propTypes = {
         roomCode: PropTypes.string.isRequired
     }), // Made optional for students not in a room
     userRole: PropTypes.oneOf(['host', 'student']),
-    studentHomeLanguage: PropTypes.string
+    studentHomeLanguage: PropTypes.string,
+    onJoinRoom: PropTypes.func
 };
 
 // Define backend port in a config object or hardcode if simple
