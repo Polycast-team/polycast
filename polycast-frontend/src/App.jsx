@@ -712,59 +712,66 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
           {modeError}
         </div>
       )}
-      {errorMessages.length > 0 && (
-        <div className="app-container">
-          <div className="top-bar">
-            <div className="app-title">
-              <h1>PolyCast</h1>
-              {roomSetup && (
-                <div className="room-info">
-                  <span className="room-label">{roomSetup?.isHost ? 'Host' : 'Student'}</span>
-                  <span className="room-code">Room: {roomSetup?.roomCode || 'Not Connected'}</span>
-                </div>
-              )}
-              {/* Debug info - remove later */}
-              {console.log('Debug - userRole:', userRole, 'roomSetup:', roomSetup)}
-              {userRole === 'student' && !roomSetup && (
-                <button 
-                  onClick={() => setShowJoinRoomModal(true)}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: 14,
-                    borderRadius: 4,
-                    background: '#10b981',
-                    color: '#fff',
-                    border: 'none',
-                    cursor: 'pointer',
-                    marginLeft: 16
-                  }}
-                >
-                  Join Room
-                </button>
-              )}
-              {/* Temporary always-show button for debugging */}
-              {userRole === 'student' && (
-                <button 
-                  onClick={() => setShowJoinRoomModal(true)}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: 14,
-                    borderRadius: 4,
-                    background: '#ff6b6b',
-                    color: '#fff',
-                    border: 'none',
-                    cursor: 'pointer',
-                    marginLeft: 16
-                  }}
-                >
-                  DEBUG Join Room
-                </button>
-              )}
-            </div>
-            <button onClick={onReset} className="reset-button">
-              Exit Room
-            </button>
+      
+      {/* Header - always visible */}
+      <div className="app-container">
+        <div className="top-bar">
+          <div className="app-title">
+            <h1>PolyCast</h1>
+            {roomSetup && (
+              <div className="room-info">
+                <span className="room-label">{roomSetup?.isHost ? 'Host' : 'Student'}</span>
+                <span className="room-code">Room: {roomSetup?.roomCode || 'Not Connected'}</span>
+              </div>
+            )}
+            {/* Debug info - remove later */}
+            {console.log('Debug - userRole:', userRole, 'roomSetup:', roomSetup)}
+            {userRole === 'student' && !roomSetup && (
+              <button 
+                onClick={() => setShowJoinRoomModal(true)}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: 14,
+                  borderRadius: 4,
+                  background: '#10b981',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  marginLeft: 16
+                }}
+              >
+                Join Room
+              </button>
+            )}
+            {/* Temporary always-show button for debugging */}
+            {userRole === 'student' && (
+              <button 
+                onClick={() => setShowJoinRoomModal(true)}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: 14,
+                  borderRadius: 4,
+                  background: '#ff6b6b',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  marginLeft: 16
+                }}
+              >
+                DEBUG Join Room
+              </button>
+            )}
           </div>
+          <button onClick={onReset} className="reset-button">
+            Exit Room
+          </button>
+        </div>
+      </div>
+      
+      {/* Error messages */}
+      {errorMessages.length > 0 && (
+        <div className="error-messages">
+          {/* Error content would go here */}
         </div>
       )}
       {/* Notification Pop-up */} 
