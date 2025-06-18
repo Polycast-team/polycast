@@ -875,24 +875,19 @@ const TranscriptionDisplay = ({
           const nativeLanguage = targetLanguages[0] || 'Spanish';
           
           // Create the prompt for example sentences with translations
-          const examplePrompt = `Generate a frequency rating (1-10) and 5 example sentences using "${word}" in context of: ${definition}
+          const examplePrompt = `Rate "${word}" frequency (1-10) and create 5 example sentences in context: ${definition}
 
-Rate how common "${word}" is in modern spoken English:
-1-2 = extremely rare, 3-4 = uncommon, 5-6 = moderate, 7-8 = common, 9-10 = ubiquitous
-Use realistic distribution: most words are 1-3, very few are 9-10.
+Frequency scale: 1=extremely rare, 10=ubiquitous. Most words are 1-3, very few are 9-10.
 
-Requirements:
-- Surround "${word}" with ~ characters in each sentence
-- Provide English sentence followed by ${nativeLanguage} translation
-- Use varied sentence types (statements, questions, past tense, etc.)
-- Make sentences natural and conversational
+Create exactly 5 English sentences with "${word}" surrounded by ~ characters, each followed by ${nativeLanguage} translation.
 
-Format example:
-7//How are ~you~ doing today?//¿Cómo estás hoy?//I saw ~you~ at the store yesterday//Te vi en la tienda ayer//etc.
+Output format (no other text):
+[number]//[English sentence with ~${word}~]//[${nativeLanguage} translation]//[English sentence with ~${word}~]//[${nativeLanguage} translation]//[English sentence with ~${word}~]//[${nativeLanguage} translation]//[English sentence with ~${word}~]//[${nativeLanguage} translation]//[English sentence with ~${word}~]//[${nativeLanguage} translation]
 
-Start immediately with: [frequency number]//[first English sentence with ~${word}~]//[first ${nativeLanguage} translation]//[continue pattern]
+Example output:
+6//I need to ~call~ my mom tonight//Necesito llamar a mi mamá esta noche//Can you ~call~ me back later?//¿Puedes devolverme la llamada más tarde?//She didn't ~call~ yesterday//Ella no llamó ayer//Let's ~call~ it a day//Terminemos por hoy//The teacher will ~call~ your name//El maestro dirá tu nombre
 
-No explanations, confirmations, or extra text.`;
+START NOW:`;
 
           // Make the API call to generate example sentences
           const response = await fetch('https://polycast-server.onrender.com/api/dictionary/generate-examples', {
