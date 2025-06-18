@@ -77,8 +77,10 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
   useEffect(() => {
     fetchProfileData(selectedProfile);
   }, [selectedProfile, fetchProfileData]);
-  // Students use the same languages as the host
-  const effectiveLanguages = targetLanguages;
+  // For students, use their home language; for hosts, use their selected display languages
+  const effectiveLanguages = userRole === 'student' && studentHomeLanguage 
+    ? [studentHomeLanguage] 
+    : targetLanguages;
   const languagesQueryParam = effectiveLanguages.map(encodeURIComponent).join(',');
 
   // Construct the WebSocket URL for Render backend, including room information
