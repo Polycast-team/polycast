@@ -128,10 +128,12 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
   useEffect(() => { modeRef.current = appMode === 'text'; }, [appMode]);
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
 
-  // --- FIX: Only listen for spacebar in audio mode ---
+  // --- FIX: Only listen for spacebar in audio mode and only for hosts ---
   useEffect(() => {
     let spacebarPressed = false;
-    if (appMode !== 'audio') return; // Only add listeners in audio mode
+    // Only add listeners in audio mode and only for hosts (not students)
+    if (appMode !== 'audio') return;
+    if (roomSetup && !roomSetup.isHost) return; // Skip for students
 
     const handleKeyDown = (event) => {
       if (event.code === 'Space' && !isRecordingRef.current && !spacebarPressed) {
@@ -153,10 +155,13 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [appMode]);
+  }, [appMode, roomSetup]);
 
-  // Add Page Up/Page Down recording hotkeys
+  // Add Page Up/Page Down recording hotkeys (only for hosts)
   useEffect(() => {
+    // Only add hotkeys for hosts (not students)
+    if (roomSetup && !roomSetup.isHost) return;
+
     function handlePageKey(e) {
       if (e.repeat) return; // Prevent holding key from triggering repeatedly
       if (e.key === "PageUp") {
@@ -170,7 +175,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     }
     window.addEventListener("keydown", handlePageKey);
     return () => window.removeEventListener("keydown", handlePageKey);
-  }, []);
+  }, [roomSetup]);
 
   // Backend base URL for /mode endpoints
   const BACKEND_HTTP_BASE = 'https://polycast-server.onrender.com';
