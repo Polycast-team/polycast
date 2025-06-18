@@ -18,6 +18,7 @@ const [cardIntervals, setCardIntervals] = useState({});
   const [generatedSentences, setGeneratedSentences] = useState({});
   const [viewedCards, setViewedCards] = useState({});
   const [queueOrder, setQueueOrder] = useState([]);
+  const [cardAnimation, setCardAnimation] = useState('');
   
   // Reference to track which cards have been processed to avoid infinite re-renders
   const processedCardsRef = useRef('');
@@ -203,6 +204,9 @@ useEffect(() => {
       }
       return { ...prev, [currentSenseId]: newInterval };
     });
+    // Trigger slide out animation
+    setCardAnimation('slide-out-left');
+    
     setTimeout(() => {
       setIsFlipped(false);
       setQueueOrder(prevOrder => {
@@ -216,7 +220,11 @@ useEffect(() => {
         return baseOrder;
       });
       setCurrentIndex(0); // Always show the new front card
-    }, 500);
+      
+      // Trigger slide in animation for new card
+      setCardAnimation('slide-in-right');
+      setTimeout(() => setCardAnimation(''), 300);
+    }, 300);
   };
 
 // Always use queueOrder if present, else fallback to availableCards
@@ -248,15 +256,28 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
         }]
       }));
     }
-    setIsFlipped(false);
-    setCurrentIndex(prev => (prev + 1) % availableCards.length);
+    
+    // Trigger slide animation for manual navigation
+    setCardAnimation('slide-out-left');
+    setTimeout(() => {
+      setIsFlipped(false);
+      setCurrentIndex(prev => (prev + 1) % availableCards.length);
+      setCardAnimation('slide-in-right');
+      setTimeout(() => setCardAnimation(''), 300);
+    }, 300);
   };
   
   const prevCard = () => {
-    setIsFlipped(false);
-    setCurrentIndex(prev => 
-      prev === 0 ? availableCards.length - 1 : prev - 1
-    );
+    // Trigger slide animation for previous navigation (reverse direction)
+    setCardAnimation('slide-out-right');
+    setTimeout(() => {
+      setIsFlipped(false);
+      setCurrentIndex(prev => 
+        prev === 0 ? availableCards.length - 1 : prev - 1
+      );
+      setCardAnimation('slide-in-left');
+      setTimeout(() => setCardAnimation(''), 300);
+    }, 300);
   };
   
   // Load images for all cards once when the component mounts or availableCards changes significantly
@@ -434,7 +455,7 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
             return (
               <div 
                 ref={cardContainerRef}
-                className="flashcard-container" 
+                className={`flashcard-container ${cardAnimation}`}
               >
                 <div 
                   className={`flashcard ${isFlipped ? 'flipped' : ''}`}
@@ -456,28 +477,37 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                           const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
                           
                           return (
-                            <>
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              height: '100%',
+                              padding: '20px',
+                              textAlign: 'center'
+                            }}>
                               <div style={{ 
-                                fontSize: '18px', 
-                                lineHeight: '1.6', 
-                                marginBottom: '20px',
-                                textAlign: 'center',
-                                padding: '0 10px'
+                                fontSize: '22px', 
+                                lineHeight: '1.4', 
+                                marginBottom: '30px',
+                                fontWeight: '500',
+                                color: '#fff',
+                                maxWidth: '90%'
                               }}>
                                 {clozeSentence}
                               </div>
                               {nativeTranslation && (
                                 <div style={{ 
-                                  fontSize: '16px', 
+                                  fontSize: '18px', 
                                   fontStyle: 'italic',
-                                  color: '#bbb',
-                                  textAlign: 'center',
-                                  padding: '0 10px'
+                                  color: '#a0a0a0',
+                                  lineHeight: '1.3',
+                                  maxWidth: '85%'
                                 }}>
                                   {nativeTranslation}
                                 </div>
                               )}
-                            </>
+                            </div>
                           );
                         })()
                       ) : (
@@ -495,7 +525,6 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                   </div>
                   <div className="flashcard-back">
                     <div className="flashcard-content">
-                      <div style={{fontWeight:'bold', fontSize:'22px', color:'#e3e36b', marginBottom:8}}>Interval: {interval}</div>
                       
                       {/* Display the full sentence with highlighted word */}
                       <div className="flashcard-generated-examples">
