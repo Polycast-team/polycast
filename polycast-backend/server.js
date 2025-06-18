@@ -204,7 +204,7 @@ wss.on('connection', (ws, req) => {
     }, 60000); // 60 seconds timeout
     
     // 1. Parse target languages
-    let targetLangsArray = ['Spanish']; // Default
+    let targetLangsArray = []; // No default language
     try {
         if (query && query.targetLangs) {
             // Split comma-separated string, decode, trim, filter empty
@@ -214,13 +214,12 @@ wss.on('connection', (ws, req) => {
                 .filter(lang => lang.length > 0);
             
             if (targetLangsArray.length === 0) {
-                targetLangsArray = ['Spanish']; // Fallback if parsing results in empty array
-                console.log(`Client connected. Invalid targetLangs in URL, defaulting to ${targetLangsArray[0]}`);
+                console.log(`Client connected. Invalid targetLangs in URL, no languages set`);
             } else {
                  console.log(`Client connected. Target languages from URL: ${targetLangsArray.join(', ')}`);
             }
         } else {
-            console.log(`Client connected. No targetLangs in URL, defaulting to ${targetLangsArray[0]}`);
+            console.log(`Client connected. No targetLangs in URL, no languages set`);
         }
     } catch (e) {
         console.error('Error parsing connection URL for target languages:', e);
@@ -341,7 +340,7 @@ wss.on('connection', (ws, req) => {
                     if (isTextMode) {
                         const translateThis = data.text;
                         const sourceLang = data.lang;
-                        const targetLangs = clientTargetLanguages.get(ws) || ['Spanish'];
+                        const targetLangs = clientTargetLanguages.get(ws) || [];
                         // Always include English as a possible translation target
                         const allLangs = Array.from(new Set(['English', ...targetLangs]));
                         
@@ -419,19 +418,9 @@ wss.on('connection', (ws, req) => {
                 const transcription = await transcribeAudio(message, 'audio.webm');
                 if (transcription && ws.readyState === ws.OPEN) {
                     // Translate to all target languages (batch)
-                    let targetLangs = clientTargetLanguages.get(ws) || ['Spanish'];
+                    let targetLangs = clientTargetLanguages.get(ws) || [];
                     
-                    // Check if this is a host with students in the room - ensure Spanish is included for students
-                    if (isRoomHost) {
-                        const room = activeRooms.get(clientRoom.roomCode);
-                        if (room && room.students && room.students.length > 0) {
-                            // Only add Spanish if it's not already in the target languages
-                            if (!targetLangs.includes('Spanish')) {
-                                targetLangs = [...targetLangs, 'Spanish'];
-                                console.log(`[Polycast] Added Spanish translation for students in room ${clientRoom.roomCode}`);
-                            }
-                        }
-                    }
+                    // Host shares their selected languages with students in the room
                     
                     console.log(`[Polycast] Calling Gemini for batch translation: '${transcription}' -> ${targetLangs.join(', ')}`);
                     const translations = await llmService.translateTextBatch(transcription, targetLangs);
@@ -465,24 +454,13 @@ wss.on('connection', (ws, req) => {
                                 if (student.readyState === WebSocket.OPEN) {
                                     student.send(JSON.stringify(recognizedResponse));
                                     
-                                    // Send Spanish translation to students, regardless of what other languages are available
-                                    if (translations['Spanish']) {
+                                    // Send all translations to students (same as host)
+                                    for (const lang of targetLangs) {
                                         student.send(JSON.stringify({ 
                                             type: 'translation', 
-                                            lang: 'Spanish', 
-                                            data: translations['Spanish'] 
+                                            lang, 
+                                            data: translations[lang] 
                                         }));
-                                    } else {
-                                        // Fallback: send the first available translation if Spanish isn't available
-                                        const availableLangs = Object.keys(translations);
-                                        if (availableLangs.length > 0) {
-                                            const firstLang = availableLangs[0];
-                                            student.send(JSON.stringify({ 
-                                                type: 'translation', 
-                                                lang: 'Spanish', // Still label it as Spanish for the student UI
-                                                data: translations[firstLang] 
-                                            }));
-                                        }
                                     }
                                 }
                             });
@@ -520,7 +498,7 @@ wss.on('connection', (ws, req) => {
                     if (isTextMode) {
                         const translateThis = data.text;
                         const sourceLang = data.lang;
-                        const targetLangs = clientTargetLanguages.get(ws) || ['Spanish'];
+                        const targetLangs = clientTargetLanguages.get(ws) || [];
                         // Always include English as a possible translation target
                         const allLangs = Array.from(new Set(['English', ...targetLangs]));
                         // Use textModeLLM for text mode, llmService for audio mode
@@ -744,20 +722,7 @@ The word "${word}" appears in this context: "${context}"
 
 Your task is to:
 1. Identify the SINGLE best definition that applies to how this word is used in this specific context
-2. Determine the correct definition number from the following standard dictionary entries:
-
-For "charge" word:
-1: to make a rush at or sudden attack upon (verb)
-2: blame for, make a claim of wrongdoing against (verb)
-3: demand payment (verb)
-4: the quantity of unbalanced electricity in a body (noun)
-7: make an accusatory claim (verb)
-8: fill or load to capacity (verb)
-11: request for payment of a debt (noun)
-12: pay with a credit card (verb)
-24: energize a battery by passing a current through it (verb)
-
-For other words, use other standard definition numbers that apply.
+2. Provide a definition number that represents this specific meaning (you can use any appropriate number)
 
 Output ONLY a JSON object with these fields:
 {
@@ -765,7 +730,7 @@ Output ONLY a JSON object with these fields:
   "partOfSpeech": "The part of speech of the word in this context (noun, verb, adjective, etc.)",
   "definition": "A clear and concise definition appropriate for how the word is used in this context only",
   "example": "A simple example sentence showing a similar usage to the context",
-  "definitionNumber": The number from the standard dictionary that best matches this usage (e.g., 1, 3, 11, 24, etc.)
+  "definitionNumber": A number representing this specific meaning (e.g., 1, 2, 3, etc.)
 }
 
 Do NOT provide multiple definitions or explanations outside the JSON.`;
@@ -1714,9 +1679,9 @@ async function generateTextWithGemini(prompt, temperature = 0.7) {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(config.googleApiKey);
         
-        // Configure the model - using latest Gemini 2.5 Flash-Lite
+        // Configure the model - using stable Gemini 2.5 Flash
         const model = genAI.getGenerativeModel({ 
-            model: "models/gemini-2.5-flash-lite-preview-06-17",
+            model: "gemini-2.5-flash",
             systemInstruction: "You're helping language learners understand words in context."
         });
         
