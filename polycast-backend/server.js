@@ -1654,6 +1654,77 @@ Only return the JSON object, nothing else.`;
 
 // Disambiguation endpoint removed - flashcards now use popup definition directly
 
+// New endpoint for generating example sentences in the background
+app.post('/api/dictionary/generate-examples', async (req, res) => {
+    try {
+        const { word, definition, prompt } = req.body;
+        
+        // Validate input parameters
+        if (!word || typeof word !== 'string') {
+            return res.status(400).json({ 
+                error: 'Missing or invalid word parameter',
+                status: 'error'
+            });
+        }
+        
+        if (!definition || typeof definition !== 'string') {
+            return res.status(400).json({ 
+                error: 'Missing or invalid definition parameter',
+                status: 'error'
+            });
+        }
+        
+        if (!prompt || typeof prompt !== 'string') {
+            return res.status(400).json({ 
+                error: 'Missing or invalid prompt parameter',
+                status: 'error'
+            });
+        }
+        
+        console.log(`[EXAMPLE GENERATION] Generating examples for word: ${word}`);
+        console.log(`[EXAMPLE GENERATION] Definition: ${definition.substring(0, 50)}...`);
+        
+        // Call Gemini API to generate example sentences
+        let response;
+        try {
+            response = await generateTextWithGemini(prompt, 0.7);
+            
+            // Validate the response
+            if (!response || response.trim() === '') {
+                throw new Error('Empty response from Gemini API');
+            }
+            
+            console.log(`[EXAMPLE GENERATION] Generated examples: ${response.substring(0, 100)}...`);
+            console.log(`[EXAMPLE GENERATION] Response type: ${typeof response}, length: ${response.length}`);
+        } catch (geminiError) {
+            console.error(`[EXAMPLE GENERATION] Gemini API error for word '${word}':`, geminiError);
+            
+            return res.status(502).json({
+                error: `Gemini API error: ${geminiError.message}`,
+                status: 'error',
+                message: 'There was an issue generating examples. Please try again later.',
+                word: word
+            });
+        }
+        
+        // Ensure response is a string and clean it up
+        const cleanedResponse = String(response).trim();
+        
+        // Return the raw response as plain text (as requested - no JSON parsing needed)
+        console.log(`[EXAMPLE GENERATION] Sending raw text response:`, cleanedResponse.substring(0, 200) + '...');
+        res.setHeader('Content-Type', 'text/plain');
+        return res.send(cleanedResponse);
+        
+    } catch (error) {
+        console.error(`[EXAMPLE GENERATION] Error:`, error);
+        return res.status(500).json({ 
+            error: `Server error: ${error.message}`,
+            status: 'error',
+            word: req.body?.word || 'unknown'
+        });
+    }
+});
+
 // Helper functions removed - no longer needed since disambiguation endpoint was removed
 
 /**

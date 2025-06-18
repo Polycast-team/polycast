@@ -897,8 +897,8 @@ Example format: Sentence one//Sentence two//Sentence three//Sentence four//Sente
           });
 
           if (response.ok) {
-            const responseData = await response.json();
-            const exampleSentences = responseData.examples || responseData.response || '';
+            // Get the raw text response (no JSON parsing needed)
+            const exampleSentences = await response.text();
             
             console.log(`[BACKGROUND GEMINI] Generated examples for "${word}":`, exampleSentences);
             
