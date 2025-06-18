@@ -375,16 +375,10 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
   // Function for students to generate their own translations
   const generateStudentTranslation = async (englishText, targetLanguage) => {
     try {
-      const response = await fetch('https://polycast-server.onrender.com/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: englishText,
-          targetLanguage: targetLanguage
-        })
-      });
+      // Use the correct GET endpoint: /api/translate/:language/:text
+      const encodedText = encodeURIComponent(englishText);
+      const encodedLanguage = encodeURIComponent(targetLanguage);
+      const response = await fetch(`https://polycast-server.onrender.com/api/translate/${encodedLanguage}/${encodedText}`);
       
       if (response.ok) {
         const translationData = await response.json();
