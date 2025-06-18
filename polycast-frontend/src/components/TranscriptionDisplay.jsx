@@ -871,6 +871,9 @@ const TranscriptionDisplay = ({
         try {
           console.log(`[BACKGROUND GEMINI] Generating example sentences for "${word}"`);
           
+          // Get the native language (first selected language)
+          const nativeLanguage = targetLanguages[0] || 'Spanish';
+          
           // Create the prompt for example sentences with translations
           const examplePrompt = `You are helping a language learner practice using a word in different contexts.
 
@@ -881,12 +884,12 @@ Generate 5 different example sentences where "${word}" is used in this specific 
 
 IMPORTANT: Surround the target word "${word}" with ~ characters in each sentence (like ~${word}~).
 
-For each sentence, provide both the English version and the Spanish translation.
+For each sentence, provide both the English version and the ${nativeLanguage} translation.
 
-Format each pair as: English sentence with ~word~//Spanish translation
+Format each pair as: English sentence with ~word~//${nativeLanguage} translation
 
 Separate each sentence pair with "//" so the full format is:
-English1 with ~word~//Spanish1//English2 with ~word~//Spanish2//English3 with ~word~//Spanish3//English4 with ~word~//Spanish4//English5 with ~word~//Spanish5
+English1 with ~word~//${nativeLanguage}1//English2 with ~word~//${nativeLanguage}2//English3 with ~word~//${nativeLanguage}3//English4 with ~word~//${nativeLanguage}4//English5 with ~word~//${nativeLanguage}5
 
 Provide only the sentences without any explanations or numbering.`;
 

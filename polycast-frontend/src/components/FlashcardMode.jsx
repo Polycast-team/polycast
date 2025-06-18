@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import './FlashcardMode.css';
 
-const FlashcardMode = ({ selectedWords, wordDefinitions, englishSegments }) => {
+const FlashcardMode = ({ selectedWords, wordDefinitions, englishSegments, targetLanguages }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 // Track intervals for each card by senseId
 const [cardIntervals, setCardIntervals] = useState({});
@@ -444,13 +444,13 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                     <div className="flashcard-content">
                       {currentCardData.exampleSentencesGenerated ? (
                         (() => {
-                          // Parse the sentences and translations (English1//Spanish1//English2//Spanish2//etc)
+                          // Parse the sentences and translations (English1//NativeLanguage1//English2//NativeLanguage2//etc)
                           const parts = currentCardData.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
                           
                           // Calculate which sentence to show based on interval (looping after 5)
-                          const sentenceIndex = ((interval - 1) % 5) * 2; // *2 because each sentence has English + Spanish
+                          const sentenceIndex = ((interval - 1) % 5) * 2; // *2 because each sentence has English + native language
                           const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                          const spanishTranslation = parts[sentenceIndex + 1] || parts[1] || '';
+                          const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
                           
                           // Create cloze version by replacing ~word~ with _____
                           const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
@@ -466,7 +466,7 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                               }}>
                                 {clozeSentence}
                               </div>
-                              {spanishTranslation && (
+                              {nativeTranslation && (
                                 <div style={{ 
                                   fontSize: '16px', 
                                   fontStyle: 'italic',
@@ -474,7 +474,7 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                                   textAlign: 'center',
                                   padding: '0 10px'
                                 }}>
-                                  {spanishTranslation}
+                                  {nativeTranslation}
                                 </div>
                               )}
                             </>
@@ -501,11 +501,11 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                       <div className="flashcard-generated-examples">
                         {currentCardData.exampleSentencesGenerated ? (
                           (() => {
-                            // Parse the sentences and translations (English1//Spanish1//English2//Spanish2//etc)
+                            // Parse the sentences and translations (English1//NativeLanguage1//English2//NativeLanguage2//etc)
                             const parts = currentCardData.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
                             
                             // Calculate which sentence to show based on interval (looping after 5)
-                            const sentenceIndex = ((interval - 1) % 5) * 2; // *2 because each sentence has English + Spanish
+                            const sentenceIndex = ((interval - 1) % 5) * 2; // *2 because each sentence has English + native language
                             const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
                             
                             // Create highlighted version by replacing ~word~ with bold yellow word
@@ -609,7 +609,8 @@ function formatShortDate(dateStr) {
 FlashcardMode.propTypes = {
   selectedWords: PropTypes.arrayOf(PropTypes.string).isRequired,
   wordDefinitions: PropTypes.object.isRequired,
-  englishSegments: PropTypes.arrayOf(PropTypes.object)
+  englishSegments: PropTypes.arrayOf(PropTypes.object),
+  targetLanguages: PropTypes.arrayOf(PropTypes.string)
 };
 
 export default FlashcardMode;

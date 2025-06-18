@@ -790,6 +790,7 @@ function App({ targetLanguages, onReset, roomSetup }) {
             selectedWords={selectedWords}
             wordDefinitions={wordDefinitions}
             englishSegments={englishSegments}
+            targetLanguages={effectiveLanguages}
           />
         ) : (
           <TranscriptionDisplay 
