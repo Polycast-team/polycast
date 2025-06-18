@@ -3,11 +3,26 @@ import PropTypes from 'prop-types';
 
 function VideoMode() {
   const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const [hasPermission, setHasPermission] = useState(null);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const initializingRef = useRef(false);
 
   const requestCameraAccess = async () => {
+    // Prevent multiple simultaneous requests
+    if (initializingRef.current) {
+      console.log('VideoMode: Camera access already in progress, skipping...');
+      return;
+    }
+
+    // If we already have a working stream, don't request again
+    if (streamRef.current && hasPermission === true) {
+      console.log('VideoMode: Camera already active, skipping request...');
+      return;
+    }
+
+    initializingRef.current = true;
     console.log(`VideoMode: Attempting camera access (attempt ${retryCount + 1})`);
     setHasPermission(null);
     setError(null);
@@ -38,6 +53,9 @@ function VideoMode() {
       
       console.log('VideoMode: Camera access granted, setting up video stream');
       
+      // Store the stream in ref for persistence
+      streamRef.current = stream;
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setHasPermission(true);
@@ -61,10 +79,23 @@ function VideoMode() {
       } else {
         setError(`Camera error: ${err.message || 'Unknown error'}`);
       }
+    } finally {
+      initializingRef.current = false;
     }
   };
 
   useEffect(() => {
+    console.log('VideoMode: Component mounted, checking for existing stream...');
+    
+    // If we already have a stream, just set it up
+    if (streamRef.current && videoRef.current) {
+      console.log('VideoMode: Reusing existing stream');
+      videoRef.current.srcObject = streamRef.current;
+      setHasPermission(true);
+      setError(null);
+      return;
+    }
+
     // Add a small delay to ensure component is mounted
     const timer = setTimeout(() => {
       requestCameraAccess();
@@ -73,10 +104,18 @@ function VideoMode() {
     // Cleanup function
     return () => {
       clearTimeout(timer);
-      // Stop any existing video stream
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject;
-        stream.getTracks().forEach(track => track.stop());
+      // Note: We don't stop the stream here to allow it to persist across re-mounts
+      // The stream will be stopped when the component is actually destroyed
+    };
+  }, []);
+
+  // Separate cleanup effect that only runs on actual unmount
+  useEffect(() => {
+    return () => {
+      console.log('VideoMode: Component unmounting, stopping stream...');
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
     };
   }, []);
