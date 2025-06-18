@@ -188,15 +188,28 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
   const getWordFrequency = (word) => {
     const entries = groupedEntries[word] || [];
     const firstEntry = entries[0] || {};
-    const frequency = firstEntry?.disambiguatedDefinition?.wordFrequency || null;
     
-    if (!frequency) {
-      // Generate a consistent frequency rating if none available
-      const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      return (sum % 5) + 1;
+    // Check for new frequencyRating field (1-10 scale) from Gemini
+    const frequencyRating = firstEntry?.frequencyRating;
+    if (frequencyRating) {
+      // Convert 1-10 scale to 1-5 scale for display
+      // 10,9 → 5 dots, 8,7 → 4 dots, 6,5 → 3 dots, 4,3 → 2 dots, 2,1 → 1 dot
+      if (frequencyRating >= 9) return 5;
+      if (frequencyRating >= 7) return 4;
+      if (frequencyRating >= 5) return 3;
+      if (frequencyRating >= 3) return 2;
+      return 1;
     }
     
-    return parseInt(frequency, 10);
+    // Fallback to old logic if no frequencyRating available
+    const frequency = firstEntry?.disambiguatedDefinition?.wordFrequency || null;
+    if (frequency) {
+      return parseInt(frequency, 10);
+    }
+    
+    // Final fallback: generate a consistent frequency rating
+    const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return (sum % 5) + 1;
   };
   
   // Filter words based on search term and frequency filter

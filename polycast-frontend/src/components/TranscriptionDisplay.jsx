@@ -875,15 +875,18 @@ const TranscriptionDisplay = ({
           const nativeLanguage = targetLanguages[0] || 'Spanish';
           
           // Create the prompt for example sentences with translations
-          const examplePrompt = `Generate 5 example sentences using "${word}" in context of: ${definition}
+          const examplePrompt = `Generate a frequency rating (1-10) and 5 example sentences using "${word}" in context of: ${definition}
+
+Rate how common "${word}" is in modern spoken English:
+1-2 = extremely rare, 3-4 = uncommon, 5-6 = moderate, 7-8 = common, 9-10 = ubiquitous
+Use realistic distribution: most words are 1-3, very few are 9-10.
 
 Surround "${word}" with ~ characters in each sentence.
 Provide English sentence followed by ${nativeLanguage} translation.
-Separate with // in this exact format:
 
-English1 with ~${word}~//${nativeLanguage}1//English2 with ~${word}~//${nativeLanguage}2//English3 with ~${word}~//${nativeLanguage}3//English4 with ~${word}~//${nativeLanguage}4//English5 with ~${word}~//${nativeLanguage}5
+Format: frequency//English1 with ~${word}~//${nativeLanguage}1//English2 with ~${word}~//${nativeLanguage}2//English3 with ~${word}~//${nativeLanguage}3//English4 with ~${word}~//${nativeLanguage}4//English5 with ~${word}~//${nativeLanguage}5
 
-Start your response immediately with the first sentence. No explanations, confirmations, or introductory text.`;
+Start your response immediately with the frequency number. No explanations.`;
 
           // Make the API call to generate example sentences
           const response = await fetch('https://polycast-server.onrender.com/api/dictionary/generate-examples', {
@@ -902,21 +905,36 @@ Start your response immediately with the first sentence. No explanations, confir
             // Get the raw text response (no JSON parsing needed)
             let exampleSentences = await response.text();
             
-            // Clean up any preamble text from Gemini
-            // Look for the first occurrence of a sentence with ~ characters
-            const firstTildeMatch = exampleSentences.match(/[^.!?]*~[^~]+~[^\/]*\/\/[^\/]*\/\//);
-            if (firstTildeMatch) {
-              const startIndex = exampleSentences.indexOf(firstTildeMatch[0]);
-              if (startIndex > 0) {
-                exampleSentences = exampleSentences.substring(startIndex);
-                console.log(`[BACKGROUND GEMINI] Cleaned preamble, now starts with: ${exampleSentences.substring(0, 50)}...`);
+            // Parse frequency rating from the front of the response
+            let frequencyRating = 3; // Default fallback
+            
+            // Clean up any preamble text and extract frequency
+            // Look for pattern: number//sentence with ~word~
+            const frequencyMatch = exampleSentences.match(/^.*?(\d+)\/\/.*?~[^~]+~/);
+            if (frequencyMatch) {
+              frequencyRating = parseInt(frequencyMatch[1]) || 3;
+              // Remove everything before the frequency number
+              const frequencyIndex = exampleSentences.indexOf(frequencyMatch[1] + '//');
+              if (frequencyIndex >= 0) {
+                exampleSentences = exampleSentences.substring(frequencyIndex + (frequencyMatch[1] + '//').length);
+                console.log(`[BACKGROUND GEMINI] Extracted frequency: ${frequencyRating}, cleaned response starts with: ${exampleSentences.substring(0, 50)}...`);
+              }
+            } else {
+              // Fallback: look for the first occurrence of a sentence with ~ characters (old behavior)
+              const firstTildeMatch = exampleSentences.match(/[^.!?]*~[^~]+~[^\/]*\/\/[^\/]*\/\//);
+              if (firstTildeMatch) {
+                const startIndex = exampleSentences.indexOf(firstTildeMatch[0]);
+                if (startIndex > 0) {
+                  exampleSentences = exampleSentences.substring(startIndex);
+                  console.log(`[BACKGROUND GEMINI] No frequency found, cleaned preamble, now starts with: ${exampleSentences.substring(0, 50)}...`);
+                }
               }
             }
             
             console.log(`[BACKGROUND GEMINI] Generated examples for "${word}":`, exampleSentences);
             console.log(`[BACKGROUND GEMINI] Response length: ${exampleSentences.length}, type: ${typeof exampleSentences}`);
             
-            // Update the flashcard with the generated examples
+            // Update the flashcard with the generated examples and frequency
             setWordDefinitions(prev => {
               if (prev[safeWordSenseId]) {
                 return {
@@ -924,6 +942,7 @@ Start your response immediately with the first sentence. No explanations, confir
                   [safeWordSenseId]: {
                     ...prev[safeWordSenseId],
                     exampleSentencesGenerated: exampleSentences,
+                    frequencyRating: frequencyRating,
                     generatedAt: new Date().toISOString()
                   }
                 };
