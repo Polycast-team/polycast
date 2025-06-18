@@ -651,11 +651,14 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        margin: '24px 0 12px 0',
-        width: '100%'
+        justifyContent: 'space-between',
+        margin: '24px 24px 12px 24px',
+        width: 'calc(100% - 48px)'
       }}>
+        {/* Left spacer for balance */}
+        <div style={{ width: '200px' }}></div>
+        
+        {/* Centered logo */}
         <h1
           className="polycast-title"
           style={{
@@ -667,6 +670,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             cursor: 'pointer',
             transition: 'opacity 0.2s',
             margin: 0,
+            flex: '0 0 auto',
           }}
           onClick={() => typeof onReset === 'function' && onReset()}
           onMouseOver={e => (e.currentTarget.style.opacity = 0.85)}
@@ -674,25 +678,25 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
         >
           Polycast
         </h1>
-        {roomSetup && (
-          <div 
-            className="room-info-display" 
-            style={{
-              color: '#fff',
-              fontSize: '1rem',
-              fontWeight: 600,
-              padding: '8px 16px',
-              borderRadius: '8px',
-              background: roomSetup.isHost ? 'rgba(59, 130, 246, 0.6)' : 'rgba(16, 185, 129, 0.6)',
-              position: 'absolute',
-              right: '24px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-            }}
-          >
-            {roomSetup?.isHost ? `Room: ${roomSetup?.roomCode || 'Not Connected'}` : `Student • Room: ${roomSetup?.roomCode || 'Not Connected'}`}
-          </div>
-        )}
+        
+        {/* Right side - room code or spacer */}
+        <div style={{ width: '200px', display: 'flex', justifyContent: 'flex-end' }}>
+          {roomSetup && (
+            <div 
+              className="room-info-display" 
+              style={{
+                color: '#fff',
+                fontSize: '1rem',
+                fontWeight: 600,
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: roomSetup.isHost ? 'rgba(59, 130, 246, 0.6)' : 'rgba(16, 185, 129, 0.6)',
+              }}
+            >
+              {roomSetup?.isHost ? `Room: ${roomSetup?.roomCode || 'Not Connected'}` : `Student • Room: ${roomSetup?.roomCode || 'Not Connected'}`}
+            </div>
+          )}
+        </div>
       </div>
       <div className="controls-container" style={{ marginBottom: 4 }}>
         {/* Main Toolbar */}
