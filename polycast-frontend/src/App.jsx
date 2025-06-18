@@ -720,6 +720,8 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
                   <span className="room-code">Room: {roomSetup?.roomCode || 'Not Connected'}</span>
                 </div>
               )}
+              {/* Debug info - remove later */}
+              {console.log('Debug - userRole:', userRole, 'roomSetup:', roomSetup)}
               {userRole === 'student' && !roomSetup && (
                 <button 
                   onClick={() => setShowJoinRoomModal(true)}
@@ -735,6 +737,24 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
                   }}
                 >
                   Join Room
+                </button>
+              )}
+              {/* Temporary always-show button for debugging */}
+              {userRole === 'student' && (
+                <button 
+                  onClick={() => setShowJoinRoomModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: 14,
+                    borderRadius: 4,
+                    background: '#ff6b6b',
+                    color: '#fff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    marginLeft: 16
+                  }}
+                >
+                  DEBUG Join Room
                 </button>
               )}
             </div>
