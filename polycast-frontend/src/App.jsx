@@ -311,8 +311,8 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
           setAppMode('audio');
         }
       } else {
-        // Student not in a room → switch to flashcard mode
-        if (appMode === 'audio' || appMode === 'text' || appMode === 'video') {
+        // Student not in a room → switch to flashcard mode (but allow video mode)
+        if (appMode === 'audio' || appMode === 'text') {
           setAppMode('flashcard');
         }
       }
