@@ -442,30 +442,78 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                 >
                   <div className="flashcard-front">
                     <div className="flashcard-content">
-                      <div className="flashcard-word-container">
-                        <div className="flashcard-word">
-                          {baseWord}
-                          {defNumber && <span className="definition-number">({defNumber})</span>}
-                        </div>
-                      </div>
-                      <div className="flashcard-pos">{currentCardData.partOfSpeech || 'verb'}</div>
-                      {/* Image display removed as requested */}
+                      {currentCardData.exampleSentencesGenerated ? (
+                        (() => {
+                          // Parse the sentences and translations (English1//Spanish1//English2//Spanish2//etc)
+                          const parts = currentCardData.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+                          
+                          // Calculate which sentence to show based on interval (looping after 5)
+                          const sentenceIndex = ((interval - 1) % 5) * 2; // *2 because each sentence has English + Spanish
+                          const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+                          const spanishTranslation = parts[sentenceIndex + 1] || parts[1] || '';
+                          
+                          // Create cloze version by replacing ~word~ with _____
+                          const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
+                          
+                          return (
+                            <>
+                              <div style={{ 
+                                fontSize: '18px', 
+                                lineHeight: '1.6', 
+                                marginBottom: '20px',
+                                textAlign: 'center',
+                                padding: '0 10px'
+                              }}>
+                                {clozeSentence}
+                              </div>
+                              {spanishTranslation && (
+                                <div style={{ 
+                                  fontSize: '16px', 
+                                  fontStyle: 'italic',
+                                  color: '#bbb',
+                                  textAlign: 'center',
+                                  padding: '0 10px'
+                                }}>
+                                  {spanishTranslation}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()
+                      ) : (
+                        <>
+                          <div className="flashcard-word-container">
+                            <div className="flashcard-word">
+                              {baseWord}
+                              {defNumber && <span className="definition-number">({defNumber})</span>}
+                            </div>
+                          </div>
+                          <div className="flashcard-pos">{currentCardData.partOfSpeech || 'verb'}</div>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flashcard-back">
                     <div className="flashcard-content">
                       <div style={{fontWeight:'bold', fontSize:'22px', color:'#e3e36b', marginBottom:8}}>Interval: {interval}</div>
                       
-                      {/* Display the sentence corresponding to current interval */}
+                      {/* Display the full sentence with highlighted word */}
                       <div className="flashcard-generated-examples">
                         {currentCardData.exampleSentencesGenerated ? (
                           (() => {
-                            // Parse the sentences separated by "//"
-                            const sentences = currentCardData.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+                            // Parse the sentences and translations (English1//Spanish1//English2//Spanish2//etc)
+                            const parts = currentCardData.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
                             
-                            // Get the sentence for the current interval (1-based, so interval 1 = sentence 0)
-                            const sentenceIndex = Math.max(0, Math.min(interval - 1, sentences.length - 1));
-                            const currentSentence = sentences[sentenceIndex] || sentences[0] || 'No example available';
+                            // Calculate which sentence to show based on interval (looping after 5)
+                            const sentenceIndex = ((interval - 1) % 5) * 2; // *2 because each sentence has English + Spanish
+                            const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+                            
+                            // Create highlighted version by replacing ~word~ with bold yellow word
+                            const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
+                              return `<span style="font-weight: bold; color: #e3e36b;">${word}</span>`;
+                            });
+                            
+                            const exampleNumber = ((interval - 1) % 5) + 1;
                             
                             return (
                               <div style={{ 
@@ -482,11 +530,15 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                                   marginBottom: '8px',
                                   fontWeight: 'bold'
                                 }}>
-                                  Example {Math.min(interval, sentences.length)}:
+                                  Example {exampleNumber}:
                                 </div>
-                                <div>
-                                  {currentSentence}
-                                </div>
+                                <div 
+                                  dangerouslySetInnerHTML={{ __html: highlightedSentence }}
+                                  style={{
+                                    fontSize: '18px',
+                                    lineHeight: '1.6'
+                                  }}
+                                />
                               </div>
                             );
                           })()
