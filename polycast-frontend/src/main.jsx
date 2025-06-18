@@ -64,17 +64,21 @@ function Main() {
   }
 
   // Step 3: Main app
+  const propsToPass = {
+    targetLanguages: selectedLanguages || ['English'], // Default fallback
+    onReset: () => {
+      setRoomSetup(null);
+      setSelectedLanguages(null);
+    },
+    roomSetup: roomSetup?.isHost ? roomSetup : null, // Only pass room setup for hosts
+    userRole: roomSetup?.isHost ? 'host' : 'student',
+    studentHomeLanguage: roomSetup?.isHost ? null : selectedLanguages?.[0]
+  };
+  
+  console.log('Props being passed to AppRouter:', propsToPass);
+  
   return (
-    <AppRouter
-      targetLanguages={selectedLanguages || ['English']} // Default fallback
-      onReset={() => {
-        setRoomSetup(null);
-        setSelectedLanguages(null);
-      }}
-      roomSetup={roomSetup?.isHost ? roomSetup : null} // Only pass room setup for hosts
-      userRole={roomSetup?.isHost ? 'host' : 'student'}
-      studentHomeLanguage={roomSetup?.isHost ? null : selectedLanguages?.[0]}
-    />
+    <AppRouter {...propsToPass} />
   );
 }
 
