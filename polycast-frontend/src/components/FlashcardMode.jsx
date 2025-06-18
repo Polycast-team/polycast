@@ -455,38 +455,31 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                   <div className="flashcard-back">
                     <div className="flashcard-content">
                       <div style={{fontWeight:'bold', fontSize:'22px', color:'#e3e36b', marginBottom:8}}>Interval: {interval}</div>
-                      <div className="flashcard-pos">
-                        {currentCardData.partOfSpeech || 
-                         currentCardData.disambiguatedDefinition?.partOfSpeech || 
-                         'verb'}
-                      </div>
-                      <div className="flashcard-translation">
-                        {currentCardData.translation || currentCardData.disambiguatedDefinition?.translation || ''}
-                      </div>
-                      <div className="flashcard-example">
-                        {/* Display the example sentences from the API */}
-                        {currentCardData.exampleSentencesRaw && currentCardData.exampleSentencesRaw.includes('//') ? (
-                          <ul style={{ margin: 0, paddingLeft: 18 }}>
-                            {currentCardData.exampleSentencesRaw.split('//').map((sentence, idx) => (
-                              <li key={idx}>{sentence.trim()}</li>
-                            ))}
-                          </ul>
+                      
+                      {/* Display the generated examples in their entirety */}
+                      <div className="flashcard-generated-examples">
+                        {currentCardData.exampleSentencesGenerated ? (
+                          <div style={{ 
+                            backgroundColor: '#2a2a3e', 
+                            padding: '15px', 
+                            borderRadius: '8px', 
+                            marginBottom: '15px',
+                            fontSize: '16px',
+                            lineHeight: '1.6',
+                            whiteSpace: 'pre-wrap'
+                          }}>
+                            {currentCardData.exampleSentencesGenerated}
+                          </div>
                         ) : (
-                          <span>
-                            {currentCardData.contextSentence || 'No example available'}
-                          </span>
+                          <div style={{ 
+                            color: '#888', 
+                            fontStyle: 'italic',
+                            textAlign: 'center',
+                            marginBottom: '15px'
+                          }}>
+                            Generating examples...
+                          </div>
                         )}
-                      </div>
-                      {/* Display frequency ratings if available */}
-                      <div className="flashcard-frequency">
-                        <div className="frequency-item">
-                          <span className="frequency-label">Word Frequency:</span>
-                          <span className="frequency-value">{currentCardData.wordFrequency || 3}/5</span>
-                        </div>
-                        <div className="frequency-item">
-                          <span className="frequency-label">Usage Frequency:</span>
-                          <span className="frequency-value">{currentCardData.definitionFrequency || 3}/5</span>
-                        </div>
                       </div>
                       
                        {/* Correct/Incorrect buttons */}

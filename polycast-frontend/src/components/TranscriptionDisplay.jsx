@@ -866,6 +866,69 @@ const TranscriptionDisplay = ({
         };
       });
       
+      // Background Gemini call for example sentences (happens independently)
+      setTimeout(async () => {
+        try {
+          console.log(`[BACKGROUND GEMINI] Generating example sentences for "${word}"`);
+          
+          // Create the prompt for example sentences
+          const examplePrompt = `You are helping a language learner practice using a word in different contexts.
+
+Word: "${word}"
+Definition: "${definition}"
+
+Generate 5 different example sentences where "${word}" is used in this specific sense. Each sentence should demonstrate a different grammatical construction or context (e.g., past tense, question form, negative form, etc.) to give variety in usage.
+
+Separate each sentence with "//" and provide only the sentences without any explanations or numbering.
+
+Example format: Sentence one//Sentence two//Sentence three//Sentence four//Sentence five`;
+
+          // Make the API call to generate example sentences
+          const response = await fetch('/api/dictionary/generate-examples', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              word: wordLower,
+              definition: definition,
+              prompt: examplePrompt
+            })
+          });
+
+          if (response.ok) {
+            const responseData = await response.json();
+            const exampleSentences = responseData.examples || responseData.response || '';
+            
+            console.log(`[BACKGROUND GEMINI] Generated examples for "${word}":`, exampleSentences);
+            
+            // Update the flashcard with the generated examples
+            setWordDefinitions(prev => {
+              if (prev[safeWordSenseId]) {
+                return {
+                  ...prev,
+                  [safeWordSenseId]: {
+                    ...prev[safeWordSenseId],
+                    exampleSentencesGenerated: exampleSentences,
+                    generatedAt: new Date().toISOString()
+                  }
+                };
+              }
+              return prev;
+            });
+            
+            // Save updated data if needed
+            if (selectedProfile !== 'non-saving') {
+              setTimeout(() => saveProfileData(), 500);
+            }
+          } else {
+            console.error(`[BACKGROUND GEMINI] Failed to generate examples for "${word}":`, await response.text());
+          }
+        } catch (error) {
+          console.error(`[BACKGROUND GEMINI] Error generating examples for "${word}":`, error);
+        }
+      }, 200);
+      
       // Run cleanup to ensure no duplicates after the state update
       setTimeout(() => {
         console.log('Running duplicate cleanup after adding flashcard...');
