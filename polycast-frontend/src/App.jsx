@@ -10,6 +10,7 @@ import Controls from './components/Controls';
 import TranscriptionDisplay from './components/TranscriptionDisplay';
 import DictionaryTable from './components/DictionaryTable';
 import FlashcardMode from './components/FlashcardMode';
+import VideoMode from './components/VideoMode';
 
 // App now receives an array of target languages and room setup as props
 function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom }) {
@@ -311,7 +312,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
         }
       } else {
         // Student not in a room → switch to flashcard mode
-        if (appMode === 'audio' || appMode === 'text') {
+        if (appMode === 'audio' || appMode === 'text' || appMode === 'video') {
           setAppMode('flashcard');
         }
       }
@@ -702,7 +703,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
         {/* Main Toolbar */}
         <div className="main-toolbar" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch', marginBottom: 0 }}>
           {/* Absolutely positioned Recording indicator in circled space */}
-          {appMode !== 'text' && isRecording && (
+          {(appMode === 'audio' || appMode === 'video') && isRecording && (
             <div style={{
               position: 'absolute',
               top: 100,
@@ -722,7 +723,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
           )}
           <div style={{ display: 'flex', alignItems: 'center' }}>
             {/* Pass sendMessage down to components that need to send audio - only for hosts */}
-            {appMode === 'audio' && roomSetup && roomSetup.isHost && (
+            {(appMode === 'audio' || appMode === 'video') && roomSetup && roomSetup.isHost && (
               <AudioRecorder
                 sendMessage={sendMessage}
                 isRecording={isRecording}
@@ -973,6 +974,8 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             englishSegments={englishSegments}
             targetLanguages={effectiveLanguages}
           />
+        ) : appMode === 'video' ? (
+          <VideoMode />
         ) : (
           <TranscriptionDisplay 
             englishSegments={englishSegments} 
