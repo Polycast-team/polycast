@@ -54,7 +54,16 @@ function Controls({
                 <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Mode:</label>
                 <select 
                     value={appMode}
-                    onChange={e => setAppMode && setAppMode(e.target.value)}
+                    onChange={e => {
+                        console.log('Mode dropdown onChange fired:', e.target.value);
+                        console.log('setAppMode function exists:', !!setAppMode);
+                        console.log('Current appMode:', appMode);
+                        if (setAppMode) {
+                            setAppMode(e.target.value);
+                        } else {
+                            console.error('setAppMode is null or undefined!');
+                        }
+                    }}
                     style={{ minWidth: 90, fontSize: 15, padding: '2px 6px', borderRadius: 6 }}
                     disabled={isRecording} // Only disable while recording, allow students to change modes
                 >

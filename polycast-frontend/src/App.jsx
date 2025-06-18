@@ -304,21 +304,16 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
 
   // Auto-switch modes for students based on room status
   useEffect(() => {
-    console.log(`Auto-switch check: userRole=${userRole}, roomSetup=${!!roomSetup}, appMode=${appMode}`);
     if (userRole === 'student') {
       if (roomSetup) {
         // Student joined a room → switch to audio mode (transcript view)
         if (appMode === 'flashcard') {
-          console.log('Auto-switching student from flashcard to audio (joined room)');
           setAppMode('audio');
         }
       } else {
         // Student not in a room → switch to flashcard mode (but allow video mode)
         if (appMode === 'audio' || appMode === 'text') {
-          console.log(`Auto-switching student from ${appMode} to flashcard (not in room)`);
           setAppMode('flashcard');
-        } else {
-          console.log(`Not auto-switching from ${appMode} (video/flashcard/dictionary modes are allowed)`);
         }
       }
     }
@@ -605,7 +600,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
       console.log(`Setting mode to ${newMode} (with backend sync)`);
       updateMode(newMode);
     }
-  }, [updateMode]);
+  }, [updateMode, appMode]);
 
   // Get connection status string
   const connectionStatus = {
