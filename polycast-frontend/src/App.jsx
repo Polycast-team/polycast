@@ -102,7 +102,15 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
   const [showTranslation, setShowTranslation] = useState(true); 
-  const [appMode, setAppMode] = useState('audio'); // Options: 'audio', 'text', 'dictionary', 'flashcard'
+  // Students start in flashcard mode, hosts start in audio mode
+  const [appMode, setAppMode] = useState(() => {
+    // If student not in a room, start in flashcard mode
+    if (userRole === 'student' && !roomSetup) {
+      return 'flashcard';
+    }
+    // Otherwise start in audio mode (hosts or students in rooms)
+    return 'audio';
+  }); // Options: 'audio', 'text', 'dictionary', 'flashcard'
   const [selectedWords, setSelectedWords] = useState([]); // Selected words for dictionary
   const [wordDefinitions, setWordDefinitions] = useState({}); // Cache for word definitions
   const [modeError, setModeError] = useState(null);
@@ -292,6 +300,23 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     const interval = setInterval(fetchMode, 5000);
     return () => clearInterval(interval);
   }, [fetchMode]);
+
+  // Auto-switch modes for students based on room status
+  useEffect(() => {
+    if (userRole === 'student') {
+      if (roomSetup) {
+        // Student joined a room → switch to audio mode (transcript view)
+        if (appMode === 'flashcard') {
+          setAppMode('audio');
+        }
+      } else {
+        // Student not in a room → switch to flashcard mode
+        if (appMode === 'audio' || appMode === 'text') {
+          setAppMode('flashcard');
+        }
+      }
+    }
+  }, [roomSetup, userRole, appMode]);
 
   // --- FIX: Prevent text submission error in text mode ---
   // (No code needed here, but ensure isTextMode is derived from appMode === 'text')
