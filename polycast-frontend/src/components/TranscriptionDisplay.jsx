@@ -889,27 +889,21 @@ const TranscriptionDisplay = ({
       const wordLower = word.toLowerCase();
       console.log(`Removing word from dictionary: ${wordLower}`);
       
-      // Get the current popup info to get the context sentence and determine the wordSenseId
-      const contextSentence = popupInfo.contextSentence || '';
+      // Get the word data from the current state (same as creation logic)
+      const wordData = wordDefinitions[wordLower];
       
-      // Extract definition number if possible from what's shown in the popup
-      let definitionNumber = 1;
-      const contextLower = contextSentence ? contextSentence.toLowerCase() : '';
-      
-      // Special handling for different senses of words based on context
-      if (wordLower === 'charge') {
-        if (contextLower.includes('battle')) {
-          definitionNumber = 1; // attack sense
-        } else if (contextLower.includes('phone') || contextLower.includes('battery')) {
-          definitionNumber = 24; // electrical sense
-        } else if (contextLower.includes('murder')) {
-          definitionNumber = 5; // legal accusation sense
-        }
+      if (!wordData) {
+        console.error('No word data found for:', wordLower);
+        return;
       }
       
-      // Generate the specific wordSenseId for this instance
-      const wordSenseId = `${wordLower}${definitionNumber}`;
-      console.log(`Determined wordSenseId: ${wordSenseId} based on context: ${contextSentence}`);
+      // Get the definition number from the word data (matching creation logic)
+      const definitionData = wordData.disambiguatedDefinition || wordData;
+      const definitionNumber = definitionData.definitionNumber || wordData.definitionNumber || 1;
+      
+      // Generate the specific wordSenseId for this instance (must match creation format)
+      const wordSenseId = `${wordLower}_${definitionNumber}`;
+      console.log(`Determined wordSenseId: ${wordSenseId} based on definition number: ${definitionNumber}`);
       
       // Only remove the specific wordSenseId that was clicked
       const senseIdsToRemove = [wordSenseId];
