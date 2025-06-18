@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import './WordDefinitionPopup.css';
 
-const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDefinition, position, onClose, onAddToDictionary, onRemoveFromDictionary, isInDictionary, loading }) => {
+const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDefinition, position, onClose, onAddToDictionary, onRemoveFromDictionary, isInDictionary, loading, nativeLanguage = 'Spanish' }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   // Add local state to track when a word is added, so we can show checkmark immediately
   const [localAdded, setLocalAdded] = useState(false);
@@ -45,6 +45,8 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
   
   // Look for translations in multiple possible locations in the API response
   const translation = definition?.translation || 
+                     (definition?.translations && definition.translations[nativeLanguage.toLowerCase()]) ||
+                     (definition?.translations && definition.translations[nativeLanguage]) ||
                      (definition?.translations && definition.translations.es) || 
                      (definition?.translations && definition.translations.Spanish) || 
                      '';
@@ -215,7 +217,8 @@ WordDefinitionPopup.propTypes = {
   onAddToDictionary: PropTypes.func,
   onRemoveFromDictionary: PropTypes.func,
   isInDictionary: PropTypes.bool,
-  loading: PropTypes.bool
+  loading: PropTypes.bool,
+  nativeLanguage: PropTypes.string
 };
 
 WordDefinitionPopup.defaultProps = {

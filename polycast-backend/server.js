@@ -45,7 +45,6 @@ const http = require('http');
 const WebSocket = require('ws');
 const url = require('url'); // To parse connection URL
 const config = require('./config/config');
-const speechService = require('./services/speechService');
 const llmService = require('./services/llmService');
 const { transcribeAudio } = require('./services/whisperService');
 const { generateImage } = require('./services/imageService');

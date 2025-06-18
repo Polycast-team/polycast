@@ -782,7 +782,6 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             borderRadius: 4
           }}>
             <span>{roomSetup?.isHost ? 'Host' : 'Student'}</span>
-            <span style={{ marginLeft: 8, opacity: 0.8 }}>Room: {roomSetup?.roomCode}</span>
           </div>
         )}
         
@@ -941,6 +940,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             showTranslation={showTranslation}
             isTextMode={appMode === 'text'}
             isStudentMode={roomSetup && !roomSetup.isHost}
+            studentHomeLanguage={studentHomeLanguage}
             onTextSubmit={(lang, text) => {
               // Send text submission for translation to backend
               sendMessage(JSON.stringify({ type: 'text_submit', lang, text }));

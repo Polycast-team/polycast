@@ -871,8 +871,8 @@ const TranscriptionDisplay = ({
         try {
           console.log(`[BACKGROUND GEMINI] Generating example sentences for "${word}"`);
           
-          // Get the native language (first selected language)
-          const nativeLanguage = targetLanguages[0] || 'Spanish';
+          // Get the native language (student's home language or first selected language)
+          const nativeLanguage = (isStudentMode && studentHomeLanguage) ? studentHomeLanguage : (targetLanguages[0] || 'Spanish');
           
           // Create the prompt for example sentences with translations
           const examplePrompt = `Rate "${word}" frequency (1-10) and create 5 example sentences in context: ${definition}
@@ -1310,6 +1310,7 @@ START NOW:`;
           onAddToDictionary={handleAddWordToDictionary}
           onRemoveFromDictionary={handleRemoveWordFromDictionary}
           loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
+          nativeLanguage={(isStudentMode && studentHomeLanguage) ? studentHomeLanguage : (targetLanguages[0] || 'Spanish')}
           onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
         />
       )}
@@ -1372,7 +1373,7 @@ START NOW:`;
                   textTransform: 'uppercase',
                   opacity: 0.92,
                 }}>
-                  {isStudentMode ? 'Spanish' : lang}
+                  {isStudentMode ? (studentHomeLanguage || 'Student Language') : lang}
                 </span>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 8, overflow: 'auto', minHeight: 0 }} ref={el => translationRefs.current[lang] = el}>
                   {isTextMode ? (
