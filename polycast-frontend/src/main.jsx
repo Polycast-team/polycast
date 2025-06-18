@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import AppRouter from './AppRouter.jsx'
 import LanguageSelectorScreen from './components/LanguageSelectorScreen.jsx';
+import StudentLanguageSelector from './components/StudentLanguageSelector.jsx';
 import './components/RoomSelectionScreen.css'; // Import styles
 import './index.css'
 
@@ -57,17 +58,8 @@ function Main() {
       // Host selects display languages (0-4)
       return <LanguageSelectorScreen onLanguageSelected={setSelectedLanguages} />;
     } else if (roomSetup.needsLanguageSelection) {
-      // Student selects home language (1 only) - placeholder for now
-      // TODO: Create student language selector
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#23243a' }}>
-          <h2 style={{ color: '#fff', marginBottom: 24 }}>Select Your Home Language</h2>
-          <p style={{ color: '#b3b3e7', marginBottom: 24 }}>This will be used for your flashcards and translations</p>
-          <button onClick={() => setSelectedLanguages(['Spanish'])} style={{ padding: '12px 32px', fontSize: 18, fontWeight: 700, borderRadius: 8, background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', cursor: 'pointer' }}>
-            Spanish (Temporary)
-          </button>
-        </div>
-      );
+      // Student selects home language (1 only)
+      return <StudentLanguageSelector onLanguageSelected={setSelectedLanguages} />;
     }
   }
 

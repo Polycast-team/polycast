@@ -7,8 +7,8 @@ function LanguageSelectorScreen({ onLanguageSelected }) {
     const [languages, setLanguages] = useState(Array(1).fill('')); 
 
     const handleNumChange = (event) => {
-        const count = parseInt(event.target.value, 10) || 1;
-        const newCount = Math.max(1, Math.min(4, count)); // Clamp between 1 and 4
+        const count = parseInt(event.target.value, 10) || 0;
+        const newCount = Math.max(0, Math.min(4, count)); // Clamp between 0 and 4
         setNumLanguages(newCount);
         // Adjust the languages array size, preserving existing values
         setLanguages(prevLangs => {
@@ -29,7 +29,10 @@ function LanguageSelectorScreen({ onLanguageSelected }) {
     const handleSubmit = (event) => {
         event.preventDefault();
         const validLanguages = languages.map(lang => lang.trim()).filter(lang => lang !== '');
-        if (validLanguages.length === numLanguages) {
+        if (numLanguages === 0) {
+            // Host selected 0 languages - just English transcript
+            onLanguageSelected([]);
+        } else if (validLanguages.length === numLanguages) {
             onLanguageSelected(validLanguages);
         } else {
             alert('Please fill in all target language fields.');
@@ -41,20 +44,20 @@ function LanguageSelectorScreen({ onLanguageSelected }) {
             <h1>Polycast Setup</h1>
             <form onSubmit={handleSubmit}>
                 <div>
-                    <label htmlFor="num-languages">Number of Translations (1-4): </label>
+                    <label htmlFor="num-languages">Number of Display Languages (0-4): </label>
                     <input 
                         type="number"
                         id="num-languages"
                         value={numLanguages}
                         onChange={handleNumChange}
-                        min="1"
+                        min="0"
                         max="4"
                     />
                 </div>
 
                 {languages.map((lang, index) => (
                     <div key={index}>
-                        <label htmlFor={`language-input-${index}`}>Target Language {index + 1}:</label>
+                        <label htmlFor={`language-input-${index}`}>Display Language {index + 1}:</label>
                         <input 
                             type="text"
                             id={`language-input-${index}`}

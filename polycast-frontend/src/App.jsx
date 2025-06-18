@@ -12,9 +12,15 @@ import DictionaryTable from './components/DictionaryTable';
 import FlashcardMode from './components/FlashcardMode';
 
 // App now receives an array of target languages and room setup as props
-function App({ targetLanguages, onReset, roomSetup }) {
+function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguage }) {
   // Step 1: Add selectedProfile state
   const [selectedProfile, setSelectedProfile] = React.useState('non-saving');
+  
+  // Join Room state for students
+  const [showJoinRoomModal, setShowJoinRoomModal] = useState(false);
+  const [joinRoomCode, setJoinRoomCode] = useState('');
+  const [joinRoomError, setJoinRoomError] = useState('');
+  const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   
   // Function to fetch profile data from backend
   const fetchProfileData = useCallback(async (profile) => {
@@ -276,6 +282,35 @@ function App({ targetLanguages, onReset, roomSetup }) {
 
   // --- FIX: Prevent text submission error in text mode ---
   // (No code needed here, but ensure isTextMode is derived from appMode === 'text')
+
+  // Join Room handler for students
+  const handleJoinRoom = async () => {
+    const cleanedRoomCode = joinRoomCode.replace(/[^0-9]/g, '').trim();
+    
+    if (cleanedRoomCode.length !== 5) {
+      setJoinRoomError('Room code must be 5 digits');
+      return;
+    }
+    
+    setIsJoiningRoom(true);
+    setJoinRoomError('');
+    
+    try {
+      const response = await fetch(`https://polycast-server.onrender.com/api/check-room/${cleanedRoomCode}`);
+      const data = await response.json();
+      
+      if (!data.exists) {
+        throw new Error(data.message || 'Room not found');
+      }
+      
+      // Update URL to reconnect WebSocket with room code
+      window.location.href = `/?roomCode=${cleanedRoomCode}&isHost=false`;
+    } catch (error) {
+      console.error('Error joining room:', error);
+      setJoinRoomError(`Failed to join room: ${error.message}`);
+      setIsJoiningRoom(false);
+    }
+  };
 
   // Track reconnection attempts and invalid room state
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
@@ -685,6 +720,23 @@ function App({ targetLanguages, onReset, roomSetup }) {
                   <span className="room-code">Room: {roomSetup?.roomCode || 'Not Connected'}</span>
                 </div>
               )}
+              {userRole === 'student' && !roomSetup && (
+                <button 
+                  onClick={() => setShowJoinRoomModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: 14,
+                    borderRadius: 4,
+                    background: '#10b981',
+                    color: '#fff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    marginLeft: 16
+                  }}
+                >
+                  Join Room
+                </button>
+              )}
             </div>
             <button onClick={onReset} className="reset-button">
               Exit Room
@@ -818,6 +870,99 @@ function App({ targetLanguages, onReset, roomSetup }) {
           />
         )}
       </div>
+      
+      {/* Join Room Modal */}
+      {showJoinRoomModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: '#23243a',
+            borderRadius: 16,
+            padding: 36,
+            minWidth: 400,
+            textAlign: 'center',
+            boxShadow: '0 4px 18px 0 rgba(60, 60, 90, 0.2)'
+          }}>
+            <h2 style={{ color: '#fff', marginBottom: 24 }}>Join Room</h2>
+            <p style={{ color: '#b3b3e7', marginBottom: 24, fontSize: 14 }}>
+              Enter a 5-digit room code to join a host's session
+            </p>
+            
+            <input
+              type="text"
+              value={joinRoomCode}
+              onChange={(e) => setJoinRoomCode(e.target.value)}
+              placeholder="5-digit room code"
+              maxLength={5}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: 18,
+                borderRadius: 4,
+                border: '1px solid #444',
+                background: '#fff',
+                color: '#000',
+                textAlign: 'center',
+                boxSizing: 'border-box',
+                marginBottom: 16
+              }}
+            />
+            
+            {joinRoomError && (
+              <div style={{ color: '#dc2626', marginBottom: 16, fontSize: 14 }}>
+                {joinRoomError}
+              </div>
+            )}
+            
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                onClick={() => {
+                  setShowJoinRoomModal(false);
+                  setJoinRoomCode('');
+                  setJoinRoomError('');
+                }}
+                disabled={isJoiningRoom}
+                style={{
+                  padding: '12px 24px',
+                  fontSize: 16,
+                  borderRadius: 4,
+                  background: '#444',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleJoinRoom}
+                disabled={isJoiningRoom}
+                style={{
+                  padding: '12px 24px',
+                  fontSize: 16,
+                  borderRadius: 4,
+                  background: '#10b981',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {isJoiningRoom ? 'Joining...' : 'Join Room'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -829,7 +974,9 @@ App.propTypes = {
     roomSetup: PropTypes.shape({
         isHost: PropTypes.bool.isRequired,
         roomCode: PropTypes.string.isRequired
-    }) // Made optional for students not in a room
+    }), // Made optional for students not in a room
+    userRole: PropTypes.oneOf(['host', 'student']),
+    studentHomeLanguage: PropTypes.string
 };
 
 // Define backend port in a config object or hardcode if simple
