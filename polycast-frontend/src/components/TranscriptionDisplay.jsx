@@ -790,205 +790,50 @@ const TranscriptionDisplay = ({
       // Get all existing flashcard sense IDs
       const existingFlashcardSenseIds = getAllFlashcardSenseIds();
             
-      // Get dictionary definitions from the original API response
-      const allDictDefinitions = [];
+      // Use the definition data directly from the popup (no more 2-stage approach)
+      console.log(`[FLASHCARD CREATE] Creating flashcard directly from popup data for word: ${word}`);
       
-      // Extract definitions from all available sources
-      if (wordData.dictionaryDefinition && wordData.dictionaryDefinition.allDefinitions) {
-        allDictDefinitions.push(...wordData.dictionaryDefinition.allDefinitions);
-      } else if (wordData.dictionaryDefinition && wordData.dictionaryDefinition.definitions) {
-        allDictDefinitions.push(...wordData.dictionaryDefinition.definitions);
-      }
-      
-      if (allDictDefinitions.length === 0 && wordData.disambiguatedDefinition) {
-        allDictDefinitions.push(wordData.disambiguatedDefinition);
-      }
-      
-      if (allDictDefinitions.length === 0) {
-        console.error(`No definitions found for ${word} in context: ${contextSentence}`);
-        return;
-      }
-      
-      // STAGE 1: Call the disambiguate endpoint with our new format
-      console.log(`[STAGE 1] Calling disambiguate endpoint for word: ${word}`);
-      
-      // STAGE 1: Call the disambiguate endpoint to get the correct definition
-      let disambiguateData;
-      let responseWord, responseDefinition, responseTranslation;
-      let wordSenseId;
-      
-      try {
-        console.log(`[STAGE 1] Making API request to disambiguate word: ${wordLower}`);
+      // Check if we have the basic definition data from when the word was clicked
+      if (!wordData.definition && !wordData.disambiguatedDefinition) {
+        console.error(`No definition data available for ${word} in popup`);
         
-        // Create a clean request payload with only valid data
-        const requestPayload = {
-          word: wordLower,
-          contextSentence: contextSentence,
-          definitions: allDictDefinitions.filter(def => def && typeof def === 'object'),
-          existingFlashcardSenseIds: getAllFlashcardSenseIds() // Get fresh list
-        };
-        
-        // Log the exact request we're making
-        console.log(`[STAGE 1] Request payload:`, JSON.stringify(requestPayload).substring(0, 200) + '...');
-        
-        // Make API request with a timeout
-        const abortController = new AbortController();
-        const timeoutId = setTimeout(() => abortController.abort(), 20000); // 20 second timeout
-        
-        const disambiguateResponse = await fetch('/api/disambiguate-word', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestPayload),
-          signal: abortController.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        // Check for successful response
-        if (!disambiguateResponse.ok) {
-          const errorText = await disambiguateResponse.text();
-          throw new Error(`Disambiguation request failed with status: ${disambiguateResponse.status}, response: ${errorText}`);
-        }
-        
-        // Parse the response with extra safety measures
-        const responseText = await disambiguateResponse.text();
-        if (!responseText || responseText.trim() === '') {
-          throw new Error('Empty response from disambiguation endpoint');
-        }
-        
-        try {
-          disambiguateData = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error(`[STAGE 1] JSON parse error:`, parseError, `for text: ${responseText}`);
-          throw new Error(`Failed to parse JSON response: ${parseError.message}`);
-        }
-        
-        console.log(`[STAGE 1] Disambiguation successful:`, disambiguateData);
-        
-        // Check for error in response
-        if (disambiguateData.error || disambiguateData.status === 'error') {
-          throw new Error(`API error: ${disambiguateData.error || 'Unknown error'}`);
-        }
-        
-        // Stop if the API indicates this is an existing flashcard
-        if (disambiguateData.existingFlashcard) {
-          console.log(`This sense of "${word}" already exists with ID: ${disambiguateData.wordSenseId}`);
-          return;
-        }
-        
-        // Extract the key information from the response
-        const responseParts = disambiguateData.rawLlmResponse?.split('//') || [];
-        wordSenseId = disambiguateData.wordSenseId; // Store for later use
-        
-        if (responseParts.length >= 3) {
-          [responseWord, responseDefinition, responseTranslation] = responseParts.map(part => part.trim());
-          console.log(`[STAGE 1] Parsed parts: Word=${responseWord}, Definition=${responseDefinition}, Translation=${responseTranslation}`);
-        } else {
-          console.warn(`[STAGE 1] Unexpected response format, using fallbacks`);
-          responseWord = wordLower;
-          responseDefinition = disambiguateData.disambiguatedDefinition?.definition || '';
-          responseTranslation = disambiguateData.disambiguatedDefinition?.translation || '';
-        }
-      } catch (error) {
-        console.error(`[STAGE 1] Error during disambiguation:`, error);
-        
-        // Show error message to user instead of silently failing
+        // Show error message to user
         setPopupInfo(prev => ({
           ...prev,
           showPopup: true,
           error: true,
-          popupMessage: `Could not add "${word}" to flashcards. ${error.message.includes('Gemini API') ? 'The AI service is currently unavailable. Please try again later.' : 'Please try again.'}`,
+          popupMessage: `Could not add "${word}" to flashcards. Definition data not available. Try clicking the word again.`,
         }));
-        
-        // Remove the word from selected words to allow the user to try again
-        setSelectedWords(prev => prev.filter(w => w !== word));
-        
-        // Stop processing further
         return;
       }
       
-      // STAGE 2: Send the disambiguated definition to the dictionary endpoint for example sentences and frequency
-      console.log(`[STAGE 2] Generating flashcard content for word: ${word}`);
+      // Extract definition data from the popup
+      const definitionData = wordData.disambiguatedDefinition || wordData;
+      const definition = definitionData.definition || wordData.definition || '';
+      const translation = definitionData.translation || wordData.translation || '';
+      const partOfSpeech = definitionData.partOfSpeech || wordData.partOfSpeech || 'unknown';
+      const definitionNumber = definitionData.definitionNumber || wordData.definitionNumber || 1;
       
-      let flashcardData;
-      try {
-        // Make API request with a timeout
-        const abortController = new AbortController();
-        const timeoutId = setTimeout(() => abortController.abort(), 20000); // 20 second timeout
-        
-        // Add a timestamp to prevent caching
-        const timestamp = Date.now();
-        const url = `/api/dictionary/${wordLower}?context=${encodeURIComponent(contextSentence)}&t=${timestamp}`;
-        
-        console.log(`[STAGE 2] Making request to dictionary endpoint: ${url}`);
-        
-        const dictionaryResponse = await fetch(url, {
-          signal: abortController.signal,
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!dictionaryResponse.ok) {
-          const errorText = await dictionaryResponse.text();
-          throw new Error(`Dictionary request failed with status: ${dictionaryResponse.status}, response: ${errorText}`);
-        }
-        
-        // Parse the response with extra safety measures
-        const responseText = await dictionaryResponse.text();
-        if (!responseText || responseText.trim() === '') {
-          throw new Error('Empty response from dictionary endpoint');
-        }
-        
-        try {
-          flashcardData = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error(`[STAGE 2] JSON parse error:`, parseError, `for text: ${responseText}`);
-          throw new Error(`Failed to parse dictionary response: ${parseError.message}`);
-        }
-        
-        console.log(`[STAGE 2] Flashcard generation successful:`, flashcardData);
-        
-        // Validate the flashcard data
-        if (!flashcardData || typeof flashcardData !== 'object') {
-          throw new Error('Invalid flashcard data received');
-        }
-      } catch (error) {
-        console.error(`[STAGE 2] Error during flashcard generation:`, error);
-        
-        // Show error message to user instead of using fallbacks
-        setPopupInfo(prev => ({
-          ...prev,
-          showPopup: true,
-          error: true,
-          popupMessage: `Could not add "${word}" to flashcards. ${error.message.includes('Gemini API') ? 'The AI service is currently unavailable. Please try again later.' : 'Please try again.'}`,
-        }));
-        
-        // Remove the word from selected words to allow the user to try again
-        setSelectedWords(prev => prev.filter(w => w !== word));
-        
-        // Stop processing further
-        return;
-      }
-      
-      // Create a word sense ID from the disambiguation response or generate one
-      const safeWordSenseId = disambiguateData?.wordSenseId || `${wordLower}_${Date.now()}`;
+      // Create a simple word sense ID
+      const safeWordSenseId = `${wordLower}_${definitionNumber}`;
       console.log(`[FLASHCARD CREATE] Using word sense ID: ${safeWordSenseId}`);
       
-      // Create the flashcard with data from both API calls
-      setWordDefinitions(prev => {
-        // Double-check to prevent race conditions
-        if (prev[safeWordSenseId] && prev[safeWordSenseId].inFlashcards) {
-          console.warn(`[DUPLICATE-GUARD] Duplicate flashcard prevented for ${word} (ID: ${safeWordSenseId}).`);
-          return prev;
-        }
+      // Check for duplicates
+      if (wordDefinitions[safeWordSenseId] && wordDefinitions[safeWordSenseId].inFlashcards) {
+        console.warn(`[DUPLICATE-GUARD] Duplicate flashcard prevented for ${word} (ID: ${safeWordSenseId}).`);
         
-        // Create a new flashcard object with the combined data
+        setPopupInfo(prev => ({
+          ...prev,
+          showPopup: true,
+          error: true,
+          popupMessage: `"${word}" is already in your flashcards.`,
+        }));
+        return;
+      }
+      
+      // Create the flashcard with data from the popup
+      setWordDefinitions(prev => {
+        // Create a new flashcard object using popup data
         const newFlashcard = {
           // Basic word information
           word: wordLower,
@@ -997,21 +842,22 @@ const TranscriptionDisplay = ({
           inFlashcards: true,
           cardCreatedAt: new Date().toISOString(),
           
-          // Stage 1: Disambiguation data
-          translation: responseTranslation || '',
-          disambiguatedDefinition: disambiguateData?.disambiguatedDefinition || {
-            definition: responseDefinition || '',
-            partOfSpeech: disambiguateData?.disambiguatedDefinition?.partOfSpeech || 'unknown'
-          },
+          // Definition data from popup
+          definition: definition,
+          translation: translation,
+          partOfSpeech: partOfSpeech,
+          definitionNumber: definitionNumber,
           
-          // Stage 2: Dictionary/flashcard data
-          partOfSpeech: flashcardData?.partOfSpeech || disambiguateData?.disambiguatedDefinition?.partOfSpeech || 'unknown',
-          exampleSentencesRaw: flashcardData?.exampleSentencesRaw || '',
-          wordFrequency: typeof flashcardData?.wordFrequency === 'number' ? flashcardData.wordFrequency : 3,
-          definitionFrequency: typeof flashcardData?.definitionFrequency === 'number' ? flashcardData.definitionFrequency : 3
+          // Use existing example data if available, otherwise use context
+          exampleSentencesRaw: wordData.exampleSentencesRaw || wordData.example || contextSentence,
+          example: wordData.example || contextSentence,
+          
+          // Default frequency ratings
+          wordFrequency: wordData.wordFrequency || 3,
+          definitionFrequency: wordData.definitionFrequency || 3
         };
         
-        console.log(`[FLASHCARD CREATE] Successfully created flashcard with data:`, newFlashcard);
+        console.log(`[FLASHCARD CREATE] Successfully created flashcard with popup data:`, newFlashcard);
         
         // Return the updated state with the new flashcard
         return {
