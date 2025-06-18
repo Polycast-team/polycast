@@ -82,6 +82,9 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     ? [studentHomeLanguage] 
     : targetLanguages;
   const languagesQueryParam = effectiveLanguages.map(encodeURIComponent).join(',');
+  
+  console.log('Effective languages for WebSocket:', effectiveLanguages);
+  console.log('WebSocket URL will use languages:', languagesQueryParam);
 
   // Construct the WebSocket URL for Render backend, including room information
   const wsBaseUrl = `wss://polycast-server.onrender.com`;
