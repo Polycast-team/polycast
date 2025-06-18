@@ -802,7 +802,8 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
         gap: '8px',
         alignItems: 'center'
       }}>
-        {roomSetup && (
+        {/* Show role indicator only for students */}
+        {roomSetup && !roomSetup.isHost && (
           <div style={{ 
             fontSize: 14, 
             color: '#fff', 
@@ -811,7 +812,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             padding: '8px 12px',
             borderRadius: 4
           }}>
-            <span>{roomSetup?.isHost ? 'Host' : 'Student'}</span>
+            <span>Student</span>
           </div>
         )}
         
@@ -833,8 +834,8 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
           </button>
         )}
         
-        {/* Exit Room button - only when in a room */}
-        {roomSetup && (
+        {/* Exit Room button - only for students in a room */}
+        {roomSetup && !roomSetup.isHost && (
           <button 
             onClick={onReset}
             style={{
