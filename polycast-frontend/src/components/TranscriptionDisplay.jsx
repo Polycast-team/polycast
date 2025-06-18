@@ -881,12 +881,18 @@ Rate how common "${word}" is in modern spoken English:
 1-2 = extremely rare, 3-4 = uncommon, 5-6 = moderate, 7-8 = common, 9-10 = ubiquitous
 Use realistic distribution: most words are 1-3, very few are 9-10.
 
-Surround "${word}" with ~ characters in each sentence.
-Provide English sentence followed by ${nativeLanguage} translation.
+Requirements:
+- Surround "${word}" with ~ characters in each sentence
+- Provide English sentence followed by ${nativeLanguage} translation
+- Use varied sentence types (statements, questions, past tense, etc.)
+- Make sentences natural and conversational
 
-Format: frequency//English1 with ~${word}~//${nativeLanguage}1//English2 with ~${word}~//${nativeLanguage}2//English3 with ~${word}~//${nativeLanguage}3//English4 with ~${word}~//${nativeLanguage}4//English5 with ~${word}~//${nativeLanguage}5
+Format example:
+7//How are ~you~ doing today?//¿Cómo estás hoy?//I saw ~you~ at the store yesterday//Te vi en la tienda ayer//etc.
 
-Start your response immediately with the frequency number. No explanations.`;
+Start immediately with: [frequency number]//[first English sentence with ~${word}~]//[first ${nativeLanguage} translation]//[continue pattern]
+
+No explanations, confirmations, or extra text.`;
 
           // Make the API call to generate example sentences
           const response = await fetch('https://polycast-server.onrender.com/api/dictionary/generate-examples', {
