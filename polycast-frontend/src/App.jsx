@@ -647,46 +647,53 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
         }} />
       )} */}
       {/* Big Polycast Title */}
-      <h1
-        className="polycast-title"
-        style={{
-          color: '#fff',
-          fontSize: '3rem',
-          fontWeight: 900,
-          letterSpacing: '0.06em',
-          textAlign: 'center',
-          margin: '24px 0 12px 0',
-          textShadow: '0 4px 24px #0008',
-          cursor: 'pointer', // Show pointer
-          transition: 'opacity 0.2s',
-        }}
-        onClick={() => typeof onReset === 'function' && onReset()}
-        onMouseOver={e => (e.currentTarget.style.opacity = 0.85)}
-        onMouseOut={e => (e.currentTarget.style.opacity = 1)}
-      >
-        Polycast
-      </h1>
-      {roomSetup && (
-        <div 
-          className="room-info-display" 
+      {/* Header container with logo and room code */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        margin: '24px 0 12px 0',
+        width: '100%'
+      }}>
+        <h1
+          className="polycast-title"
           style={{
             color: '#fff',
-            textAlign: 'center',
-            marginBottom: '15px',
-            fontSize: '1rem',
-            fontWeight: 600,
-            padding: '4px 12px',
-            borderRadius: '6px',
-            background: roomSetup.isHost ? 'rgba(59, 130, 246, 0.6)' : 'rgba(16, 185, 129, 0.6)',
-            display: 'inline-block',
-            position: 'relative',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            fontSize: '3rem',
+            fontWeight: 900,
+            letterSpacing: '0.06em',
+            textShadow: '0 4px 24px #0008',
+            cursor: 'pointer',
+            transition: 'opacity 0.2s',
+            margin: 0,
           }}
+          onClick={() => typeof onReset === 'function' && onReset()}
+          onMouseOver={e => (e.currentTarget.style.opacity = 0.85)}
+          onMouseOut={e => (e.currentTarget.style.opacity = 1)}
         >
-          {roomSetup?.isHost ? `Room: ${roomSetup?.roomCode || 'Not Connected'}` : `Student • Room: ${roomSetup?.roomCode || 'Not Connected'}`}
-        </div>
-      )}
+          Polycast
+        </h1>
+        {roomSetup && (
+          <div 
+            className="room-info-display" 
+            style={{
+              color: '#fff',
+              fontSize: '1rem',
+              fontWeight: 600,
+              padding: '8px 16px',
+              borderRadius: '8px',
+              background: roomSetup.isHost ? 'rgba(59, 130, 246, 0.6)' : 'rgba(16, 185, 129, 0.6)',
+              position: 'absolute',
+              right: '24px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+            }}
+          >
+            {roomSetup?.isHost ? `Room: ${roomSetup?.roomCode || 'Not Connected'}` : `Student • Room: ${roomSetup?.roomCode || 'Not Connected'}`}
+          </div>
+        )}
+      </div>
       <div className="controls-container" style={{ marginBottom: 4 }}>
         {/* Main Toolbar */}
         <div className="main-toolbar" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch', marginBottom: 0 }}>
