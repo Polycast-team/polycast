@@ -884,7 +884,7 @@ Separate each sentence with "//" and provide only the sentences without any expl
 Example format: Sentence one//Sentence two//Sentence three//Sentence four//Sentence five`;
 
           // Make the API call to generate example sentences
-          const response = await fetch('/api/dictionary/generate-examples', {
+          const response = await fetch('https://polycast-server.onrender.com/api/dictionary/generate-examples', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -901,6 +901,7 @@ Example format: Sentence one//Sentence two//Sentence three//Sentence four//Sente
             const exampleSentences = await response.text();
             
             console.log(`[BACKGROUND GEMINI] Generated examples for "${word}":`, exampleSentences);
+            console.log(`[BACKGROUND GEMINI] Response length: ${exampleSentences.length}, type: ${typeof exampleSentences}`);
             
             // Update the flashcard with the generated examples
             setWordDefinitions(prev => {
@@ -922,7 +923,8 @@ Example format: Sentence one//Sentence two//Sentence three//Sentence four//Sente
               setTimeout(() => saveProfileData(), 500);
             }
           } else {
-            console.error(`[BACKGROUND GEMINI] Failed to generate examples for "${word}":`, await response.text());
+            const errorText = await response.text();
+            console.error(`[BACKGROUND GEMINI] Failed to generate examples for "${word}". Status: ${response.status}, Error:`, errorText);
           }
         } catch (error) {
           console.error(`[BACKGROUND GEMINI] Error generating examples for "${word}":`, error);
