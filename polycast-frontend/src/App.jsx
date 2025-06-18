@@ -13,6 +13,9 @@ import FlashcardMode from './components/FlashcardMode';
 
 // App now receives an array of target languages and room setup as props
 function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguage }) {
+  // Debug logging
+  console.log('App component received props:', { targetLanguages, roomSetup, userRole, studentHomeLanguage });
+  
   // Step 1: Add selectedProfile state
   const [selectedProfile, setSelectedProfile] = React.useState('non-saving');
   

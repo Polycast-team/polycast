@@ -75,7 +75,7 @@ function Main() {
     studentHomeLanguage: roomSetup?.isHost ? null : selectedLanguages?.[0]
   };
   
-  console.log('Props being passed to AppRouter:', propsToPass);
+  console.log('Props being passed to AppRouter:', JSON.stringify(propsToPass, null, 2));
   
   return (
     <AppRouter {...propsToPass} />
