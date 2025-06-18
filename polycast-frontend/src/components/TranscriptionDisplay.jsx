@@ -141,6 +141,7 @@ const TranscriptionDisplay = ({
   wordDefinitions,
   setWordDefinitions,
   isStudentMode = false,
+  studentHomeLanguage,
   // Add setter for transcript segments if available
   setEnglishSegments = null,
   // Add profile management props
@@ -1441,7 +1442,8 @@ TranscriptionDisplay.propTypes = {
   setSelectedWords: PropTypes.func.isRequired,
   wordDefinitions: PropTypes.object.isRequired,
   setWordDefinitions: PropTypes.func.isRequired,
-  isStudentMode: PropTypes.bool
+  isStudentMode: PropTypes.bool,
+  studentHomeLanguage: PropTypes.string
 };
 
 TranscriptionDisplay.defaultProps = {
