@@ -875,23 +875,15 @@ const TranscriptionDisplay = ({
           const nativeLanguage = targetLanguages[0] || 'Spanish';
           
           // Create the prompt for example sentences with translations
-          const examplePrompt = `You are helping a language learner practice using a word in different contexts.
+          const examplePrompt = `Generate 5 example sentences using "${word}" in context of: ${definition}
 
-Word: "${word}"
-Definition: "${definition}"
+Surround "${word}" with ~ characters in each sentence.
+Provide English sentence followed by ${nativeLanguage} translation.
+Separate with // in this exact format:
 
-Generate 5 different example sentences where "${word}" is used in this specific sense. Each sentence should demonstrate a different grammatical construction or context (e.g., past tense, question form, negative form, etc.) to give variety in usage.
+English1 with ~${word}~//${nativeLanguage}1//English2 with ~${word}~//${nativeLanguage}2//English3 with ~${word}~//${nativeLanguage}3//English4 with ~${word}~//${nativeLanguage}4//English5 with ~${word}~//${nativeLanguage}5
 
-IMPORTANT: Surround the target word "${word}" with ~ characters in each sentence (like ~${word}~).
-
-For each sentence, provide both the English version and the ${nativeLanguage} translation.
-
-Format each pair as: English sentence with ~word~//${nativeLanguage} translation
-
-Separate each sentence pair with "//" so the full format is:
-English1 with ~word~//${nativeLanguage}1//English2 with ~word~//${nativeLanguage}2//English3 with ~word~//${nativeLanguage}3//English4 with ~word~//${nativeLanguage}4//English5 with ~word~//${nativeLanguage}5
-
-Provide only the sentences without any explanations or numbering.`;
+Start your response immediately with the first sentence. No explanations, confirmations, or introductory text.`;
 
           // Make the API call to generate example sentences
           const response = await fetch('https://polycast-server.onrender.com/api/dictionary/generate-examples', {
@@ -908,7 +900,18 @@ Provide only the sentences without any explanations or numbering.`;
 
           if (response.ok) {
             // Get the raw text response (no JSON parsing needed)
-            const exampleSentences = await response.text();
+            let exampleSentences = await response.text();
+            
+            // Clean up any preamble text from Gemini
+            // Look for the first occurrence of a sentence with ~ characters
+            const firstTildeMatch = exampleSentences.match(/[^.!?]*~[^~]+~[^\/]*\/\/[^\/]*\/\//);
+            if (firstTildeMatch) {
+              const startIndex = exampleSentences.indexOf(firstTildeMatch[0]);
+              if (startIndex > 0) {
+                exampleSentences = exampleSentences.substring(startIndex);
+                console.log(`[BACKGROUND GEMINI] Cleaned preamble, now starts with: ${exampleSentences.substring(0, 50)}...`);
+              }
+            }
             
             console.log(`[BACKGROUND GEMINI] Generated examples for "${word}":`, exampleSentences);
             console.log(`[BACKGROUND GEMINI] Response length: ${exampleSentences.length}, type: ${typeof exampleSentences}`);
