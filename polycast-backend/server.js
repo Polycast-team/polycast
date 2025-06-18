@@ -1995,8 +1995,8 @@ function calculateSimilarity(text1, text2) {
  */
 async function generateTextWithGemini(prompt, temperature = 0.7) {
     try {
-        // Make sure we have the Google API key available
-        if (!process.env.GOOGLE_API_KEY) {
+        // Make sure we have the Google API key available (use same config as other services)
+        if (!config.googleApiKey) {
             throw new Error('Google API Key (GOOGLE_API_KEY) is not configured');
         }
         
@@ -2004,9 +2004,9 @@ async function generateTextWithGemini(prompt, temperature = 0.7) {
         const promptPreview = prompt.length > 100 ? `${prompt.substring(0, 100)}...` : prompt;
         console.log(`[GEMINI] Generating text with prompt: ${promptPreview}`);
         
-        // Use the raw Google API directly
+        // Use the raw Google API directly (same as other services)
         const { GoogleGenerativeAI } = require('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+        const genAI = new GoogleGenerativeAI(config.googleApiKey);
         
         // Configure the model
         const model = genAI.getGenerativeModel({ 
