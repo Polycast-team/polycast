@@ -70,7 +70,7 @@ function Main() {
       setRoomSetup(null);
       setSelectedLanguages(null);
     },
-    roomSetup: roomSetup, // Pass room setup for both hosts and students in rooms
+    roomSetup: roomSetup?.roomCode ? roomSetup : null, // Only pass room setup when there's a valid room code
     userRole: roomSetup?.isHost ? 'host' : 'student',
     studentHomeLanguage: roomSetup?.isHost ? null : selectedLanguages?.[0],
     onJoinRoom: (roomCode) => {
