@@ -79,7 +79,7 @@ function Main() {
         setRoomSetup(null);
         setSelectedLanguages(null);
       }}
-      roomSetup={roomSetup}
+      roomSetup={roomSetup?.isHost ? roomSetup : null} // Only pass room setup for hosts
       userRole={roomSetup?.isHost ? 'host' : 'student'}
       studentHomeLanguage={roomSetup?.isHost ? null : selectedLanguages?.[0]}
     />
