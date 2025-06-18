@@ -18,7 +18,14 @@ function VideoMode() {
         throw new Error('getUserMedia not supported in this browser');
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      console.log('VideoMode: getUserMedia API is available, requesting permissions...');
+
+      // Add a timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Camera request timed out after 10 seconds')), 10000);
+      });
+
+      const cameraPromise = navigator.mediaDevices.getUserMedia({ 
         video: { 
           width: { ideal: 1280 },
           height: { ideal: 720 },
@@ -26,6 +33,8 @@ function VideoMode() {
         },
         audio: false 
       });
+
+      const stream = await Promise.race([cameraPromise, timeoutPromise]);
       
       console.log('VideoMode: Camera access granted, setting up video stream');
       
@@ -39,8 +48,10 @@ function VideoMode() {
       setHasPermission(false);
       
       // Provide more specific error messages
-      if (err.name === 'NotAllowedError') {
-        setError('Camera access denied. Please allow camera permissions and refresh.');
+      if (err.message && err.message.includes('timed out')) {
+        setError('Camera request timed out. This might be a browser issue. Try refreshing the page or checking browser settings.');
+      } else if (err.name === 'NotAllowedError') {
+        setError('Camera access denied. Please allow camera permissions and try again.');
       } else if (err.name === 'NotFoundError') {
         setError('No camera found. Please connect a camera and try again.');
       } else if (err.name === 'NotReadableError') {
