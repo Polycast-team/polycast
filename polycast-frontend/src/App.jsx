@@ -588,6 +588,9 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     } else if (newMode === 'flashcard') {
       // Just update local state for flashcard mode
       setAppMode('flashcard');
+    } else if (newMode === 'video') {
+      // Just update local state for video mode
+      setAppMode('video');
     } else {
       // Call updateMode for audio/text modes to sync with backend
       updateMode(newMode);
