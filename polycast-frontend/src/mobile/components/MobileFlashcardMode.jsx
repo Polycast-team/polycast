@@ -427,6 +427,7 @@ const MobileFlashcardMode = ({
     },
     onTap: (e, point) => {
       // Only flip if not dragging
+      console.log('[TAP DEBUG] Tap detected, isDragging:', dragState.isDragging);
       if (!dragState.isDragging) {
         flipCard();
       }
@@ -540,11 +541,17 @@ const MobileFlashcardMode = ({
       {/* Card Container */}
       <div className="mobile-card-container" ref={cardContainerRef}>
         <div 
-          className={`mobile-flashcard ${isFlipped ? 'flipped' : ''} ${swipeAnimation}`}
+          className={`mobile-flashcard ${swipeAnimation}`}
           style={{
-            transform: dragState.isDragging 
-              ? `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg)`
-              : undefined,
+            transform: (() => {
+              const baseTransform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
+              const dragTransform = dragState.isDragging 
+                ? `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg)` 
+                : '';
+              const finalTransform = dragState.isDragging ? `${dragTransform} ${baseTransform}` : baseTransform;
+              console.log('[TRANSFORM DEBUG]', { dragState, isFlipped, finalTransform });
+              return finalTransform;
+            })(),
             opacity: dragState.opacity,
             transition: dragState.isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease'
           }}
