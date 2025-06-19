@@ -982,6 +982,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             setWordDefinitions={setWordDefinitions}
             englishSegments={englishSegments}
             targetLanguages={effectiveLanguages}
+            selectedProfile={selectedProfile}
           />
         ) : appMode === 'video' ? (
           <VideoMode />

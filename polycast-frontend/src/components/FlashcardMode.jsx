@@ -5,7 +5,7 @@ import { calculateNextReview, getDueCards, getReviewStats, formatNextReviewTime 
 import { getSRSSettings } from '../utils/srsSettings';
 import SRSSettings from './SRSSettings';
 
-const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages }) => {
+const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   // SRS: Track today's review session
   const [todaysNewCards, setTodaysNewCards] = useState(0);
@@ -48,23 +48,65 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
 
   // Initialize SRS data and get due cards
   useEffect(() => {
-    // Get today's date for tracking new cards
-    const today = new Date().toDateString();
-    const storedDate = localStorage.getItem('srsLastDate');
-    const storedCount = parseInt(localStorage.getItem('srsNewCardsToday') || '0');
+    const initializeDailyLimits = async () => {
+      const today = new Date().toDateString();
+      
+      if (selectedProfile === 'non-saving') {
+        // Non-saving mode: don't persist daily limits at all
+        setTodaysNewCards(0);
+      } else {
+        // Profile mode: use database for daily limits
+        try {
+          const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`);
+          if (response.ok) {
+            const dailyData = await response.json();
+            
+            // Reset count if it's a new day
+            if (dailyData.date !== today) {
+              setTodaysNewCards(0);
+              // Save reset to database
+              await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: today, newCardsToday: 0 })
+              });
+            } else {
+              setTodaysNewCards(dailyData.newCardsToday || 0);
+            }
+          } else {
+            // First time or error - initialize
+            setTodaysNewCards(0);
+            await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ date: today, newCardsToday: 0 })
+            });
+          }
+        } catch (error) {
+          console.error('Error loading daily SRS data:', error);
+          // Fallback to localStorage for this session
+          const storedDate = localStorage.getItem('srsLastDate');
+          const storedCount = parseInt(localStorage.getItem('srsNewCardsToday') || '0');
+          
+          if (storedDate !== today) {
+            localStorage.setItem('srsLastDate', today);
+            localStorage.setItem('srsNewCardsToday', '0');
+            setTodaysNewCards(0);
+          } else {
+            setTodaysNewCards(storedCount);
+          }
+        }
+      }
+    };
     
-    // Reset count if it's a new day
-    if (storedDate !== today) {
-      localStorage.setItem('srsLastDate', today);
-      localStorage.setItem('srsNewCardsToday', '0');
-      setTodaysNewCards(0);
-    } else {
-      setTodaysNewCards(storedCount);
-    }
-    
+    initializeDailyLimits();
+  }, [selectedProfile]); // Re-run when profile changes
+  
+  // Separate effect for due cards that depends on todaysNewCards
+  useEffect(() => {
     // Get due cards using SRS algorithm with current settings
     const currentSettings = getSRSSettings();
-    const maxNewToday = Math.max(0, currentSettings.newCardsPerDay - storedCount);
+    const maxNewToday = Math.max(0, currentSettings.newCardsPerDay - todaysNewCards);
     let due = getDueCards(availableCards, { newPerDay: maxNewToday }, false);
     
     // If no cards are strictly due, include waiting learning cards
@@ -74,7 +116,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     
     setDueCards(due);
     setCurrentDueIndex(0);
-  }, [availableCards, wordDefinitions]); // Re-run when wordDefinitions changes to pick up SRS updates
+  }, [availableCards, wordDefinitions, todaysNewCards]); // Re-run when dependencies change
   
   const cardContainerRef = useRef(null);
   
@@ -232,7 +274,20 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     if (currentCard.srsData.status === 'new') {
       const newCount = todaysNewCards + 1;
       setTodaysNewCards(newCount);
-      localStorage.setItem('srsNewCardsToday', newCount.toString());
+      
+      // Save to database for profiles, skip for non-saving mode
+      if (selectedProfile !== 'non-saving') {
+        const today = new Date().toDateString();
+        fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: today, newCardsToday: newCount })
+        }).catch(error => {
+          console.error('Error saving daily SRS count:', error);
+          // Fallback to localStorage for this session
+          localStorage.setItem('srsNewCardsToday', newCount.toString());
+        });
+      }
     }
     
     // Move to next card
@@ -825,7 +880,8 @@ FlashcardMode.propTypes = {
   wordDefinitions: PropTypes.object.isRequired,
   setWordDefinitions: PropTypes.func.isRequired,
   englishSegments: PropTypes.arrayOf(PropTypes.object),
-  targetLanguages: PropTypes.arrayOf(PropTypes.string)
+  targetLanguages: PropTypes.arrayOf(PropTypes.string),
+  selectedProfile: PropTypes.string.isRequired
 };
 
 export default FlashcardMode;
