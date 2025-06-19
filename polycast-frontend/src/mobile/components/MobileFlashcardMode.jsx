@@ -258,107 +258,8 @@ const MobileFlashcardMode = ({
     }, 200);
   }, [dueCards.length]);
 
-  // Quick action for easy marking
-  const quickMarkEasy = useCallback(() => {
-    if (dueCards.length === 0 || !isFlipped) return;
-    markCard('easy');
-  }, [dueCards.length, isFlipped]);
-
-  // Gesture callbacks
-  const gestureCallbacks = useCallback({
-    onDrag: (e, startPoint, currentPoint, gesture) => {
-      if (!isFlipped) return; // Only allow dragging on flipped cards
-      
-      const { deltaX, deltaY, distance } = gesture;
-      
-      // Only track horizontal drags for answer swiping
-      if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        const rotation = deltaX * 0.1; // Slight rotation based on drag
-        const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
-        
-        setDragState({
-          isDragging: true,
-          deltaX,
-          deltaY: 0,
-          rotation,
-          opacity
-        });
-      }
-    },
-    onSwipe: (e, gesture) => {
-      e.preventDefault();
-      
-      if (!isFlipped) {
-        // On front of card, only handle navigation and flip
-        switch (gesture.direction) {
-          case 'right':
-            goToPrevCard();
-            break;
-          case 'left':
-            goToNextCard();
-            break;
-          case 'up':
-            flipCard();
-            break;
-        }
-      } else {
-        // On back of card, handle answer swiping
-        switch (gesture.direction) {
-          case 'right':
-            // Swipe right: Correct
-            markCard('correct');
-            break;
-          case 'left':
-            // Swipe left: Incorrect
-            markCard('incorrect');
-            break;
-          case 'up':
-            // Swipe up: Easy
-            markCard('easy');
-            break;
-        }
-      }
-      
-      // Reset drag state after swipe
-      setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
-    },
-    onTap: (e, point) => {
-      // Only flip if not dragging
-      if (!dragState.isDragging) {
-        flipCard();
-      }
-    },
-    onTouchEnd: () => {
-      // Reset drag state when touch ends without swiping
-      setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
-    },
-    onLongPress: (e, point) => {
-      // Long press to show quick actions
-      if (isFlipped) {
-        setShowQuickActions(true);
-        setTimeout(() => setShowQuickActions(false), 2000);
-      }
-    }
-  }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped, markCard, dragState.isDragging]);
-
-  // Initialize gesture handler
-  useEffect(() => {
-    if (!cardContainerRef.current) return;
-
-    gestureHandlerRef.current = new TouchGestureHandler(
-      cardContainerRef.current,
-      gestureCallbacks
-    );
-
-    return () => {
-      if (gestureHandlerRef.current) {
-        gestureHandlerRef.current.destroy();
-      }
-    };
-  }, [gestureCallbacks]);
-
   // Handle answer selection
-  const markCard = (answer) => {
+  const markCard = useCallback((answer) => {
     if (dueCards.length === 0) return;
     
     const currentCard = dueCards[currentDueIndex];
@@ -454,8 +355,106 @@ const MobileFlashcardMode = ({
         }, 500);
       }
     }, 200);
-  };
+  }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings]);
 
+  // Quick action for easy marking
+  const quickMarkEasy = useCallback(() => {
+    if (dueCards.length === 0 || !isFlipped) return;
+    markCard('easy');
+  }, [dueCards.length, isFlipped, markCard]);
+
+  // Gesture callbacks
+  const gestureCallbacks = useCallback({
+    onDrag: (e, startPoint, currentPoint, gesture) => {
+      if (!isFlipped) return; // Only allow dragging on flipped cards
+      
+      const { deltaX, deltaY, distance } = gesture;
+      
+      // Only track horizontal drags for answer swiping
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        const rotation = deltaX * 0.1; // Slight rotation based on drag
+        const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
+        
+        setDragState({
+          isDragging: true,
+          deltaX,
+          deltaY: 0,
+          rotation,
+          opacity
+        });
+      }
+    },
+    onSwipe: (e, gesture) => {
+      e.preventDefault();
+      
+      if (!isFlipped) {
+        // On front of card, only handle navigation and flip
+        switch (gesture.direction) {
+          case 'right':
+            goToPrevCard();
+            break;
+          case 'left':
+            goToNextCard();
+            break;
+          case 'up':
+            flipCard();
+            break;
+        }
+      } else {
+        // On back of card, handle answer swiping
+        switch (gesture.direction) {
+          case 'right':
+            // Swipe right: Correct
+            markCard('correct');
+            break;
+          case 'left':
+            // Swipe left: Incorrect
+            markCard('incorrect');
+            break;
+          case 'up':
+            // Swipe up: Easy
+            markCard('easy');
+            break;
+        }
+      }
+      
+      // Reset drag state after swipe
+      setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+    },
+    onTap: (e, point) => {
+      // Only flip if not dragging
+      if (!dragState.isDragging) {
+        flipCard();
+      }
+    },
+    onTouchEnd: () => {
+      // Reset drag state when touch ends without swiping
+      setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+    },
+    onLongPress: (e, point) => {
+      // Long press to show quick actions
+      if (isFlipped) {
+        setShowQuickActions(true);
+        setTimeout(() => setShowQuickActions(false), 2000);
+      }
+    }
+  }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped, markCard, dragState.isDragging]);
+
+  // Initialize gesture handler
+  useEffect(() => {
+    if (!cardContainerRef.current) return;
+
+    gestureHandlerRef.current = new TouchGestureHandler(
+      cardContainerRef.current,
+      gestureCallbacks
+    );
+
+    return () => {
+      if (gestureHandlerRef.current) {
+        gestureHandlerRef.current.destroy();
+      }
+    };
+  }, [gestureCallbacks]);
 
   // Calculate session stats
   const sessionDuration = Math.floor((new Date() - stats.sessionStartTime) / 1000 / 60);
