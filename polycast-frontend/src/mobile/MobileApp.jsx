@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import MobileProfileSelector from './components/MobileProfileSelector.jsx';
+import MobileFlashcardMode from './components/MobileFlashcardMode.jsx';
 import './styles/mobile.css';
 import './styles/mobile-profile.css';
+import './styles/mobile-flashcards.css';
 
 const MobileApp = () => {
   const [currentMode, setCurrentMode] = useState('profile'); // 'profile' or 'flashcards'
@@ -17,8 +19,33 @@ const MobileApp = () => {
   // Handle starting study session
   const handleStartStudying = (profile, flashcards) => {
     console.log(`[MOBILE] Starting study session for ${profile} with ${Object.keys(flashcards).length} flashcards`);
+    setSelectedProfile(profile);
+    setWordDefinitions(flashcards);
     setCurrentMode('flashcards');
-    // TODO: Phase 3 - Navigate to MobileFlashcardMode
+  };
+
+  // Handle updating word definitions from flashcard mode
+  const handleSetWordDefinitions = (newDefinitions) => {
+    setWordDefinitions(newDefinitions);
+    
+    // Save to backend if not in non-saving mode
+    if (selectedProfile !== 'non-saving') {
+      setTimeout(async () => {
+        try {
+          await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              flashcards: newDefinitions,
+              selectedWords: Object.keys(newDefinitions)
+            })
+          });
+          console.log(`[MOBILE] Saved SRS updates for profile: ${selectedProfile}`);
+        } catch (error) {
+          console.error('Error saving SRS updates:', error);
+        }
+      }, 500);
+    }
   };
 
   // Handle returning to profile selection
@@ -42,20 +69,12 @@ const MobileApp = () => {
             onStartStudying={handleStartStudying}
           />
         ) : currentMode === 'flashcards' ? (
-          <div className="mobile-flashcard-placeholder">
-            <div className="mobile-placeholder-content">
-              <h2>🚧 Flashcard Mode Coming Soon</h2>
-              <p>Phase 3 will add the mobile flashcard interface here.</p>
-              <p><strong>Profile:</strong> {selectedProfile}</p>
-              <p><strong>Cards:</strong> {Object.keys(wordDefinitions).length}</p>
-              <button 
-                className="mobile-back-button"
-                onClick={handleBackToProfile}
-              >
-                ← Back to Profiles
-              </button>
-            </div>
-          </div>
+          <MobileFlashcardMode
+            selectedProfile={selectedProfile}
+            wordDefinitions={wordDefinitions}
+            setWordDefinitions={handleSetWordDefinitions}
+            onBack={handleBackToProfile}
+          />
         ) : null}
       </div>
 
