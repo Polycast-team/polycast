@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import AppRouter from './AppRouter.jsx'
 import LanguageSelectorScreen from './components/LanguageSelectorScreen.jsx';
 import StudentLanguageSelector from './components/StudentLanguageSelector.jsx';
+import MobileApp from './mobile/MobileApp.jsx';
+import { shouldUseMobileApp } from './utils/deviceDetection.js';
 import './components/RoomSelectionScreen.css'; // Import styles
 import './index.css'
 
@@ -12,6 +14,25 @@ function Main() {
   const [selectedLanguages, setSelectedLanguages] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if device should use mobile app
+  useEffect(() => {
+    const checkDevice = () => {
+      setIsMobile(shouldUseMobileApp());
+    };
+    
+    checkDevice();
+    
+    // Recheck on resize (for responsive behavior)
+    window.addEventListener('resize', checkDevice);
+    return () => window.removeEventListener('resize', checkDevice);
+  }, []);
+
+  // If mobile device, render mobile app instead
+  if (isMobile) {
+    return <MobileApp />;
+  }
 
   // Host flow: clicking Host should immediately create a room and advance to language selection
   const handleHostClick = async () => {
