@@ -408,20 +408,14 @@ const MobileFlashcardMode = ({
             break;
         }
       } else {
-        // On back of card, handle answer swiping
+        // On back of card, only handle fast swipes as answers (not drags)
+        // Drags are handled by onTouchEnd for Tinder-style behavior
         switch (gesture.direction) {
-          case 'right':
-            // Swipe right: Correct
-            markCard('correct');
-            break;
-          case 'left':
-            // Swipe left: Incorrect
-            markCard('incorrect');
-            break;
           case 'up':
-            // Swipe up: Easy
+            // Fast swipe up: Easy
             markCard('easy');
             break;
+          // Remove left/right swipe handling here since drag handles it
         }
       }
       
@@ -436,6 +430,8 @@ const MobileFlashcardMode = ({
       }
     },
     onTouchEnd: () => {
+      console.log('[TOUCH END DEBUG] Touch ended, dragState:', dragState);
+      
       // Check if card was dragged far enough to trigger auto-swipe
       const swipeThreshold = 100; // pixels
       
@@ -445,9 +441,11 @@ const MobileFlashcardMode = ({
         // Determine direction and answer
         if (dragState.deltaX > 0) {
           // Swiped right - Correct
+          console.log('[AUTO-SWIPE] Marking as correct');
           markCard('correct');
         } else {
           // Swiped left - Incorrect  
+          console.log('[AUTO-SWIPE] Marking as incorrect');
           markCard('incorrect');
         }
         
@@ -463,6 +461,7 @@ const MobileFlashcardMode = ({
           setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
         }, 300);
       } else {
+        console.log('[TOUCH END DEBUG] Not triggering auto-swipe, resetting drag state');
         // Reset drag state when touch ends without swiping
         setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
       }
@@ -585,11 +584,17 @@ const MobileFlashcardMode = ({
             })(),
             opacity: dragState.opacity,
             transition: dragState.isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease',
-            // Add color feedback when in swipe zone
+            // Add intense color feedback when in swipe zone
             boxShadow: dragState.isInSwipeZone 
               ? dragState.deltaX > 0 
-                ? '0 0 30px rgba(34, 197, 94, 0.8)' // Green for correct
-                : '0 0 30px rgba(239, 68, 68, 0.8)'  // Red for incorrect
+                ? '0 0 50px rgba(34, 197, 94, 1), 0 0 100px rgba(34, 197, 94, 0.5)' // Intense green for correct
+                : '0 0 50px rgba(239, 68, 68, 1), 0 0 100px rgba(239, 68, 68, 0.5)'  // Intense red for incorrect
+              : undefined,
+            // Add background color overlay for more intensity  
+            backgroundColor: dragState.isInSwipeZone 
+              ? dragState.deltaX > 0 
+                ? 'rgba(34, 197, 94, 0.1)' // Subtle green background
+                : 'rgba(239, 68, 68, 0.1)'  // Subtle red background
               : undefined
           }}
         >
