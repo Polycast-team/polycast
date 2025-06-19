@@ -55,15 +55,19 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
   }, [selectedProfile]);
 
   // Count available flashcards
-  const flashcardCount = Object.values(wordDefinitions).filter(def => 
-    def && def.wordSenseId && def.inFlashcards
-  ).length;
+  const flashcardCount = selectedProfile === 'non-saving' 
+    ? 5 // Hardcoded cards for non-saving mode
+    : Object.values(wordDefinitions).filter(def => 
+        def && def.wordSenseId && def.inFlashcards
+      ).length;
 
   const selectedProfileData = profiles.find(p => p.value === selectedProfile);
 
   const handleStartStudying = () => {
     if (flashcardCount > 0) {
-      onStartStudying(selectedProfile, wordDefinitions);
+      // For non-saving mode, pass empty wordDefinitions since hardcoded cards are created in flashcard mode
+      const dataToPass = selectedProfile === 'non-saving' ? {} : wordDefinitions;
+      onStartStudying(selectedProfile, dataToPass);
     }
   };
 
@@ -132,6 +136,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
               </div>
               <div className="mobile-flashcard-count">
                 {flashcardCount} flashcard{flashcardCount !== 1 ? 's' : ''} available
+                {selectedProfile === 'non-saving' && <span style={{color: 'red', fontSize: '10px'}}> (HC)</span>}
               </div>
             </div>
           </div>
