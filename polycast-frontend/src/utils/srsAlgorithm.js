@@ -181,35 +181,55 @@ function handleRelearningCard(srsData, answer, now) {
  * Get cards due for review, sorted by priority
  * @param {Array} allCards - All flashcard objects
  * @param {Object} settings - Review settings (newPerDay, etc.)
+ * @param {boolean} includeWaiting - Include learning cards that are waiting (not yet due)
  * @returns {Array} Cards ready for review
  */
-export function getDueCards(allCards, settings = {}) {
+export function getDueCards(allCards, settings = {}, includeWaiting = false) {
   const now = new Date();
   const maxNew = settings.newPerDay || 5;
   
   // Filter cards that have srsData
   const cardsWithSRS = allCards.filter(card => card.srsData);
   
-  // Separate cards by status
-  const dueCards = cardsWithSRS.filter(card => {
+  // Separate cards by status and due date
+  const strictlyDueCards = cardsWithSRS.filter(card => {
     const dueDate = new Date(card.srsData.nextReviewDate);
     return dueDate <= now && card.srsData.status !== 'new';
   });
   
+  // Learning cards that are waiting (not yet due but in learning phase)
+  const waitingLearningCards = cardsWithSRS.filter(card => {
+    const dueDate = new Date(card.srsData.nextReviewDate);
+    return dueDate > now && 
+           (card.srsData.status === 'learning' || card.srsData.status === 'relearning') &&
+           (dueDate - now) < (24 * 60 * 60 * 1000); // Due within 24 hours
+  });
+  
   const newCards = cardsWithSRS.filter(card => card.srsData.status === 'new');
   
-  // Sort by priority: relearning > learning > review
-  const relearning = dueCards.filter(c => c.srsData.status === 'relearning');
-  const learning = dueCards.filter(c => c.srsData.status === 'learning');
-  const review = dueCards.filter(c => c.srsData.status === 'review');
+  // Sort strictly due cards by priority: relearning > learning > review
+  const relearning = strictlyDueCards.filter(c => c.srsData.status === 'relearning');
+  const learning = strictlyDueCards.filter(c => c.srsData.status === 'learning');
+  const review = strictlyDueCards.filter(c => c.srsData.status === 'review');
   
-  // Combine in priority order, limiting new cards
-  return [
+  // Base queue: priority cards + new cards (limited)
+  const baseQueue = [
     ...relearning,
     ...learning,
     ...review,
     ...newCards.slice(0, maxNew)
   ];
+  
+  // If we're including waiting cards (when no other cards available), add them
+  if (includeWaiting && baseQueue.length === 0) {
+    // Sort waiting cards by how close they are to being due
+    const sortedWaitingCards = waitingLearningCards.sort((a, b) => {
+      return new Date(a.srsData.nextReviewDate) - new Date(b.srsData.nextReviewDate);
+    });
+    return sortedWaitingCards;
+  }
+  
+  return baseQueue;
 }
 
 /**

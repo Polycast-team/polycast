@@ -59,7 +59,13 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     }
     
     // Get due cards using SRS algorithm
-    const due = getDueCards(availableCards, { newPerDay: 5 - storedCount });
+    let due = getDueCards(availableCards, { newPerDay: 5 - storedCount }, false);
+    
+    // If no cards are strictly due, include waiting learning cards
+    if (due.length === 0) {
+      due = getDueCards(availableCards, { newPerDay: 5 - storedCount }, true);
+    }
+    
     setDueCards(due);
     setCurrentDueIndex(0);
   }, [availableCards, wordDefinitions]); // Re-run when wordDefinitions changes to pick up SRS updates
@@ -270,7 +276,14 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
             }
           });
           
-          const refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: 5 - todaysNewCards });
+          // First try to get strictly due cards
+          let refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: 5 - todaysNewCards }, false);
+          
+          // If no cards are strictly due, include waiting learning cards (Anki behavior)
+          if (refreshedDueCards.length === 0) {
+            refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: 5 - todaysNewCards }, true);
+          }
+          
           setDueCards(refreshedDueCards);
           setCurrentDueIndex(0);
         }, 500);
@@ -491,16 +504,54 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           
           {/* Get the current due card data */}
           {(() => {
-            if (!dueCards.length) return (
-              <div className="flashcard-empty-state">
-                <div className="empty-state-icon">🎉</div>
-                <h2>All Done!</h2>
-                <p>You've reviewed all cards due today. Come back tomorrow for more!</p>
-                <div style={{ marginTop: '20px', fontSize: '14px', color: '#999' }}>
-                  Total cards: {availableCards.length} | Tomorrow: {srsStats.total - srsStats.dueToday} due
+            if (!dueCards.length) {
+              // Check if there are any waiting learning cards
+              const waitingCards = getDueCards(availableCards, { newPerDay: 5 - todaysNewCards }, true);
+              
+              if (waitingCards.length > 0) {
+                const nextCard = waitingCards[0];
+                const nextDueDate = new Date(nextCard.srsData.nextReviewDate);
+                const timeUntilNext = formatNextReviewTime(nextCard.srsData.nextReviewDate);
+                
+                return (
+                  <div className="flashcard-empty-state">
+                    <div className="empty-state-icon">⏰</div>
+                    <h2>Waiting for Learning Cards</h2>
+                    <p>You have {waitingCards.length} learning card{waitingCards.length > 1 ? 's' : ''} waiting.</p>
+                    <p>Next card available in: <strong>{timeUntilNext}</strong></p>
+                    <button 
+                      onClick={() => {
+                        setDueCards(waitingCards);
+                        setCurrentDueIndex(0);
+                      }}
+                      style={{
+                        marginTop: '15px',
+                        padding: '10px 20px',
+                        background: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '16px'
+                      }}
+                    >
+                      Study Waiting Cards Now
+                    </button>
+                  </div>
+                );
+              }
+              
+              return (
+                <div className="flashcard-empty-state">
+                  <div className="empty-state-icon">🎉</div>
+                  <h2>All Done!</h2>
+                  <p>You've reviewed all cards due today. Come back tomorrow for more!</p>
+                  <div style={{ marginTop: '20px', fontSize: '14px', color: '#999' }}>
+                    Total cards: {availableCards.length} | Tomorrow: {srsStats.total - srsStats.dueToday} due
+                  </div>
                 </div>
-              </div>
-            );
+              );
+            }
             
             const currentCardData = dueCards[currentDueIndex];
             const currentSenseId = currentCardData?.wordSenseId;
