@@ -376,15 +376,18 @@ const MobileFlashcardMode = ({
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
         const rotation = deltaX * 0.1; // Slight rotation based on drag
         const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
+        const swipeThreshold = 100;
+        const isInSwipeZone = Math.abs(deltaX) > swipeThreshold;
         
-        console.log('[DRAG DEBUG] Setting drag state:', { deltaX, rotation, opacity });
+        console.log('[DRAG DEBUG] Setting drag state:', { deltaX, rotation, opacity, isInSwipeZone });
         
         setDragState({
           isDragging: true,
           deltaX,
           deltaY: 0,
           rotation,
-          opacity
+          opacity,
+          isInSwipeZone
         });
       }
     },
@@ -433,8 +436,36 @@ const MobileFlashcardMode = ({
       }
     },
     onTouchEnd: () => {
-      // Reset drag state when touch ends without swiping
-      setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+      // Check if card was dragged far enough to trigger auto-swipe
+      const swipeThreshold = 100; // pixels
+      
+      if (dragState.isDragging && Math.abs(dragState.deltaX) > swipeThreshold) {
+        console.log('[AUTO-SWIPE] Triggering auto-swipe with deltaX:', dragState.deltaX);
+        
+        // Determine direction and answer
+        if (dragState.deltaX > 0) {
+          // Swiped right - Correct
+          markCard('correct');
+        } else {
+          // Swiped left - Incorrect  
+          markCard('incorrect');
+        }
+        
+        // Animate card flying off screen
+        setDragState(prev => ({
+          ...prev,
+          deltaX: dragState.deltaX > 0 ? window.innerWidth : -window.innerWidth,
+          opacity: 0
+        }));
+        
+        // Reset after animation
+        setTimeout(() => {
+          setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+        }, 300);
+      } else {
+        // Reset drag state when touch ends without swiping
+        setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+      }
     },
     onLongPress: (e, point) => {
       // Long press to show quick actions
@@ -553,7 +584,13 @@ const MobileFlashcardMode = ({
               return finalTransform;
             })(),
             opacity: dragState.opacity,
-            transition: dragState.isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease'
+            transition: dragState.isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease',
+            // Add color feedback when in swipe zone
+            boxShadow: dragState.isInSwipeZone 
+              ? dragState.deltaX > 0 
+                ? '0 0 30px rgba(34, 197, 94, 0.8)' // Green for correct
+                : '0 0 30px rgba(239, 68, 68, 0.8)'  // Red for incorrect
+              : undefined
           }}
         >
           {/* Front of Card */}
