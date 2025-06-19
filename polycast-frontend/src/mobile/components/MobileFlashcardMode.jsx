@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { calculateNextReview, getDueCards, getReviewStats, formatNextReviewTime } from '../../utils/srsAlgorithm';
 import { getSRSSettings } from '../../utils/srsSettings';
+import { TouchGestureHandler } from '../utils/touchGestures';
 
 const MobileFlashcardMode = ({ 
   selectedProfile, 
@@ -19,6 +20,12 @@ const MobileFlashcardMode = ({
     correctAnswers: 0,
     sessionStartTime: new Date()
   });
+  const [swipeAnimation, setSwipeAnimation] = useState('');
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  
+  // Refs for gesture handling
+  const cardContainerRef = useRef(null);
+  const gestureHandlerRef = useRef(null);
 
   // Process the wordDefinitions to extract all word senses
   const availableCards = React.useMemo(() => {
@@ -90,9 +97,95 @@ const MobileFlashcardMode = ({
   const srsStats = React.useMemo(() => getReviewStats(availableCards), [availableCards]);
 
   // Handle card flipping
-  const flipCard = () => {
+  const flipCard = useCallback(() => {
     setIsFlipped(prev => !prev);
-  };
+  }, []);
+
+  // Enhanced navigation with animations
+  const goToNextCard = useCallback(() => {
+    if (dueCards.length === 0) return;
+    setSwipeAnimation('slide-out-left');
+    setTimeout(() => {
+      setIsFlipped(false);
+      setCurrentDueIndex(prev => (prev + 1) % dueCards.length);
+      setSwipeAnimation('slide-in-right');
+      setTimeout(() => setSwipeAnimation(''), 300);
+    }, 200);
+  }, [dueCards.length]);
+
+  const goToPrevCard = useCallback(() => {
+    if (dueCards.length === 0) return;
+    setSwipeAnimation('slide-out-right');
+    setTimeout(() => {
+      setIsFlipped(false);
+      setCurrentDueIndex(prev => prev === 0 ? dueCards.length - 1 : prev - 1);
+      setSwipeAnimation('slide-in-left');
+      setTimeout(() => setSwipeAnimation(''), 300);
+    }, 200);
+  }, [dueCards.length]);
+
+  // Quick action for easy marking
+  const quickMarkEasy = useCallback(() => {
+    if (dueCards.length === 0 || !isFlipped) return;
+    markCard('easy');
+  }, [dueCards.length, isFlipped]);
+
+  // Gesture callbacks
+  const gestureCallbacks = useCallback({
+    onSwipe: (e, gesture) => {
+      e.preventDefault();
+      
+      switch (gesture.direction) {
+        case 'right':
+          // Swipe right: Previous card
+          goToPrevCard();
+          break;
+        case 'left':
+          // Swipe left: Next card
+          goToNextCard();
+          break;
+        case 'up':
+          // Swipe up: Flip card
+          if (!isFlipped) {
+            flipCard();
+          }
+          break;
+        case 'down':
+          // Swipe down: Mark as easy (if card is flipped)
+          if (isFlipped) {
+            quickMarkEasy();
+          }
+          break;
+      }
+    },
+    onTap: (e, point) => {
+      // Tap to flip card
+      flipCard();
+    },
+    onLongPress: (e, point) => {
+      // Long press to show quick actions
+      if (isFlipped) {
+        setShowQuickActions(true);
+        setTimeout(() => setShowQuickActions(false), 2000);
+      }
+    }
+  }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped]);
+
+  // Initialize gesture handler
+  useEffect(() => {
+    if (!cardContainerRef.current) return;
+
+    gestureHandlerRef.current = new TouchGestureHandler(
+      cardContainerRef.current,
+      gestureCallbacks
+    );
+
+    return () => {
+      if (gestureHandlerRef.current) {
+        gestureHandlerRef.current.destroy();
+      }
+    };
+  }, [gestureCallbacks]);
 
   // Handle answer selection
   const markCard = (answer) => {
@@ -193,18 +286,6 @@ const MobileFlashcardMode = ({
     }, 200);
   };
 
-  // Navigate to next/previous card
-  const goToNextCard = () => {
-    if (dueCards.length === 0) return;
-    setIsFlipped(false);
-    setCurrentDueIndex(prev => (prev + 1) % dueCards.length);
-  };
-
-  const goToPrevCard = () => {
-    if (dueCards.length === 0) return;
-    setIsFlipped(false);
-    setCurrentDueIndex(prev => prev === 0 ? dueCards.length - 1 : prev - 1);
-  };
 
   // Calculate session stats
   const sessionDuration = Math.floor((new Date() - stats.sessionStartTime) / 1000 / 60);
@@ -283,10 +364,9 @@ const MobileFlashcardMode = ({
       </div>
 
       {/* Card Container */}
-      <div className="mobile-card-container">
+      <div className="mobile-card-container" ref={cardContainerRef}>
         <div 
-          className={`mobile-flashcard ${isFlipped ? 'flipped' : ''}`}
-          onClick={flipCard}
+          className={`mobile-flashcard ${isFlipped ? 'flipped' : ''} ${swipeAnimation}`}
         >
           {/* Front of Card */}
           <div className="mobile-card-front">
@@ -309,7 +389,7 @@ const MobileFlashcardMode = ({
                       </div>
                     )}
                     <div className="mobile-card-hint">
-                      Tap to reveal answer
+                      Tap or swipe up to reveal • Swipe left/right to navigate
                     </div>
                   </div>
                 );
@@ -322,7 +402,7 @@ const MobileFlashcardMode = ({
                 </div>
                 <div className="mobile-card-pos">{currentCard.partOfSpeech || 'word'}</div>
                 <div className="mobile-card-hint">
-                  Tap to see definition
+                  Tap or swipe up to see definition • Swipe left/right to navigate
                 </div>
               </div>
             )}
@@ -372,6 +452,37 @@ const MobileFlashcardMode = ({
               )}
             </div>
           </div>
+        </div>
+        
+        {/* Quick Actions Overlay */}
+        {showQuickActions && isFlipped && (
+          <div className="mobile-quick-actions-overlay">
+            <div className="mobile-quick-action-hint">
+              <div className="mobile-quick-hint-text">Quick Actions:</div>
+              <div className="mobile-quick-hint-item">↓ Swipe down for Easy</div>
+              <div className="mobile-quick-hint-item">← → Swipe for navigation</div>
+            </div>
+          </div>
+        )}
+        
+        {/* Gesture Hints */}
+        <div className="mobile-gesture-hints">
+          <div className="mobile-gesture-hint mobile-gesture-left">
+            <span>‹</span>
+          </div>
+          <div className="mobile-gesture-hint mobile-gesture-right">
+            <span>›</span>
+          </div>
+          {!isFlipped && (
+            <div className="mobile-gesture-hint mobile-gesture-up">
+              <span>↑</span>
+            </div>
+          )}
+          {isFlipped && (
+            <div className="mobile-gesture-hint mobile-gesture-down">
+              <span>↓</span>
+            </div>
+          )}
         </div>
       </div>
 

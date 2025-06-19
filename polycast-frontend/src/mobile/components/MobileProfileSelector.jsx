@@ -55,7 +55,7 @@ const MobileProfileSelector = ({ onProfileSelect, onStartStudying }) => {
     };
 
     fetchProfileData();
-  }, [selectedProfile, onProfileSelect]);
+  }, [selectedProfile]);
 
   // Count available flashcards
   const flashcardCount = Object.values(wordDefinitions).filter(def => 

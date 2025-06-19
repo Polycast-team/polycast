@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import MobileProfileSelector from './components/MobileProfileSelector.jsx';
 import MobileFlashcardMode from './components/MobileFlashcardMode.jsx';
 import './styles/mobile.css';
@@ -11,18 +11,18 @@ const MobileApp = () => {
   const [wordDefinitions, setWordDefinitions] = useState({});
 
   // Handle profile selection
-  const handleProfileSelect = (profile, flashcards) => {
+  const handleProfileSelect = useCallback((profile, flashcards) => {
     setSelectedProfile(profile);
     setWordDefinitions(flashcards);
-  };
+  }, []);
 
   // Handle starting study session
-  const handleStartStudying = (profile, flashcards) => {
+  const handleStartStudying = useCallback((profile, flashcards) => {
     console.log(`[MOBILE] Starting study session for ${profile} with ${Object.keys(flashcards).length} flashcards`);
     setSelectedProfile(profile);
     setWordDefinitions(flashcards);
     setCurrentMode('flashcards');
-  };
+  }, []);
 
   // Handle updating word definitions from flashcard mode
   const handleSetWordDefinitions = (newDefinitions) => {

@@ -102,6 +102,8 @@
   justify-content: center;
   padding: 20px;
   perspective: 1000px;
+  position: relative;
+  touch-action: pan-y; /* Allow vertical scrolling but enable horizontal gestures */
 }
 
 .mobile-flashcard {
@@ -116,6 +118,53 @@
 
 .mobile-flashcard.flipped {
   transform: rotateY(180deg);
+}
+
+/* Swipe Animations */
+.mobile-flashcard.slide-out-left {
+  transform: translateX(-100%) rotateY(0deg);
+  opacity: 0;
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+.mobile-flashcard.slide-out-right {
+  transform: translateX(100%) rotateY(0deg);
+  opacity: 0;
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+.mobile-flashcard.slide-in-left {
+  transform: translateX(-100%) rotateY(0deg);
+  opacity: 0;
+  animation: mobile-slide-in-left 0.3s ease-out forwards;
+}
+
+.mobile-flashcard.slide-in-right {
+  transform: translateX(100%) rotateY(0deg);
+  opacity: 0;
+  animation: mobile-slide-in-right 0.3s ease-out forwards;
+}
+
+@keyframes mobile-slide-in-left {
+  0% {
+    transform: translateX(-100%) rotateY(0deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0) rotateY(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes mobile-slide-in-right {
+  0% {
+    transform: translateX(100%) rotateY(0deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0) rotateY(0deg);
+    opacity: 1;
+  }
 }
 
 .mobile-card-front,
@@ -522,6 +571,146 @@
   }
 }
 
+/* Gesture Hints */
+.mobile-gesture-hints {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.mobile-gesture-hint {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.2rem;
+  font-weight: 700;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  opacity: 0;
+  animation: mobile-hint-pulse 3s infinite;
+}
+
+.mobile-gesture-left {
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  animation-delay: 0s;
+}
+
+.mobile-gesture-right {
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  animation-delay: 1s;
+}
+
+.mobile-gesture-up {
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: 2s;
+}
+
+.mobile-gesture-down {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: 0.5s;
+}
+
+@keyframes mobile-hint-pulse {
+  0%, 85%, 100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  5%, 80% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+  42.5% {
+    opacity: 0.4;
+    transform: scale(1.05);
+  }
+}
+
+/* Quick Actions Overlay */
+.mobile-quick-actions-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 20px;
+  z-index: 10;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  animation: mobile-quick-actions-appear 0.3s ease-out;
+}
+
+.mobile-quick-action-hint {
+  text-align: center;
+  color: #ffffff;
+}
+
+.mobile-quick-hint-text {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #5f72ff;
+}
+
+.mobile-quick-hint-item {
+  font-size: 0.9rem;
+  margin: 8px 0;
+  color: #d1d5db;
+  font-weight: 500;
+}
+
+@keyframes mobile-quick-actions-appear {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Enhanced card hints */
+.mobile-card-hint {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  font-weight: 500;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* Touch feedback */
+.mobile-flashcard:active {
+  transform: scale(0.98);
+}
+
+.mobile-answer-btn:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
 /* Portrait orientation adjustments */
 @media (orientation: portrait) and (max-height: 700px) {
   .mobile-card-container {
@@ -539,5 +728,11 @@
   .mobile-answer-btn {
     min-height: 64px;
     padding: 12px 8px;
+  }
+  
+  .mobile-gesture-hint {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
   }
 }
