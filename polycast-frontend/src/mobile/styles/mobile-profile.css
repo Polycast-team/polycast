@@ -6,6 +6,29 @@
   padding: 0;
 }
 
+.mobile-profile-back {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+
+.mobile-profile-back .mobile-back-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-profile-back .mobile-back-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateX(-2px);
+}
+
 /* Profile Selection Section */
 .mobile-profile-section {
   background: rgba(255, 255, 255, 0.05);

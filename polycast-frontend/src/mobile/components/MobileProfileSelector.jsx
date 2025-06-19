@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
-const MobileProfileSelector = ({ onProfileSelect, onStartStudying }) => {
-  const [selectedProfile, setSelectedProfile] = useState('non-saving');
+const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudying, onBack }) => {
+  const [selectedProfile, setSelectedProfile] = useState(initialProfile || 'non-saving');
   const [wordDefinitions, setWordDefinitions] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -69,6 +69,13 @@ const MobileProfileSelector = ({ onProfileSelect, onStartStudying }) => {
 
   return (
     <div className="mobile-profile-selector">
+      {/* Back Button */}
+      <div className="mobile-profile-back">
+        <button className="mobile-back-btn" onClick={onBack}>
+          ← Change Profile
+        </button>
+      </div>
+
       {/* Profile Selection */}
       <div className="mobile-profile-section">
         <label className="mobile-label">
@@ -188,8 +195,9 @@ const MobileProfileSelector = ({ onProfileSelect, onStartStudying }) => {
 };
 
 MobileProfileSelector.propTypes = {
-  onProfileSelect: PropTypes.func.isRequired,
-  onStartStudying: PropTypes.func.isRequired
+  selectedProfile: PropTypes.string,
+  onStartStudying: PropTypes.func.isRequired,
+  onBack: PropTypes.func.isRequired
 };
 
 export default MobileProfileSelector;

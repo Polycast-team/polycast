@@ -81,12 +81,17 @@ const MobileFlashcardMode = ({
 
   // Update due cards when dependencies change
   useEffect(() => {
+    console.log(`[MOBILE DEBUG] Available cards:`, availableCards.length, availableCards);
     const currentSettings = getSRSSettings();
     const maxNewToday = Math.max(0, currentSettings.newCardsPerDay - todaysNewCards);
+    console.log(`[MOBILE DEBUG] Max new cards today:`, maxNewToday, `(total: ${currentSettings.newCardsPerDay}, used: ${todaysNewCards})`);
+    
     let due = getDueCards(availableCards, { newPerDay: maxNewToday }, false);
+    console.log(`[MOBILE DEBUG] Due cards (strict):`, due.length, due);
     
     if (due.length === 0) {
       due = getDueCards(availableCards, { newPerDay: maxNewToday }, true);
+      console.log(`[MOBILE DEBUG] Due cards (fallback):`, due.length, due);
     }
     
     setDueCards(due);
