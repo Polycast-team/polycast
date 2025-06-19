@@ -62,7 +62,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     const due = getDueCards(availableCards, { newPerDay: 5 - storedCount });
     setDueCards(due);
     setCurrentDueIndex(0);
-  }, [availableCards]);
+  }, [availableCards, wordDefinitions]); // Re-run when wordDefinitions changes to pick up SRS updates
   
   const cardContainerRef = useRef(null);
   
@@ -192,12 +192,14 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     const updatedSrsData = calculateNextReview(currentCard, answer);
     
     // Update the card in wordDefinitions with new SRS data
+    const updatedCard = {
+      ...currentCard,
+      srsData: updatedSrsData
+    };
+    
     setWordDefinitions(prev => ({
       ...prev,
-      [currentCard.key]: {
-        ...currentCard,
-        srsData: updatedSrsData
-      }
+      [currentCard.key]: updatedCard
     }));
     
     // Update stats
@@ -226,14 +228,52 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     setTimeout(() => {
       setIsFlipped(false);
       
-      // Move to next due card or finish session
-      if (currentDueIndex < dueCards.length - 1) {
-        setCurrentDueIndex(prev => prev + 1);
-      } else {
-        // Session complete - refresh due cards
-        const newDueCards = getDueCards(availableCards, { newPerDay: 5 - todaysNewCards });
+      // Update the due cards list
+      const now = new Date();
+      const updatedDueDate = new Date(updatedSrsData.nextReviewDate);
+      
+      // If the card is still due today (within next 24 hours), keep it in rotation
+      const stillDueToday = (updatedDueDate - now) < (24 * 60 * 60 * 1000);
+      
+      if (stillDueToday && updatedSrsData.status !== 'review') {
+        // Move card to end of queue
+        const newDueCards = [...dueCards];
+        newDueCards.splice(currentDueIndex, 1);
+        newDueCards.push(updatedCard);
         setDueCards(newDueCards);
-        setCurrentDueIndex(0);
+        
+        // Stay at same index (which now shows next card)
+        if (currentDueIndex >= newDueCards.length) {
+          setCurrentDueIndex(0);
+        }
+      } else {
+        // Remove card from today's queue
+        const newDueCards = dueCards.filter((_, index) => index !== currentDueIndex);
+        setDueCards(newDueCards);
+        
+        // Adjust index if needed
+        if (currentDueIndex >= newDueCards.length && newDueCards.length > 0) {
+          setCurrentDueIndex(newDueCards.length - 1);
+        }
+      }
+      
+      // If no more cards in current queue, wait a bit for state updates then refresh
+      if (dueCards.length <= 1) {
+        setTimeout(() => {
+          // Re-fetch all cards with updated SRS data
+          const updatedAvailableCards = [];
+          Object.entries(wordDefinitions).forEach(([key, value]) => {
+            if (value && value.wordSenseId && value.inFlashcards) {
+              // Include the card with potentially updated SRS data
+              const cardToCheck = key === currentCard.key ? updatedCard : value;
+              updatedAvailableCards.push({ ...cardToCheck, key });
+            }
+          });
+          
+          const refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: 5 - todaysNewCards });
+          setDueCards(refreshedDueCards);
+          setCurrentDueIndex(0);
+        }, 500);
       }
       
       setCardAnimation('slide-in-right');
