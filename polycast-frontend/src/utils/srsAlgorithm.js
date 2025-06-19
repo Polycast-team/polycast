@@ -41,11 +41,11 @@ function handleNewCard(srsData, answer, now, settings) {
   
   switch (answer) {
     case 'incorrect':
-      // Stay in learning mode, review again at first learning step
+      // Stay in learning mode, review again in 1 minute (immediate review)
       updated.status = 'learning';
       updated.interval = 0;
       updated.currentStep = 0;
-      updated.nextReviewDate = addMinutes(now, settings.learningSteps[0]).toISOString();
+      updated.nextReviewDate = addMinutes(now, 1).toISOString();
       break;
       
     case 'correct':
@@ -80,11 +80,11 @@ function handleLearningCard(srsData, answer, now, settings) {
   
   switch (answer) {
     case 'incorrect':
-      // Reset to beginning of learning phase
+      // Reset to beginning of learning phase with 1 minute review
       updated.repetitions = 0;
       updated.lapses++;
       updated.currentStep = 0;
-      updated.nextReviewDate = addMinutes(now, settings.learningSteps[0]).toISOString();
+      updated.nextReviewDate = addMinutes(now, 1).toISOString();
       break;
       
     case 'correct':
@@ -166,9 +166,9 @@ function handleRelearningCard(srsData, answer, now, settings) {
   
   switch (answer) {
     case 'incorrect':
-      // Reset to beginning of relearning
+      // Reset to beginning of relearning with 1 minute immediate review
       updated.currentStep = 0;
-      updated.nextReviewDate = addMinutes(now, settings.relearningSteps[0]).toISOString();
+      updated.nextReviewDate = addMinutes(now, 1).toISOString();
       break;
       
     case 'correct':
