@@ -10,6 +10,7 @@ const MobileFlashcardMode = ({
   setWordDefinitions, 
   onBack 
 }) => {
+  console.log(`[MOBILE DEBUG] MobileFlashcardMode loaded - version with hardcoded cards - ${new Date().toISOString()}`);
   const [currentDueIndex, setCurrentDueIndex] = useState(0);
   const [dueCards, setDueCards] = useState([]);
   const [todaysNewCards, setTodaysNewCards] = useState(0);
@@ -130,10 +131,12 @@ const MobileFlashcardMode = ({
 
   // Process the wordDefinitions to extract all word senses and initialize SRS data
   const availableCards = React.useMemo(() => {
+    console.log(`[MOBILE DEBUG] Selected profile is: "${selectedProfile}"`);
     // For non-saving mode, use hardcoded cards
     if (selectedProfile === 'non-saving') {
       const hardcodedCards = getHardcodedCards();
       console.log(`[MOBILE DEBUG] Using hardcoded cards for non-saving mode:`, hardcodedCards);
+      console.log(`[MOBILE DEBUG] First card example:`, hardcodedCards[0]?.exampleSentencesGenerated);
       return hardcodedCards;
     }
 
