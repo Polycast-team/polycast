@@ -264,6 +264,61 @@
   }
 }
 
+/* Flashcard Mode Placeholder (Phase 3 preview) */
+.mobile-flashcard-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.mobile-placeholder-content {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  max-width: 320px;
+}
+
+.mobile-placeholder-content h2 {
+  margin: 0 0 16px 0;
+  color: #ffffff;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.mobile-placeholder-content p {
+  margin: 8px 0;
+  color: #b3b3e7;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.mobile-back-button {
+  background: linear-gradient(45deg, #6b7280, #4b5563);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 20px;
+  min-height: 44px;
+}
+
+.mobile-back-button:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(45deg, #4b5563, #374151);
+}
+
+.mobile-back-button:active {
+  transform: translateY(0);
+}
+
 /* Dark mode safe colors */
 @media (prefers-color-scheme: light) {
   /* Mobile app always uses dark theme for consistency */
