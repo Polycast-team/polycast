@@ -27,6 +27,7 @@ const MobileLogin = ({ onProfileSelect }) => {
           <div className="mobile-login-icon">📚</div>
           <h1 className="mobile-login-title">Welcome to PolyCast</h1>
           <p className="mobile-login-subtitle">Select your study profile to begin</p>
+          <div style={{color: 'red', fontSize: '12px', marginTop: '8px'}}>DEBUG: Version 2.0 - Hardcoded Cards</div>
         </div>
 
         <div className="mobile-login-form">

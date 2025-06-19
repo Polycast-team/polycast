@@ -476,6 +476,7 @@ const MobileFlashcardMode = ({
         <button className="mobile-back-btn" onClick={onBack}>
           ← Back
         </button>
+        <div style={{color: 'red', fontSize: '10px'}}>V2.0-HC</div>
         <div className="mobile-header-stats">
           <div className="mobile-header-progress">
             {currentDueIndex + 1} of {dueCards.length}
