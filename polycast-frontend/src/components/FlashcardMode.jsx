@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import './FlashcardMode.css';
 import { calculateNextReview, getDueCards, getReviewStats, formatNextReviewTime } from '../utils/srsAlgorithm';
+import { getSRSSettings } from '../utils/srsSettings';
+import SRSSettings from './SRSSettings';
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -9,6 +11,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   const [todaysNewCards, setTodaysNewCards] = useState(0);
   const [dueCards, setDueCards] = useState([]);
   const [currentDueIndex, setCurrentDueIndex] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [srsSettings, setSrsSettings] = useState(getSRSSettings());
   const [isFlipped, setIsFlipped] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState({
@@ -58,12 +62,14 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       setTodaysNewCards(storedCount);
     }
     
-    // Get due cards using SRS algorithm
-    let due = getDueCards(availableCards, { newPerDay: 5 - storedCount }, false);
+    // Get due cards using SRS algorithm with current settings
+    const currentSettings = getSRSSettings();
+    const maxNewToday = Math.max(0, currentSettings.newCardsPerDay - storedCount);
+    let due = getDueCards(availableCards, { newPerDay: maxNewToday }, false);
     
     // If no cards are strictly due, include waiting learning cards
     if (due.length === 0) {
-      due = getDueCards(availableCards, { newPerDay: 5 - storedCount }, true);
+      due = getDueCards(availableCards, { newPerDay: maxNewToday }, true);
     }
     
     setDueCards(due);
@@ -277,11 +283,13 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           });
           
           // First try to get strictly due cards
-          let refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: 5 - todaysNewCards }, false);
+          const currentSettings = getSRSSettings();
+          const maxNewForRefresh = Math.max(0, currentSettings.newCardsPerDay - todaysNewCards);
+          let refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: maxNewForRefresh }, false);
           
           // If no cards are strictly due, include waiting learning cards (Anki behavior)
           if (refreshedDueCards.length === 0) {
-            refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: 5 - todaysNewCards }, true);
+            refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: maxNewForRefresh }, true);
           }
           
           setDueCards(refreshedDueCards);
@@ -417,8 +425,31 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     return ratings[rating] || 'Unknown';
   };
   
+  const handleSettingsChange = (newSettings) => {
+    setSrsSettings(newSettings);
+    
+    // Refresh due cards with new settings
+    const maxNewToday = Math.max(0, newSettings.newCardsPerDay - todaysNewCards);
+    let refreshedDueCards = getDueCards(availableCards, { newPerDay: maxNewToday }, false);
+    
+    // If no cards are strictly due, include waiting learning cards
+    if (refreshedDueCards.length === 0) {
+      refreshedDueCards = getDueCards(availableCards, { newPerDay: maxNewToday }, true);
+    }
+    
+    setDueCards(refreshedDueCards);
+    setCurrentDueIndex(0);
+  };
+
   return (
     <div className="flashcard-mode">
+      {showSettings && (
+        <SRSSettings 
+          onClose={() => setShowSettings(false)}
+          onSettingsChange={handleSettingsChange}
+        />
+      )}
+      
       {availableCards.length === 0 ? (
         <div className="flashcard-empty-state">
           <div className="empty-state-icon">📚</div>
@@ -488,16 +519,28 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       ) : (
         <>
           <div className="flashcard-header">
-            <button 
-              className="flashcard-stats-button" 
-              onClick={() => setShowStats(true)}
-            >
-              View Stats ({stats.cardsReviewed} reviewed)
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                className="flashcard-stats-button" 
+                onClick={() => setShowStats(true)}
+              >
+                View Stats ({stats.cardsReviewed} reviewed)
+              </button>
+              <button 
+                className="flashcard-stats-button" 
+                onClick={() => setShowSettings(true)}
+                style={{ background: '#4CAF50' }}
+              >
+                ⚙️ Settings
+              </button>
+            </div>
             <div className="card-count">
               <div>Card {currentDueIndex + 1} of {dueCards.length} due</div>
               <div style={{ fontSize: '12px', color: '#999' }}>
                 New: {srsStats.new} | Learning: {srsStats.learning} | Review: {srsStats.review}
+              </div>
+              <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>
+                Daily limit: {todaysNewCards}/{srsSettings.newCardsPerDay} new cards
               </div>
             </div>
           </div>
@@ -506,7 +549,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           {(() => {
             if (!dueCards.length) {
               // Check if there are any waiting learning cards
-              const waitingCards = getDueCards(availableCards, { newPerDay: 5 - todaysNewCards }, true);
+              const maxNewForWaiting = Math.max(0, srsSettings.newCardsPerDay - todaysNewCards);
+              const waitingCards = getDueCards(availableCards, { newPerDay: maxNewForWaiting }, true);
               
               if (waitingCards.length > 0) {
                 const nextCard = waitingCards[0];
