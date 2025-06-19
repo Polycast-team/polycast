@@ -27,14 +27,29 @@ const MobileFlashcardMode = ({
   const cardContainerRef = useRef(null);
   const gestureHandlerRef = useRef(null);
 
-  // Process the wordDefinitions to extract all word senses
+  // Process the wordDefinitions to extract all word senses and initialize SRS data
   const availableCards = React.useMemo(() => {
     const cards = [];
     Object.entries(wordDefinitions).forEach(([key, value]) => {
       if (value && value.wordSenseId && value.inFlashcards) {
-        cards.push({ ...value, key });
+        // Initialize SRS data if it doesn't exist
+        const cardWithSRS = { ...value, key };
+        if (!cardWithSRS.srsData) {
+          cardWithSRS.srsData = {
+            status: 'new',
+            interval: 0,
+            easeFactor: 2.5,
+            correctCount: 0,
+            incorrectCount: 0,
+            lastReviewDate: null,
+            nextReviewDate: new Date().toISOString(), // Due now
+            currentStep: 0
+          };
+        }
+        cards.push(cardWithSRS);
       }
     });
+    console.log(`[MOBILE DEBUG] Processed cards with SRS data:`, cards);
     return cards;
   }, [wordDefinitions]);
 
