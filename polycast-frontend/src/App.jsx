@@ -979,6 +979,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
           <FlashcardMode 
             selectedWords={selectedWords}
             wordDefinitions={wordDefinitions}
+            setWordDefinitions={setWordDefinitions}
             englishSegments={englishSegments}
             targetLanguages={effectiveLanguages}
           />

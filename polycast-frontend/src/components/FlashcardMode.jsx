@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import './FlashcardMode.css';
+import { calculateNextReview, getDueCards, getReviewStats, formatNextReviewTime } from '../utils/srsAlgorithm';
 
-const FlashcardMode = ({ selectedWords, wordDefinitions, englishSegments, targetLanguages }) => {
+const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-// Track intervals for each card by senseId
-const [cardIntervals, setCardIntervals] = useState({});
+  // SRS: Track today's review session
+  const [todaysNewCards, setTodaysNewCards] = useState(0);
+  const [dueCards, setDueCards] = useState([]);
+  const [currentDueIndex, setCurrentDueIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState({
@@ -17,7 +20,6 @@ const [cardIntervals, setCardIntervals] = useState({});
   const [imageLoading, setImageLoading] = useState({});
   const [generatedSentences, setGeneratedSentences] = useState({});
   const [viewedCards, setViewedCards] = useState({});
-  const [queueOrder, setQueueOrder] = useState([]);
   const [cardAnimation, setCardAnimation] = useState('');
   
   // Reference to track which cards have been processed to avoid infinite re-renders
@@ -32,35 +34,35 @@ const [cardIntervals, setCardIntervals] = useState({});
   // Process the wordDefinitions to extract all word senses - use useMemo to avoid recalculation on every render
   const availableCards = React.useMemo(() => {
     const cards = [];
-    const processedIds = new Set();
     Object.entries(wordDefinitions).forEach(([key, value]) => {
       if (value && value.wordSenseId && value.inFlashcards) {
-        const id = value.wordSenseId;
-        if (!processedIds.has(id)) {
-          processedIds.add(id);
-          cards.push(id);
-        }
+        cards.push({ ...value, key }); // Include the full card data
       }
     });
     return cards;
   }, [wordDefinitions]);
 
-// Ensure every card in availableCards has an interval (default 1)
-useEffect(() => {
-  setCardIntervals(prev => {
-    const updated = { ...prev };
-    availableCards.forEach(id => {
-      if (typeof updated[id] !== 'number' || isNaN(updated[id])) {
-        updated[id] = 1;
-      }
-    });
-    // Remove intervals for cards no longer present
-    Object.keys(updated).forEach(id => {
-      if (!availableCards.includes(id)) delete updated[id];
-    });
-    return updated;
-  });
-}, [availableCards]); // Only recalculate when wordDefinitions changes
+  // Initialize SRS data and get due cards
+  useEffect(() => {
+    // Get today's date for tracking new cards
+    const today = new Date().toDateString();
+    const storedDate = localStorage.getItem('srsLastDate');
+    const storedCount = parseInt(localStorage.getItem('srsNewCardsToday') || '0');
+    
+    // Reset count if it's a new day
+    if (storedDate !== today) {
+      localStorage.setItem('srsLastDate', today);
+      localStorage.setItem('srsNewCardsToday', '0');
+      setTodaysNewCards(0);
+    } else {
+      setTodaysNewCards(storedCount);
+    }
+    
+    // Get due cards using SRS algorithm
+    const due = getDueCards(availableCards, { newPerDay: 5 - storedCount });
+    setDueCards(due);
+    setCurrentDueIndex(0);
+  }, [availableCards]);
   
   const cardContainerRef = useRef(null);
   
@@ -161,12 +163,17 @@ useEffect(() => {
       } else if (e.key === '1') {
         // Mark as incorrect
         if (isFlipped) {
-          markCard(false);
+          markCard('incorrect');
         }
       } else if (e.key === '2') {
         // Mark as correct
         if (isFlipped) {
-          markCard(true);
+          markCard('correct');
+        }
+      } else if (e.key === '3') {
+        // Mark as easy
+        if (isFlipped) {
+          markCard('easy');
         }
       }
     };
@@ -175,60 +182,67 @@ useEffect(() => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, isFlipped, availableCards, showStats, wordDefinitions]);
   
-  const markCard = (isCorrect) => {
-    if (availableCards.length === 0) return;
-    // Always use cardsToShow for current card
-    const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : availableCards;
-    const currentSenseId = cardsToShow[currentIndex];
-    const currentCardData = wordDefinitions[currentSenseId];
-    const baseWord = currentCardData?.word || currentSenseId.replace(/\d+$/, '');
+  const markCard = (answer) => {
+    if (dueCards.length === 0) return;
+    
+    const currentCard = dueCards[currentDueIndex];
+    if (!currentCard) return;
+    
+    // Calculate next review using SRS algorithm
+    const updatedSrsData = calculateNextReview(currentCard, answer);
+    
+    // Update the card in wordDefinitions with new SRS data
+    setWordDefinitions(prev => ({
+      ...prev,
+      [currentCard.key]: {
+        ...currentCard,
+        srsData: updatedSrsData
+      }
+    }));
+    
     // Update stats
     setStats(prev => ({
       ...prev,
-      correctAnswers: isCorrect ? prev.correctAnswers + 1 : prev.correctAnswers,
+      cardsReviewed: prev.cardsReviewed + 1,
+      correctAnswers: answer !== 'incorrect' ? prev.correctAnswers + 1 : prev.correctAnswers,
       history: [...prev.history, {
-        wordSenseId: currentSenseId,
-        word: baseWord,
+        wordSenseId: currentCard.wordSenseId,
+        word: currentCard.word,
         date: new Date().toISOString(),
-        correct: isCorrect
+        correct: answer !== 'incorrect',
+        answer: answer
       }]
     }));
-    // Update interval and reorder queue
-    setCardIntervals(prev => {
-      const oldInterval = prev[currentSenseId] || 1;
-      let newInterval = oldInterval;
-      if (isCorrect) {
-        newInterval = oldInterval + 1;
-      } else {
-        newInterval = oldInterval > 1 ? oldInterval - 1 : 1;
-      }
-      return { ...prev, [currentSenseId]: newInterval };
-    });
-    // Trigger slide out animation
-    setCardAnimation('slide-out-left');
     
+    // If this was a new card, increment today's count
+    if (currentCard.srsData.status === 'new') {
+      const newCount = todaysNewCards + 1;
+      setTodaysNewCards(newCount);
+      localStorage.setItem('srsNewCardsToday', newCount.toString());
+    }
+    
+    // Move to next card
+    setCardAnimation('slide-out-left');
     setTimeout(() => {
       setIsFlipped(false);
-      setQueueOrder(prevOrder => {
-        // Always use the latest cardsToShow order for mutation
-        const baseOrder = prevOrder.length === availableCards.length ? [...prevOrder] : [...availableCards];
-        const idx = baseOrder.indexOf(currentSenseId);
-        if (idx !== -1) {
-          baseOrder.splice(idx, 1);
-          baseOrder.push(currentSenseId);
-        }
-        return baseOrder;
-      });
-      setCurrentIndex(0); // Always show the new front card
       
-      // Trigger slide in animation for new card
+      // Move to next due card or finish session
+      if (currentDueIndex < dueCards.length - 1) {
+        setCurrentDueIndex(prev => prev + 1);
+      } else {
+        // Session complete - refresh due cards
+        const newDueCards = getDueCards(availableCards, { newPerDay: 5 - todaysNewCards });
+        setDueCards(newDueCards);
+        setCurrentDueIndex(0);
+      }
+      
       setCardAnimation('slide-in-right');
       setTimeout(() => setCardAnimation(''), 300);
     }, 300);
   };
 
-// Always use queueOrder if present, else fallback to availableCards
-const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : availableCards;
+  // Get SRS statistics
+  const srsStats = React.useMemo(() => getReviewStats(availableCards), [availableCards]);
   
   const flipCard = () => {
     setIsFlipped(prev => !prev);
@@ -428,16 +442,28 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
               View Stats ({stats.cardsReviewed} reviewed)
             </button>
             <div className="card-count">
-              Card {currentIndex + 1} of {availableCards.length}
+              <div>Card {currentDueIndex + 1} of {dueCards.length} due</div>
+              <div style={{ fontSize: '12px', color: '#999' }}>
+                New: {srsStats.new} | Learning: {srsStats.learning} | Review: {srsStats.review}
+              </div>
             </div>
           </div>
           
-          {/* Get the current sense ID and data */}
+          {/* Get the current due card data */}
           {(() => {
-            if (!availableCards.length) return null;
+            if (!dueCards.length) return (
+              <div className="flashcard-empty-state">
+                <div className="empty-state-icon">🎉</div>
+                <h2>All Done!</h2>
+                <p>You've reviewed all cards due today. Come back tomorrow for more!</p>
+                <div style={{ marginTop: '20px', fontSize: '14px', color: '#999' }}>
+                  Total cards: {availableCards.length} | Tomorrow: {srsStats.total - srsStats.dueToday} due
+                </div>
+              </div>
+            );
             
-            const currentSenseId = availableCards[currentIndex];
-            const currentCardData = wordDefinitions[currentSenseId];
+            const currentCardData = dueCards[currentDueIndex];
+            const currentSenseId = currentCardData?.wordSenseId;
             
             if (!currentCardData) {
               console.warn(`No data found for flashcard with ID: ${currentSenseId}`);
@@ -450,8 +476,8 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
             // Get definition number for display
             const defNumber = currentCardData.definitionNumber || 
                              currentSenseId.match(/\d+$/)?.[0] || '';
-            // Get interval for display
-            const interval = cardIntervals[currentSenseId] || 1;
+            // Get interval for display (for example sentences)
+            const interval = currentCardData?.srsData?.interval || 1;
             return (
               <div 
                 ref={cardContainerRef}
@@ -583,25 +609,41 @@ const cardsToShow = queueOrder.length === availableCards.length ? queueOrder : a
                         )}
                       </div>
                       
-                       {/* Correct/Incorrect buttons */}
+                       {/* SRS Answer buttons */}
                        <div className="answer-feedback-buttons">
                          <button 
                            className="feedback-btn incorrect-btn" 
                            onClick={(e) => {
                              e.stopPropagation(); // Prevent card flip
-                             markCard(false);
+                             markCard('incorrect');
                            }}
                          >
-                           ❌ Incorrect
+                           <div>❌ Incorrect</div>
+                           <div className="next-review-time">{formatNextReviewTime(calculateNextReview(currentCardData, 'incorrect').nextReviewDate)}</div>
                          </button>
                          <button 
                            className="feedback-btn correct-btn" 
                            onClick={(e) => {
                              e.stopPropagation(); // Prevent card flip
-                             markCard(true);
+                             markCard('correct');
                            }}
                          >
-                           ✓ Correct
+                           <div>✓ Correct</div>
+                           <div className="next-review-time">{formatNextReviewTime(calculateNextReview(currentCardData, 'correct').nextReviewDate)}</div>
+                         </button>
+                         <button 
+                           className="feedback-btn easy-btn" 
+                           onClick={(e) => {
+                             e.stopPropagation(); // Prevent card flip
+                             markCard('easy');
+                           }}
+                           style={{
+                             background: 'linear-gradient(45deg, #4CAF50, #45a049)',
+                             marginLeft: '10px'
+                           }}
+                         >
+                           <div>⭐ Easy</div>
+                           <div className="next-review-time">{formatNextReviewTime(calculateNextReview(currentCardData, 'easy').nextReviewDate)}</div>
                          </button>
                        </div>
                      </div>
@@ -638,6 +680,7 @@ function formatShortDate(dateStr) {
 FlashcardMode.propTypes = {
   selectedWords: PropTypes.arrayOf(PropTypes.string).isRequired,
   wordDefinitions: PropTypes.object.isRequired,
+  setWordDefinitions: PropTypes.func.isRequired,
   englishSegments: PropTypes.arrayOf(PropTypes.object),
   targetLanguages: PropTypes.arrayOf(PropTypes.string)
 };

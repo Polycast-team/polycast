@@ -855,7 +855,18 @@ const TranscriptionDisplay = ({
           
           // Default frequency ratings
           wordFrequency: wordData.wordFrequency || 3,
-          definitionFrequency: wordData.definitionFrequency || 3
+          definitionFrequency: wordData.definitionFrequency || 3,
+          
+          // SRS (Spaced Repetition System) fields
+          srsData: {
+            interval: 0,          // Days until next review (0 = new card)
+            repetitions: 0,       // Number of successful reviews
+            easeFactor: 2.5,      // Difficulty factor (default 2.5)
+            lastReviewDate: null, // ISO date of last review
+            nextReviewDate: new Date().toISOString(), // Due immediately for new cards
+            lapses: 0,            // Number of times marked incorrect
+            status: 'new'         // 'new', 'learning', 'review', 'relearning'
+          }
         };
         
         console.log(`[FLASHCARD CREATE] Successfully created flashcard with popup data:`, newFlashcard);
