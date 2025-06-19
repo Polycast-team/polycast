@@ -22,7 +22,6 @@ const MobileProfileSelector = ({ onProfileSelect, onStartStudying }) => {
     const fetchProfileData = async () => {
       if (selectedProfile === 'non-saving') {
         setWordDefinitions({});
-        onProfileSelect(selectedProfile, {});
         return;
       }
 
@@ -41,14 +40,12 @@ const MobileProfileSelector = ({ onProfileSelect, onStartStudying }) => {
         const flashcards = data.flashcards || {};
         
         setWordDefinitions(flashcards);
-        onProfileSelect(selectedProfile, flashcards);
         
         console.log(`[MOBILE] Loaded ${Object.keys(flashcards).length} flashcards for profile: ${selectedProfile}`);
       } catch (err) {
         console.error(`Error fetching profile data for ${selectedProfile}:`, err);
         setError(`Failed to load profile: ${err.message}`);
         setWordDefinitions({});
-        onProfileSelect(selectedProfile, {});
       } finally {
         setIsLoading(false);
       }

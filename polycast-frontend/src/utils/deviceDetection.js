@@ -8,11 +8,7 @@
  * @returns {boolean} True if mobile device
  */
 export function isMobileDevice() {
-  // Check screen width first (primary indicator)
-  const screenWidth = window.innerWidth;
-  const isMobileWidth = screenWidth <= 768;
-  
-  // Check user agent for mobile devices
+  // Check user agent for mobile devices (primary indicator)
   const mobileUserAgent = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(
     navigator.userAgent
   );
@@ -20,8 +16,12 @@ export function isMobileDevice() {
   // Check for touch capability
   const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   
-  // Mobile if narrow screen OR (mobile user agent AND touch screen)
-  return isMobileWidth || (mobileUserAgent && hasTouchScreen);
+  // Check screen width (secondary indicator, only for very small screens)
+  const screenWidth = window.innerWidth;
+  const isVerySmallScreen = screenWidth <= 480; // Much more restrictive
+  
+  // Mobile if (mobile user agent AND touch screen) OR very small screen
+  return (mobileUserAgent && hasTouchScreen) || isVerySmallScreen;
 }
 
 /**
@@ -29,8 +29,19 @@ export function isMobileDevice() {
  * @returns {boolean} True if tablet
  */
 export function isTabletDevice() {
+  // Check for tablet-specific user agents
+  const tabletUserAgent = /iPad|Android.*Tablet|PlayBook|Kindle|Silk/i.test(navigator.userAgent);
+  
+  // Check for touch capability
+  const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  
+  // Check screen width for larger touch devices
   const screenWidth = window.innerWidth;
-  return screenWidth > 768 && screenWidth <= 1024 && 'ontouchstart' in window;
+  const isTabletSized = screenWidth > 480 && screenWidth <= 1024;
+  
+  // Tablet if tablet user agent OR (large touch screen AND not mobile user agent)
+  const mobileUserAgent = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  return tabletUserAgent || (isTabletSized && hasTouchScreen && !mobileUserAgent);
 }
 
 /**
