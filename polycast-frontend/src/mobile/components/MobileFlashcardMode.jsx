@@ -366,6 +366,8 @@ const MobileFlashcardMode = ({
   // Gesture callbacks
   const gestureCallbacks = useCallback({
     onDrag: (e, startPoint, currentPoint, gesture) => {
+      console.log('[DRAG DEBUG] Drag detected:', { isFlipped, gesture });
+      
       if (!isFlipped) return; // Only allow dragging on flipped cards
       
       const { deltaX, deltaY, distance } = gesture;
@@ -374,6 +376,8 @@ const MobileFlashcardMode = ({
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
         const rotation = deltaX * 0.1; // Slight rotation based on drag
         const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
+        
+        console.log('[DRAG DEBUG] Setting drag state:', { deltaX, rotation, opacity });
         
         setDragState({
           isDragging: true,
@@ -538,7 +542,9 @@ const MobileFlashcardMode = ({
         <div 
           className={`mobile-flashcard ${isFlipped ? 'flipped' : ''} ${swipeAnimation}`}
           style={{
-            transform: `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg) ${isFlipped ? 'rotateY(180deg)' : ''}`,
+            transform: dragState.isDragging 
+              ? `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg)`
+              : undefined,
             opacity: dragState.opacity,
             transition: dragState.isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease'
           }}

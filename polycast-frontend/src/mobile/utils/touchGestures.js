@@ -82,6 +82,7 @@ export class TouchGestureHandler {
     }
 
     // Call drag callback for real-time position updates
+    console.log('[TOUCH DEBUG] Touch move:', { deltaX, deltaY, distance });
     this.callbacks.onDrag?.(e, this.touchStart, this.touchEnd, { deltaX, deltaY, distance });
 
     this.callbacks.onTouchMove?.(e, this.touchStart, this.touchEnd, { deltaX, deltaY, distance });
