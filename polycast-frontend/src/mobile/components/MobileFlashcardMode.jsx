@@ -23,6 +23,7 @@ const MobileFlashcardMode = ({
   });
   const [swipeAnimation, setSwipeAnimation] = useState('');
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [dragState, setDragState] = useState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
   
   // Refs for gesture handling
   const cardContainerRef = useRef(null);
@@ -265,35 +266,71 @@ const MobileFlashcardMode = ({
 
   // Gesture callbacks
   const gestureCallbacks = useCallback({
+    onDrag: (e, startPoint, currentPoint, gesture) => {
+      if (!isFlipped) return; // Only allow dragging on flipped cards
+      
+      const { deltaX, deltaY, distance } = gesture;
+      
+      // Only track horizontal drags for answer swiping
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        const rotation = deltaX * 0.1; // Slight rotation based on drag
+        const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
+        
+        setDragState({
+          isDragging: true,
+          deltaX,
+          deltaY: 0,
+          rotation,
+          opacity
+        });
+      }
+    },
     onSwipe: (e, gesture) => {
       e.preventDefault();
       
-      switch (gesture.direction) {
-        case 'right':
-          // Swipe right: Previous card
-          goToPrevCard();
-          break;
-        case 'left':
-          // Swipe left: Next card
-          goToNextCard();
-          break;
-        case 'up':
-          // Swipe up: Flip card
-          if (!isFlipped) {
+      if (!isFlipped) {
+        // On front of card, only handle navigation and flip
+        switch (gesture.direction) {
+          case 'right':
+            goToPrevCard();
+            break;
+          case 'left':
+            goToNextCard();
+            break;
+          case 'up':
             flipCard();
-          }
-          break;
-        case 'down':
-          // Swipe down: Mark as easy (if card is flipped)
-          if (isFlipped) {
-            quickMarkEasy();
-          }
-          break;
+            break;
+        }
+      } else {
+        // On back of card, handle answer swiping
+        switch (gesture.direction) {
+          case 'right':
+            // Swipe right: Correct
+            markCard('correct');
+            break;
+          case 'left':
+            // Swipe left: Incorrect
+            markCard('incorrect');
+            break;
+          case 'up':
+            // Swipe up: Easy
+            markCard('easy');
+            break;
+        }
       }
+      
+      // Reset drag state after swipe
+      setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
     },
     onTap: (e, point) => {
-      // Tap to flip card
-      flipCard();
+      // Only flip if not dragging
+      if (!dragState.isDragging) {
+        flipCard();
+      }
+    },
+    onTouchEnd: () => {
+      // Reset drag state when touch ends without swiping
+      setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
     },
     onLongPress: (e, point) => {
       // Long press to show quick actions
@@ -302,7 +339,7 @@ const MobileFlashcardMode = ({
         setTimeout(() => setShowQuickActions(false), 2000);
       }
     }
-  }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped]);
+  }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped, markCard, dragState.isDragging]);
 
   // Initialize gesture handler
   useEffect(() => {
@@ -501,6 +538,11 @@ const MobileFlashcardMode = ({
       <div className="mobile-card-container" ref={cardContainerRef}>
         <div 
           className={`mobile-flashcard ${isFlipped ? 'flipped' : ''} ${swipeAnimation}`}
+          style={{
+            transform: `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg) ${isFlipped ? 'rotateY(180deg)' : ''}`,
+            opacity: dragState.opacity,
+            transition: dragState.isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease'
+          }}
         >
           {/* Front of Card */}
           <div className="mobile-card-front">
@@ -585,6 +627,24 @@ const MobileFlashcardMode = ({
                 </div>
               )}
             </div>
+            
+            {/* Swipe Arrows for Back of Card */}
+            {isFlipped && (
+              <div className="mobile-swipe-arrows">
+                <div className="mobile-swipe-arrow mobile-swipe-left">
+                  <div className="mobile-arrow-icon">←</div>
+                  <div className="mobile-arrow-label">Incorrect</div>
+                </div>
+                <div className="mobile-swipe-arrow mobile-swipe-right">
+                  <div className="mobile-arrow-icon">→</div>
+                  <div className="mobile-arrow-label">Correct</div>
+                </div>
+                <div className="mobile-swipe-arrow mobile-swipe-up">
+                  <div className="mobile-arrow-icon">↑</div>
+                  <div className="mobile-arrow-label">Easy</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         

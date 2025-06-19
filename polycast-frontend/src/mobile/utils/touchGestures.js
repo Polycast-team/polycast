@@ -16,7 +16,7 @@ export class TouchGestureHandler {
     this.minSwipeDistance = 50;
     this.maxVerticalDeviation = 100;
     this.longPressDelay = 500;
-    this.tapTimeout = 300;
+    this.tapTimeout = 150; // Shorter tap timeout to prevent flip conflicts
     
     this.bindEvents();
   }
@@ -80,6 +80,9 @@ export class TouchGestureHandler {
     if (distance > this.minSwipeDistance) {
       e.preventDefault();
     }
+
+    // Call drag callback for real-time position updates
+    this.callbacks.onDrag?.(e, this.touchStart, this.touchEnd, { deltaX, deltaY, distance });
 
     this.callbacks.onTouchMove?.(e, this.touchStart, this.touchEnd, { deltaX, deltaY, distance });
   }

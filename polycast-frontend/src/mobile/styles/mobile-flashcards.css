@@ -711,6 +711,90 @@
   transform: translateY(-1px) scale(0.98);
 }
 
+/* Swipe Arrows for Answer Indication */
+.mobile-swipe-arrows {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.mobile-swipe-arrow {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  border-radius: 12px;
+  padding: 8px 12px;
+  opacity: 0.8;
+  transition: all 0.3s ease;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.mobile-swipe-left {
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.mobile-swipe-right {
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+.mobile-swipe-up {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.mobile-arrow-icon {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.mobile-arrow-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-align: center;
+  line-height: 1;
+}
+
+/* Animation when dragging */
+.mobile-flashcard[data-drag-direction="left"] .mobile-swipe-left {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.2);
+  background: rgba(239, 68, 68, 0.4);
+}
+
+.mobile-flashcard[data-drag-direction="right"] .mobile-swipe-right {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.2);
+  background: rgba(34, 197, 94, 0.4);
+}
+
+.mobile-flashcard[data-drag-direction="up"] .mobile-swipe-up {
+  opacity: 1;
+  transform: translateX(-50%) scale(1.2);
+  background: rgba(168, 85, 247, 0.4);
+}
+
 /* Portrait orientation adjustments */
 @media (orientation: portrait) and (max-height: 700px) {
   .mobile-card-container {
