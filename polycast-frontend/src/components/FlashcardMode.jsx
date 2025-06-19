@@ -657,17 +657,25 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                               }}>
                                 {clozeSentence}
                               </div>
-                              {nativeTranslation && (
-                                <div style={{ 
-                                  fontSize: '18px', 
-                                  fontStyle: 'italic',
-                                  color: '#a0a0a0',
-                                  lineHeight: '1.3',
-                                  maxWidth: '85%'
-                                }}>
-                                  {nativeTranslation}
-                                </div>
-                              )}
+                              {nativeTranslation && (() => {
+                                // Create highlighted version of native translation by replacing ~word~ with bold yellow word
+                                const highlightedNativeTranslation = nativeTranslation.replace(/~([^~]+)~/g, (match, word) => {
+                                  return `<span style="font-weight: bold; color: #e3e36b;">${word}</span>`;
+                                });
+                                
+                                return (
+                                  <div 
+                                    style={{ 
+                                      fontSize: '18px', 
+                                      fontStyle: 'italic',
+                                      color: '#a0a0a0',
+                                      lineHeight: '1.3',
+                                      maxWidth: '85%'
+                                    }}
+                                    dangerouslySetInnerHTML={{ __html: highlightedNativeTranslation }}
+                                  />
+                                );
+                              })()}
                             </div>
                           );
                         })()

@@ -891,13 +891,13 @@ const TranscriptionDisplay = ({
 
 Frequency scale: 1=extremely rare, 10=ubiquitous. Most words are 1-3, very few are 9-10.
 
-Create exactly 5 English sentences with "${word}" surrounded by ~ characters, each followed by ${nativeLanguage} translation.
+Create exactly 5 English sentences with "${word}" surrounded by ~ characters, each followed by ${nativeLanguage} translation. IMPORTANT: Put ~ symbols around the target word in BOTH the English sentence AND the ${nativeLanguage} translation.
 
 Output format (no other text):
-[number]//[English sentence with ~${word}~]//[${nativeLanguage} translation]//[English sentence with ~${word}~]//[${nativeLanguage} translation]//[English sentence with ~${word}~]//[${nativeLanguage} translation]//[English sentence with ~${word}~]//[${nativeLanguage} translation]//[English sentence with ~${word}~]//[${nativeLanguage} translation]
+[number]//[English sentence with ~${word}~]//[${nativeLanguage} translation with ~target word~]//[English sentence with ~${word}~]//[${nativeLanguage} translation with ~target word~]//[English sentence with ~${word}~]//[${nativeLanguage} translation with ~target word~]//[English sentence with ~${word}~]//[${nativeLanguage} translation with ~target word~]//[English sentence with ~${word}~]//[${nativeLanguage} translation with ~target word~]
 
 Example output:
-6//I need to ~call~ my mom tonight//Necesito llamar a mi mamá esta noche//Can you ~call~ me back later?//¿Puedes devolverme la llamada más tarde?//She didn't ~call~ yesterday//Ella no llamó ayer//Let's ~call~ it a day//Terminemos por hoy//The teacher will ~call~ your name//El maestro dirá tu nombre
+6//I need to ~call~ my mom tonight//Necesito ~llamar~ a mi mamá esta noche//Can you ~call~ me back later?//¿Puedes ~devolverme la llamada~ más tarde?//She didn't ~call~ yesterday//Ella no ~llamó~ ayer//Let's ~call~ it a day//~Terminemos~ por hoy//The teacher will ~call~ your name//El maestro ~dirá~ tu nombre
 
 START NOW:`;
 
