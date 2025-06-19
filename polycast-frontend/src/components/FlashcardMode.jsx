@@ -84,6 +84,9 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           }
         } catch (error) {
           console.error('Error loading daily SRS data:', error);
+          // Show warning popup
+          alert(`Warning: Database connection failed for profile "${selectedProfile}". Falling back to local storage for this session. Daily limits may not persist correctly.`);
+          
           // Fallback to localStorage for this session
           const storedDate = localStorage.getItem('srsLastDate');
           const storedCount = parseInt(localStorage.getItem('srsNewCardsToday') || '0');
@@ -284,6 +287,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           body: JSON.stringify({ date: today, newCardsToday: newCount })
         }).catch(error => {
           console.error('Error saving daily SRS count:', error);
+          // Show warning popup
+          alert(`Warning: Failed to save daily SRS count to database for profile "${selectedProfile}". Using local storage as fallback.`);
           // Fallback to localStorage for this session
           localStorage.setItem('srsNewCardsToday', newCount.toString());
         });
