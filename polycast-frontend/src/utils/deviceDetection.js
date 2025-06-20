@@ -8,9 +8,6 @@
  * @returns {boolean} True if mobile device
  */
 export function isMobileDevice() {
-  // TEMPORARY: Always return true for debugging
-  return true;
-  
   // Check user agent for mobile devices (primary indicator)
   const mobileUserAgent = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(
     navigator.userAgent

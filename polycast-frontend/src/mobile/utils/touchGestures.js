@@ -16,7 +16,8 @@ export class TouchGestureHandler {
     this.minSwipeDistance = 50;
     this.maxVerticalDeviation = 100;
     this.longPressDelay = 500;
-    this.tapTimeout = 150; // Shorter tap timeout to prevent flip conflicts
+    this.tapTimeout = 150; // Reduced for faster tap response
+    this.moveThreshold = 5; // Pixels moved before canceling tap
     
     this.bindEvents();
   }
@@ -45,10 +46,12 @@ export class TouchGestureHandler {
     };
     this.touchEnd = null;
     this.isLongPress = false;
+    this.isTap = true; // Assume tap until proven otherwise
 
     // Start long press timer
     this.longPressTimer = setTimeout(() => {
       this.isLongPress = true;
+      this.isTap = false;
       this.triggerHapticFeedback('light');
       this.callbacks.onLongPress?.(e, this.touchStart);
     }, this.longPressDelay);
@@ -76,6 +79,11 @@ export class TouchGestureHandler {
     const deltaY = this.touchEnd.y - this.touchStart.y;
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
+    // Cancel tap if moved too much
+    if (distance > this.moveThreshold) {
+      this.isTap = false;
+    }
+
     // Prevent scrolling on significant swipes
     if (distance > this.minSwipeDistance) {
       e.preventDefault();
@@ -102,15 +110,15 @@ export class TouchGestureHandler {
       return;
     }
 
-    if (!this.touchEnd) {
-      // Simple tap
+    if (this.isTap && !this.touchEnd) {
+      // Simple tap - no movement detected
       const tapDuration = Date.now() - this.touchStart.time;
       if (tapDuration < this.tapTimeout) {
         this.triggerHapticFeedback('light');
         this.callbacks.onTap?.(e, this.touchStart);
       }
-    } else {
-      // Swipe gesture
+    } else if (!this.isTap && this.touchEnd) {
+      // Movement detected - check for swipe
       this.processSwipeGesture(e);
     }
 

@@ -24,6 +24,7 @@ const MobileFlashcardMode = ({
   const [swipeAnimation, setSwipeAnimation] = useState('');
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [dragState, setDragState] = useState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+  const [cardEntryAnimation, setCardEntryAnimation] = useState('');
   
   // Refs for gesture handling
   const cardContainerRef = useRef(null);
@@ -232,7 +233,11 @@ const MobileFlashcardMode = ({
   // Handle card flipping
   const flipCard = useCallback(() => {
     console.log(`[MOBILE DEBUG] Flipping card from ${isFlipped} to ${!isFlipped}`);
-    setIsFlipped(prev => !prev);
+    // Use function form to ensure immediate update
+    setIsFlipped(prev => {
+      console.log(`[MOBILE DEBUG] Flip state changing from ${prev} to ${!prev}`);
+      return !prev;
+    });
   }, [isFlipped]);
 
   // Enhanced navigation with animations
@@ -243,7 +248,11 @@ const MobileFlashcardMode = ({
       setIsFlipped(false);
       setCurrentDueIndex(prev => (prev + 1) % dueCards.length);
       setSwipeAnimation('slide-in-right');
-      setTimeout(() => setSwipeAnimation(''), 300);
+      setCardEntryAnimation('card-enter');
+      setTimeout(() => {
+        setSwipeAnimation('');
+        setCardEntryAnimation('');
+      }, 300);
     }, 200);
   }, [dueCards.length]);
 
@@ -254,7 +263,11 @@ const MobileFlashcardMode = ({
       setIsFlipped(false);
       setCurrentDueIndex(prev => prev === 0 ? dueCards.length - 1 : prev - 1);
       setSwipeAnimation('slide-in-left');
-      setTimeout(() => setSwipeAnimation(''), 300);
+      setCardEntryAnimation('card-enter');
+      setTimeout(() => {
+        setSwipeAnimation('');
+        setCardEntryAnimation('');
+      }, 300);
     }, 200);
   }, [dueCards.length]);
 
@@ -322,6 +335,10 @@ const MobileFlashcardMode = ({
         if (currentDueIndex >= newDueCards.length) {
           setCurrentDueIndex(0);
         }
+        
+        // Trigger entry animation for next card
+        setCardEntryAnimation('card-enter');
+        setTimeout(() => setCardEntryAnimation(''), 400);
       } else {
         // Remove card from today's queue
         const newDueCards = dueCards.filter((_, index) => index !== currentDueIndex);
@@ -329,6 +346,12 @@ const MobileFlashcardMode = ({
         
         if (currentDueIndex >= newDueCards.length && newDueCards.length > 0) {
           setCurrentDueIndex(newDueCards.length - 1);
+        }
+        
+        // Trigger entry animation for next card if there is one
+        if (newDueCards.length > 0) {
+          setCardEntryAnimation('card-enter');
+          setTimeout(() => setCardEntryAnimation(''), 400);
         }
       }
       
@@ -352,6 +375,12 @@ const MobileFlashcardMode = ({
           
           setDueCards(refreshedDueCards);
           setCurrentDueIndex(0);
+          
+          // Trigger entry animation for refreshed cards
+          if (refreshedDueCards.length > 0) {
+            setCardEntryAnimation('card-enter');
+            setTimeout(() => setCardEntryAnimation(''), 400);
+          }
         }, 500);
       }
     }, 200);
@@ -379,7 +408,10 @@ const MobileFlashcardMode = ({
         const swipeThreshold = 100;
         const isInSwipeZone = Math.abs(deltaX) > swipeThreshold;
         
-        console.log('[DRAG DEBUG] Setting drag state:', { deltaX, rotation, opacity, isInSwipeZone });
+        // Calculate proportional color intensity (0 to 1)
+        const colorIntensity = Math.min(1, Math.abs(deltaX) / 150);
+        
+        console.log('[DRAG DEBUG] Setting drag state:', { deltaX, rotation, opacity, isInSwipeZone, colorIntensity });
         
         setDragState({
           isDragging: true,
@@ -387,7 +419,8 @@ const MobileFlashcardMode = ({
           deltaY: 0,
           rotation,
           opacity,
-          isInSwipeZone
+          isInSwipeZone,
+          colorIntensity
         });
       }
     },
@@ -423,9 +456,11 @@ const MobileFlashcardMode = ({
       setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
     },
     onTap: (e, point) => {
-      // Only flip if not dragging
+      // Only flip if not dragging and not already animating
       console.log('[TAP DEBUG] Tap detected, isDragging:', dragState.isDragging);
-      if (!dragState.isDragging) {
+      if (!dragState.isDragging && dragState.deltaX === 0 && dragState.deltaY === 0) {
+        e.preventDefault();
+        e.stopPropagation();
         flipCard();
       }
     },
@@ -456,9 +491,11 @@ const MobileFlashcardMode = ({
           opacity: 0
         }));
         
-        // Reset after animation
+        // Reset after animation and trigger new card entry
         setTimeout(() => {
           setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+          setCardEntryAnimation('card-enter');
+          setTimeout(() => setCardEntryAnimation(''), 400);
         }, 300);
       } else {
         console.log('[TOUCH END DEBUG] Not triggering auto-swipe, resetting drag state');
@@ -571,7 +608,7 @@ const MobileFlashcardMode = ({
       {/* Card Container */}
       <div className="mobile-card-container" ref={cardContainerRef}>
         <div 
-          className={`mobile-flashcard ${swipeAnimation}`}
+          className={`mobile-flashcard ${swipeAnimation} ${cardEntryAnimation}`}
           style={{
             transform: (() => {
               const baseTransform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
@@ -583,18 +620,18 @@ const MobileFlashcardMode = ({
               return finalTransform;
             })(),
             opacity: dragState.opacity,
-            transition: dragState.isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease',
-            // Add intense color feedback when in swipe zone
-            boxShadow: dragState.isInSwipeZone 
+            transition: dragState.isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease',
+            // Add proportional color feedback based on drag distance
+            boxShadow: dragState.colorIntensity > 0 
               ? dragState.deltaX > 0 
-                ? '0 0 50px rgba(34, 197, 94, 1), 0 0 100px rgba(34, 197, 94, 0.5)' // Intense green for correct
-                : '0 0 50px rgba(239, 68, 68, 1), 0 0 100px rgba(239, 68, 68, 0.5)'  // Intense red for incorrect
+                ? `0 0 ${30 * dragState.colorIntensity}px rgba(34, 197, 94, ${dragState.colorIntensity}), 0 0 ${60 * dragState.colorIntensity}px rgba(34, 197, 94, ${dragState.colorIntensity * 0.5})` // Proportional green
+                : `0 0 ${30 * dragState.colorIntensity}px rgba(239, 68, 68, ${dragState.colorIntensity}), 0 0 ${60 * dragState.colorIntensity}px rgba(239, 68, 68, ${dragState.colorIntensity * 0.5})`  // Proportional red
               : undefined,
-            // Add background color overlay for more intensity  
-            backgroundColor: dragState.isInSwipeZone 
+            // Add proportional background color overlay
+            backgroundColor: dragState.colorIntensity > 0 
               ? dragState.deltaX > 0 
-                ? 'rgba(34, 197, 94, 0.1)' // Subtle green background
-                : 'rgba(239, 68, 68, 0.1)'  // Subtle red background
+                ? `rgba(34, 197, 94, ${dragState.colorIntensity * 0.1})` // Proportional green background
+                : `rgba(239, 68, 68, ${dragState.colorIntensity * 0.1})`  // Proportional red background
               : undefined
           }}
         >
