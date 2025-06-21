@@ -428,14 +428,8 @@ const MobileFlashcardMode = ({
       e.preventDefault();
       
       if (!isFlipped) {
-        // On front of card, only handle navigation and flip
+        // On front of card, only handle flip
         switch (gesture.direction) {
-          case 'right':
-            goToPrevCard();
-            break;
-          case 'left':
-            goToNextCard();
-            break;
           case 'up':
             flipCard();
             break;
@@ -656,7 +650,7 @@ const MobileFlashcardMode = ({
                       </div>
                     )}
                     <div className="mobile-card-hint">
-                      Tap or swipe up to reveal • Swipe left/right to navigate
+                      Tap or swipe up to reveal answer
                     </div>
                   </div>
                 );
@@ -669,7 +663,7 @@ const MobileFlashcardMode = ({
                 </div>
                 <div className="mobile-card-pos">{currentCard.partOfSpeech || 'word'}</div>
                 <div className="mobile-card-hint">
-                  Tap or swipe up to see definition • Swipe left/right to navigate
+                  Tap or swipe up to see definition
                 </div>
               </div>
             )}
@@ -745,19 +739,13 @@ const MobileFlashcardMode = ({
             <div className="mobile-quick-action-hint">
               <div className="mobile-quick-hint-text">Quick Actions:</div>
               <div className="mobile-quick-hint-item">↓ Swipe down for Easy</div>
-              <div className="mobile-quick-hint-item">← → Swipe for navigation</div>
+              <div className="mobile-quick-hint-item">← → Swipe for answers</div>
             </div>
           </div>
         )}
         
         {/* Gesture Hints */}
         <div className="mobile-gesture-hints">
-          <div className="mobile-gesture-hint mobile-gesture-left">
-            <span>‹</span>
-          </div>
-          <div className="mobile-gesture-hint mobile-gesture-right">
-            <span>›</span>
-          </div>
           {!isFlipped && (
             <div className="mobile-gesture-hint mobile-gesture-up">
               <span>↑</span>
@@ -771,32 +759,6 @@ const MobileFlashcardMode = ({
         </div>
       </div>
 
-      {/* Navigation Dots */}
-      <div className="mobile-nav-dots">
-        <button 
-          className="mobile-nav-btn mobile-prev-btn"
-          onClick={goToPrevCard}
-          disabled={dueCards.length <= 1}
-        >
-          ‹
-        </button>
-        <div className="mobile-dots">
-          {dueCards.slice(0, Math.min(5, dueCards.length)).map((_, index) => (
-            <div 
-              key={index}
-              className={`mobile-dot ${index === currentDueIndex ? 'active' : ''}`}
-            />
-          ))}
-          {dueCards.length > 5 && <div className="mobile-dots-more">...</div>}
-        </div>
-        <button 
-          className="mobile-nav-btn mobile-next-btn"
-          onClick={goToNextCard}
-          disabled={dueCards.length <= 1}
-        >
-          ›
-        </button>
-      </div>
 
       {/* Answer Buttons */}
       {isFlipped && (
