@@ -263,6 +263,13 @@ const MobileFlashcardMode = ({
     
     // If touch was very short (< 200ms) and didn't move much, treat as tap
     if (touchDuration < 200) {
+      // Only allow flipping if card is NOT already flipped (on front side)
+      if (isFlipped) {
+        console.log('[DIRECT TOUCH] Ignored - card is already flipped (on answer side)');
+        touchStartPos.current = null;
+        return;
+      }
+      
       // Prevent double taps within 100ms
       if (now - lastTapTime.current < 100) {
         console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
@@ -278,7 +285,7 @@ const MobileFlashcardMode = ({
     }
     
     touchStartPos.current = null;
-  }, [flipCard]);
+  }, [flipCard, isFlipped]);
 
   // Enhanced navigation with animations
   const goToNextCard = useCallback(() => {
