@@ -96,15 +96,16 @@
 
 /* Card Container */
 .mobile-card-container {
-  flex: 1;
+  flex: 0 0 auto; /* Don't flex, fixed size */
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Align to top instead of center */
   justify-content: center;
-  padding: 20px;
+  padding: 20px 20px 10px 20px; /* Less bottom padding */
   perspective: 1000px;
   position: relative;
   touch-action: none; /* Disable browser touch handling for better control */
   user-select: none;
+  height: 60vh; /* Fixed height instead of flex: 1 */
 }
 
 .mobile-flashcard {
@@ -397,6 +398,7 @@
   background: rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: auto; /* Push to bottom */
 }
 
 .mobile-answer-btn {
@@ -732,6 +734,17 @@
 
 .mobile-answer-btn:active {
   transform: translateY(-1px) scale(0.98);
+}
+
+.mobile-answer-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mobile-answer-btn:disabled:hover {
+  transform: none;
+  border-color: inherit;
+  background: inherit;
 }
 
 /* Swipe Arrows for Answer Indication */

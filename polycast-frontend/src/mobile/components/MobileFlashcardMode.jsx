@@ -784,41 +784,42 @@ const MobileFlashcardMode = ({
       </div>
 
 
-      {/* Answer Buttons */}
-      {isFlipped && (
-        <div className="mobile-answer-buttons">
-          <button 
-            className="mobile-answer-btn mobile-incorrect-btn"
-            onClick={() => markCard('incorrect')}
-          >
-            <div className="mobile-btn-emoji">❌</div>
-            <div className="mobile-btn-label">Incorrect</div>
-            <div className="mobile-btn-time">1 min</div>
-          </button>
-          
-          <button 
-            className="mobile-answer-btn mobile-correct-btn"
-            onClick={() => markCard('correct')}
-          >
-            <div className="mobile-btn-emoji">✓</div>
-            <div className="mobile-btn-label">Correct</div>
-            <div className="mobile-btn-time">
-              {formatNextReviewTime(calculateNextReview(currentCard, 'correct').nextReviewDate)}
-            </div>
-          </button>
-          
-          <button 
-            className="mobile-answer-btn mobile-easy-btn"
-            onClick={() => markCard('easy')}
-          >
-            <div className="mobile-btn-emoji">⭐</div>
-            <div className="mobile-btn-label">Easy</div>
-            <div className="mobile-btn-time">
-              {formatNextReviewTime(calculateNextReview(currentCard, 'easy').nextReviewDate)}
-            </div>
-          </button>
-        </div>
-      )}
+      {/* Answer Buttons - Always visible */}
+      <div className="mobile-answer-buttons">
+        <button 
+          className="mobile-answer-btn mobile-incorrect-btn"
+          onClick={() => markCard('incorrect')}
+          disabled={!isFlipped}
+        >
+          <div className="mobile-btn-emoji">❌</div>
+          <div className="mobile-btn-label">Incorrect</div>
+          <div className="mobile-btn-time">1 min</div>
+        </button>
+        
+        <button 
+          className="mobile-answer-btn mobile-correct-btn"
+          onClick={() => markCard('correct')}
+          disabled={!isFlipped}
+        >
+          <div className="mobile-btn-emoji">✓</div>
+          <div className="mobile-btn-label">Correct</div>
+          <div className="mobile-btn-time">
+            {isFlipped ? formatNextReviewTime(calculateNextReview(currentCard, 'correct').nextReviewDate) : '—'}
+          </div>
+        </button>
+        
+        <button 
+          className="mobile-answer-btn mobile-easy-btn"
+          onClick={() => markCard('easy')}
+          disabled={!isFlipped}
+        >
+          <div className="mobile-btn-emoji">⭐</div>
+          <div className="mobile-btn-label">Easy</div>
+          <div className="mobile-btn-time">
+            {isFlipped ? formatNextReviewTime(calculateNextReview(currentCard, 'easy').nextReviewDate) : '—'}
+          </div>
+        </button>
+      </div>
 
       {/* Answer Feedback Overlay */}
       {answerFeedback.show && (
