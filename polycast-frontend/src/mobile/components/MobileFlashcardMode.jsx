@@ -625,10 +625,8 @@ const MobileFlashcardMode = ({
         />
       </div>
 
-      {/* Card and Buttons Container */}
-      <div className="mobile-card-and-buttons-container">
-        {/* Card Container */}
-        <div className="mobile-card-container" ref={cardContainerRef}>
+      {/* Card Container */}
+      <div className="mobile-card-container" ref={cardContainerRef}>
         <div 
           className={`mobile-flashcard ${swipeAnimation} ${cardEntryAnimation}`}
           onTouchStart={handleDirectTouchStart}
@@ -768,7 +766,6 @@ const MobileFlashcardMode = ({
         </div>
       </div>
 
-
       {/* Answer Buttons - Always visible */}
       <div className="mobile-answer-buttons">
         <button 
@@ -804,7 +801,6 @@ const MobileFlashcardMode = ({
             {isFlipped ? formatNextReviewTime(calculateNextReview(currentCard, 'easy').nextReviewDate) : '—'}
           </div>
         </button>
-      </div>
       </div>
 
       {/* Answer Feedback Overlay */}
