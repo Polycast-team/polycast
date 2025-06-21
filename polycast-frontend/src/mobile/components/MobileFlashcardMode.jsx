@@ -35,6 +35,8 @@ const MobileFlashcardMode = ({
   const touchStartTime = useRef(0);
   const lastTouchPos = useRef(null);
   const lastTouchTime = useRef(0);
+  const isDragging = useRef(false);
+  const dragStartPos = useRef(null);
 
   // Get hardcoded cards for non-saving mode
   const getHardcodedCards = () => {
@@ -248,51 +250,145 @@ const MobileFlashcardMode = ({
     lastTapTime.current = now;
   }, [isFlipped]);
 
-  // Direct touch start handler - record position and time
+  // Direct touch start handler
   const handleDirectTouchStart = useCallback((e) => {
-    // Only handle direct touch on front side (for flipping)
-    if (isFlipped) {
-      console.log('[DIRECT TOUCH] Ignoring touch start - card is flipped, letting gesture handler take over');
-      return;
-    }
-    
     const touch = e.touches[0];
-    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-    touchStartTime.current = Date.now();
-    console.log('[DIRECT TOUCH] Touch start recorded for flip');
+    const now = Date.now();
+    
+    if (!isFlipped) {
+      // Front side - handle tap for flipping
+      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+      touchStartTime.current = now;
+      console.log('[DIRECT TOUCH] Touch start recorded for flip');
+    } else {
+      // Back side - handle drag for swiping
+      dragStartPos.current = { x: touch.clientX, y: touch.clientY };
+      lastTouchPos.current = { x: touch.clientX, y: touch.clientY };
+      lastTouchTime.current = now;
+      isDragging.current = false; // Will become true in touchmove
+      console.log('[DIRECT DRAG] Touch start recorded for drag at:', touch.clientX, touch.clientY);
+    }
   }, [isFlipped]);
 
-  // Direct touch end handler - check if it was a tap
-  const handleDirectTouchEnd = useCallback((e) => {
-    // Only handle direct touch on front side (for flipping)
-    if (isFlipped || !touchStartPos.current) {
-      console.log('[DIRECT TOUCH] Touch end ignored - card is flipped or no touch start');
-      touchStartPos.current = null;
-      return;
-    }
+  // Direct touch move handler for dragging
+  const handleDirectTouchMove = useCallback((e) => {
+    if (!isFlipped || !dragStartPos.current) return;
     
+    const touch = e.touches[0];
     const now = Date.now();
-    const touchDuration = now - touchStartTime.current;
     
-    // If touch was very short (< 200ms), treat as tap
-    if (touchDuration < 200) {
-      // Prevent double taps within 100ms
-      if (now - lastTapTime.current < 100) {
-        console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
-        touchStartPos.current = null;
-        return;
+    const deltaX = touch.clientX - dragStartPos.current.x;
+    const deltaY = touch.clientY - dragStartPos.current.y;
+    
+    // Only track horizontal movement
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 5) {
+      isDragging.current = true;
+      lastTouchPos.current = { x: touch.clientX, y: touch.clientY };
+      lastTouchTime.current = now;
+      
+      const rotation = deltaX * 0.1;
+      const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
+      const colorIntensity = Math.min(1, Math.abs(deltaX) / 150);
+      
+      console.log('[DIRECT DRAG] Moving - deltaX:', deltaX, 'rotation:', rotation);
+      
+      setDragState({
+        isDragging: true,
+        deltaX,
+        deltaY: 0,
+        rotation,
+        opacity,
+        colorIntensity
+      });
+      
+      e.preventDefault(); // Prevent scrolling
+    }
+  }, [isFlipped]);
+
+  // Direct touch end handler
+  const handleDirectTouchEnd = useCallback((e) => {
+    if (!isFlipped && touchStartPos.current) {
+      // Front side - handle tap for flipping
+      const now = Date.now();
+      const touchDuration = now - touchStartTime.current;
+      
+      if (touchDuration < 200) {
+        if (now - lastTapTime.current < 100) {
+          console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
+        } else {
+          console.log('[DIRECT TOUCH] Quick tap detected - executing flip');
+          e.preventDefault();
+          e.stopPropagation();
+          flipCard();
+        }
       }
       
-      console.log('[DIRECT TOUCH] Quick tap detected - executing flip');
-      e.preventDefault();
-      e.stopPropagation();
-      flipCard();
-    } else {
-      console.log('[DIRECT TOUCH] Long touch - letting gesture handler take over');
+      touchStartPos.current = null;
+    } else if (isFlipped && dragStartPos.current) {
+      // Back side - handle swipe completion
+      console.log('[DIRECT DRAG] Touch end - isDragging:', isDragging.current, 'dragState:', dragState);
+      
+      if (isDragging.current) {
+        // Calculate velocity
+        let velocity = 0;
+        if (lastTouchPos.current && lastTouchTime.current) {
+          const now = Date.now();
+          const timeDiff = now - lastTouchTime.current;
+          
+          if (timeDiff < 100 && timeDiff > 0) {
+            const distanceX = Math.abs(dragState.deltaX);
+            velocity = distanceX / (timeDiff / 1000);
+            console.log('[DIRECT MOMENTUM] Velocity:', velocity, 'px/s');
+          }
+        }
+        
+        // Check for auto-swipe
+        const distanceThreshold = 40;
+        const velocityThreshold = 200;
+        const hasDistance = Math.abs(dragState.deltaX) > distanceThreshold;
+        const hasMomentum = velocity > velocityThreshold;
+        
+        console.log('[DIRECT AUTO-SWIPE] Distance:', Math.abs(dragState.deltaX), 'Velocity:', velocity, 'hasDistance:', hasDistance, 'hasMomentum:', hasMomentum);
+        
+        if (hasDistance || hasMomentum) {
+          console.log('[DIRECT AUTO-SWIPE] Triggering swipe!');
+          
+          // Determine answer
+          if (dragState.deltaX > 0) {
+            console.log('[DIRECT AUTO-SWIPE] Marking as correct');
+            markCard('correct');
+          } else {
+            console.log('[DIRECT AUTO-SWIPE] Marking as incorrect');
+            markCard('incorrect');
+          }
+          
+          // Animate off screen
+          const finalX = dragState.deltaX > 0 ? window.innerWidth + 100 : -window.innerWidth - 100;
+          setDragState(prev => ({
+            ...prev,
+            deltaX: finalX,
+            opacity: 0
+          }));
+          
+          // Reset after animation
+          setTimeout(() => {
+            setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+            setCardEntryAnimation('card-enter');
+            setTimeout(() => setCardEntryAnimation(''), 400);
+          }, 300);
+        } else {
+          console.log('[DIRECT DRAG] Not enough distance/momentum - resetting');
+          setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+        }
+      }
+      
+      // Reset drag tracking
+      dragStartPos.current = null;
+      lastTouchPos.current = null;
+      lastTouchTime.current = 0;
+      isDragging.current = false;
     }
-    
-    touchStartPos.current = null;
-  }, [flipCard, isFlipped]);
+  }, [flipCard, isFlipped, dragState, markCard]);
 
   // Enhanced navigation with animations
   const goToNextCard = useCallback(() => {
@@ -583,21 +679,11 @@ const MobileFlashcardMode = ({
     }
   }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped, markCard]);
 
-  // Initialize gesture handler for drag/swipe only
+  // Initialize gesture handler (disabled - using direct touch handlers)
   useEffect(() => {
-    if (!cardContainerRef.current) return;
-
-    gestureHandlerRef.current = new TouchGestureHandler(
-      cardContainerRef.current,
-      gestureCallbacks
-    );
-
-    return () => {
-      if (gestureHandlerRef.current) {
-        gestureHandlerRef.current.destroy();
-      }
-    };
-  }, [gestureCallbacks]);
+    // Gesture handler disabled in favor of direct touch handlers
+    return () => {};
+  }, []);
 
   // Calculate session stats
   const sessionDuration = Math.floor((new Date() - stats.sessionStartTime) / 1000 / 60);
@@ -681,6 +767,7 @@ const MobileFlashcardMode = ({
         <div 
           className={`mobile-flashcard ${swipeAnimation} ${cardEntryAnimation}`}
           onTouchStart={handleDirectTouchStart}
+          onTouchMove={handleDirectTouchMove}
           onTouchEnd={handleDirectTouchEnd}
           style={{
             transform: (() => {
