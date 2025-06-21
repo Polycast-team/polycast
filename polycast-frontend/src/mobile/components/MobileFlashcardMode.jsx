@@ -428,12 +428,7 @@ const MobileFlashcardMode = ({
       e.preventDefault();
       
       if (!isFlipped) {
-        // On front of card, only handle flip
-        switch (gesture.direction) {
-          case 'up':
-            flipCard();
-            break;
-        }
+        // On front of card, no swipe actions - only tap to flip
       } else {
         // On back of card, only handle fast swipes as answers (not drags)
         // Drags are handled by onTouchEnd for Tinder-style behavior
@@ -650,7 +645,7 @@ const MobileFlashcardMode = ({
                       </div>
                     )}
                     <div className="mobile-card-hint">
-                      Tap or swipe up to reveal answer
+                      Tap to reveal answer
                     </div>
                   </div>
                 );
@@ -663,7 +658,7 @@ const MobileFlashcardMode = ({
                 </div>
                 <div className="mobile-card-pos">{currentCard.partOfSpeech || 'word'}</div>
                 <div className="mobile-card-hint">
-                  Tap or swipe up to see definition
+                  Tap to see definition
                 </div>
               </div>
             )}
@@ -746,11 +741,6 @@ const MobileFlashcardMode = ({
         
         {/* Gesture Hints */}
         <div className="mobile-gesture-hints">
-          {!isFlipped && (
-            <div className="mobile-gesture-hint mobile-gesture-up">
-              <span>↑</span>
-            </div>
-          )}
           {isFlipped && (
             <div className="mobile-gesture-hint mobile-gesture-down">
               <span>↓</span>
