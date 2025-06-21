@@ -620,7 +620,7 @@ const MobileFlashcardMode = ({
               return finalTransform;
             })(),
             opacity: dragState.opacity,
-            transition: dragState.isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease',
+            transition: dragState.isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease',
             // Add proportional color feedback based on drag distance
             boxShadow: dragState.colorIntensity > 0 
               ? dragState.deltaX > 0 
