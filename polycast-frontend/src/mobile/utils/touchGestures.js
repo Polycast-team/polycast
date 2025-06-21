@@ -16,8 +16,8 @@ export class TouchGestureHandler {
     this.minSwipeDistance = 50;
     this.maxVerticalDeviation = 100;
     this.longPressDelay = 500;
-    this.tapTimeout = 150; // Reduced for faster tap response
-    this.moveThreshold = 5; // Pixels moved before canceling tap
+    this.tapTimeout = 200; // Reasonable timeout for tap detection
+    this.moveThreshold = 8; // Pixels moved before canceling tap
     
     this.bindEvents();
   }

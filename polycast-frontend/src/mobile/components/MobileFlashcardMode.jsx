@@ -29,6 +29,7 @@ const MobileFlashcardMode = ({
   // Refs for gesture handling
   const cardContainerRef = useRef(null);
   const gestureHandlerRef = useRef(null);
+  const isProcessingTap = useRef(false);
 
   // Get hardcoded cards for non-saving mode
   const getHardcodedCards = () => {
@@ -445,13 +446,22 @@ const MobileFlashcardMode = ({
       setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
     },
     onTap: (e, point) => {
-      // Only flip if not dragging and not already animating
-      console.log('[TAP DEBUG] Tap detected, isDragging:', dragState.isDragging);
-      if (!dragState.isDragging && dragState.deltaX === 0 && dragState.deltaY === 0) {
-        e.preventDefault();
-        e.stopPropagation();
-        flipCard();
+      // Simple tap handler - always allow immediate flip
+      if (isProcessingTap.current) {
+        console.log('[TAP DEBUG] Tap ignored - already processing');
+        return;
       }
+      
+      isProcessingTap.current = true;
+      console.log('[TAP DEBUG] Tap detected - executing flip immediately');
+      e.preventDefault();
+      e.stopPropagation();
+      flipCard();
+      
+      // Reset processing flag after a short delay
+      setTimeout(() => {
+        isProcessingTap.current = false;
+      }, 100);
     },
     onTouchEnd: () => {
       console.log('[TOUCH END DEBUG] Touch ended, dragState:', dragState);
@@ -491,6 +501,11 @@ const MobileFlashcardMode = ({
         // Reset drag state when touch ends without swiping
         setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
       }
+      
+      // Always ensure drag state is reset on touch end
+      setTimeout(() => {
+        setDragState(prev => ({ ...prev, isDragging: false }));
+      }, 50);
     },
     onLongPress: (e, point) => {
       // Long press to show quick actions
@@ -499,7 +514,7 @@ const MobileFlashcardMode = ({
         setTimeout(() => setShowQuickActions(false), 2000);
       }
     }
-  }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped, markCard, dragState.isDragging]);
+  }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped, markCard]);
 
   // Initialize gesture handler
   useEffect(() => {
