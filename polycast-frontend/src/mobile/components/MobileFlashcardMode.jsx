@@ -25,6 +25,7 @@ const MobileFlashcardMode = ({
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [dragState, setDragState] = useState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
   const [cardEntryAnimation, setCardEntryAnimation] = useState('');
+  const [answerFeedback, setAnswerFeedback] = useState({ show: false, type: '', text: '' });
   
   // Refs for gesture handling
   const cardContainerRef = useRef(null);
@@ -305,12 +306,32 @@ const MobileFlashcardMode = ({
     }
   }, [isFlipped]);
 
+  // Show answer feedback
+  const showAnswerFeedback = useCallback((answer) => {
+    const feedbackData = {
+      correct: { type: 'correct', text: 'Correct!' },
+      incorrect: { type: 'incorrect', text: 'Incorrect' },
+      easy: { type: 'easy', text: 'Easy!' }
+    };
+    
+    const feedback = feedbackData[answer];
+    if (feedback) {
+      setAnswerFeedback({ show: true, ...feedback });
+      setTimeout(() => {
+        setAnswerFeedback({ show: false, type: '', text: '' });
+      }, 1000); // Show for 1 second
+    }
+  }, []);
+
   // Handle answer selection
   const markCard = useCallback((answer) => {
     if (dueCards.length === 0) return;
     
     const currentCard = dueCards[currentDueIndex];
     if (!currentCard) return;
+    
+    // Show visual feedback
+    showAnswerFeedback(answer);
     
     // Calculate next review using SRS algorithm
     const updatedSrsData = calculateNextReview(currentCard, answer);
@@ -418,7 +439,7 @@ const MobileFlashcardMode = ({
         }, 500);
       }
     }, 200);
-  }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings]);
+  }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings, showAnswerFeedback]);
 
   // Direct touch end handler
   const handleDirectTouchEnd = useCallback((e) => {
@@ -790,6 +811,13 @@ const MobileFlashcardMode = ({
               {formatNextReviewTime(calculateNextReview(currentCard, 'easy').nextReviewDate)}
             </div>
           </button>
+        </div>
+      )}
+
+      {/* Answer Feedback Overlay */}
+      {answerFeedback.show && (
+        <div className={`mobile-answer-feedback mobile-answer-feedback-${answerFeedback.type}`}>
+          {answerFeedback.text}
         </div>
       )}
     </div>
