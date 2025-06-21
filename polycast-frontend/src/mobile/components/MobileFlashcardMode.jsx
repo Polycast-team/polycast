@@ -33,6 +33,8 @@ const MobileFlashcardMode = ({
   const lastTapTime = useRef(0);
   const touchStartPos = useRef(null);
   const touchStartTime = useRef(0);
+  const lastTouchPos = useRef(null);
+  const lastTouchTime = useRef(0);
 
   // Get hardcoded cards for non-saving mode
   const getHardcodedCards = () => {
@@ -453,6 +455,10 @@ const MobileFlashcardMode = ({
       
       const { deltaX, deltaY, distance } = gesture;
       
+      // Track position and time for velocity calculation
+      lastTouchPos.current = { x: currentPoint.x, y: currentPoint.y };
+      lastTouchTime.current = Date.now();
+      
       // Only track horizontal drags for answer swiping
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
         const rotation = deltaX * 0.1; // Slight rotation based on drag
@@ -503,13 +509,35 @@ const MobileFlashcardMode = ({
     onTouchEnd: () => {
       console.log('[TOUCH END DEBUG] Touch ended, dragState:', dragState);
       
-      // Check if card was dragged far enough to trigger auto-swipe
-      const swipeThreshold = 60; // pixels - lowered for easier swiping
+      if (!dragState.isDragging) {
+        console.log('[TOUCH END DEBUG] Not dragging, ignoring');
+        return;
+      }
       
-      console.log('[AUTO-SWIPE DEBUG] Checking swipe: isDragging=', dragState.isDragging, 'deltaX=', dragState.deltaX, 'threshold=', swipeThreshold);
+      // Calculate velocity if we have recent touch data
+      let velocity = 0;
+      if (lastTouchPos.current && lastTouchTime.current) {
+        const now = Date.now();
+        const timeDiff = now - lastTouchTime.current;
+        
+        if (timeDiff < 100 && timeDiff > 0) { // Recent touch within 100ms
+          // Calculate velocity in pixels per second
+          const distanceX = Math.abs(dragState.deltaX);
+          velocity = distanceX / (timeDiff / 1000);
+          console.log('[MOMENTUM DEBUG] Calculated velocity:', velocity, 'px/s', 'timeDiff:', timeDiff, 'ms');
+        }
+      }
       
-      if (dragState.isDragging && Math.abs(dragState.deltaX) > swipeThreshold) {
-        console.log('[AUTO-SWIPE] Triggering auto-swipe with deltaX:', dragState.deltaX);
+      // Check for auto-swipe based on distance OR momentum
+      const distanceThreshold = 40; // Lower distance threshold
+      const velocityThreshold = 200; // pixels per second
+      const hasDistance = Math.abs(dragState.deltaX) > distanceThreshold;
+      const hasMomentum = velocity > velocityThreshold;
+      
+      console.log('[AUTO-SWIPE DEBUG] Distance:', Math.abs(dragState.deltaX), 'Velocity:', velocity, 'hasDistance:', hasDistance, 'hasMomentum:', hasMomentum);
+      
+      if (hasDistance || hasMomentum) {
+        console.log('[AUTO-SWIPE] Triggering auto-swipe - deltaX:', dragState.deltaX, 'velocity:', velocity);
         
         // Determine direction and answer
         if (dragState.deltaX > 0) {
@@ -522,10 +550,11 @@ const MobileFlashcardMode = ({
           markCard('incorrect');
         }
         
-        // Animate card flying off screen
+        // Animate card flying off screen with momentum
+        const finalX = dragState.deltaX > 0 ? window.innerWidth + 100 : -window.innerWidth - 100;
         setDragState(prev => ({
           ...prev,
-          deltaX: dragState.deltaX > 0 ? window.innerWidth : -window.innerWidth,
+          deltaX: finalX,
           opacity: 0
         }));
         
@@ -536,15 +565,14 @@ const MobileFlashcardMode = ({
           setTimeout(() => setCardEntryAnimation(''), 400);
         }, 300);
       } else {
-        console.log('[TOUCH END DEBUG] Not triggering auto-swipe, resetting drag state');
+        console.log('[TOUCH END DEBUG] Not enough distance or momentum, resetting drag state');
         // Reset drag state when touch ends without swiping
         setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
       }
       
-      // Always ensure drag state is reset on touch end
-      setTimeout(() => {
-        setDragState(prev => ({ ...prev, isDragging: false }));
-      }, 50);
+      // Reset touch tracking
+      lastTouchPos.current = null;
+      lastTouchTime.current = 0;
     },
     onLongPress: (e, point) => {
       // Long press to show quick actions
