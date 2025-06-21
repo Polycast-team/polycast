@@ -289,7 +289,7 @@ const MobileFlashcardMode = ({
       
       const rotation = deltaX * 0.1;
       const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
-      const colorIntensity = Math.min(1, Math.abs(deltaX) / 150);
+      const colorIntensity = Math.min(1, Math.abs(deltaX) / 200); // Adjusted for new threshold
       
       console.log('[DIRECT DRAG] Moving - deltaX:', deltaX, 'rotation:', rotation);
       
@@ -465,28 +465,34 @@ const MobileFlashcardMode = ({
       console.log('[DIRECT DRAG] Touch end - isDragging:', isDragging.current, 'dragState:', dragState);
       
       if (isDragging.current) {
-        // Calculate velocity
+        // Calculate velocity based on recent movement
         let velocity = 0;
-        if (lastTouchPos.current && lastTouchTime.current) {
+        if (lastTouchPos.current && lastTouchTime.current && dragStartPos.current) {
           const now = Date.now();
           const timeDiff = now - lastTouchTime.current;
           
-          if (timeDiff < 100 && timeDiff > 0) {
-            const distanceX = Math.abs(dragState.deltaX);
-            velocity = distanceX / (timeDiff / 1000);
-            console.log('[DIRECT MOMENTUM] Velocity:', velocity, 'px/s');
+          // Only use recent movement for velocity (within last 150ms)
+          if (timeDiff < 150 && timeDiff > 10) {
+            // Calculate velocity based on total movement, not just recent
+            const totalDistanceX = Math.abs(dragState.deltaX);
+            const totalTime = now - (lastTouchTime.current - timeDiff);
+            velocity = totalDistanceX / (totalTime / 1000);
+            console.log('[DIRECT MOMENTUM] Velocity:', velocity, 'px/s', 'totalDistance:', totalDistanceX, 'totalTime:', totalTime);
           }
         }
         
-        // Check for auto-swipe
-        const distanceThreshold = 40;
-        const velocityThreshold = 200;
-        const hasDistance = Math.abs(dragState.deltaX) > distanceThreshold;
-        const hasMomentum = velocity > velocityThreshold;
+        // Check for auto-swipe with more intentional thresholds
+        const distanceThreshold = 80; // Increased - need more deliberate drag
+        const velocityThreshold = 500; // Increased - need faster flick
+        const hasSignificantDistance = Math.abs(dragState.deltaX) > distanceThreshold;
+        const hasSignificantMomentum = velocity > velocityThreshold;
         
-        console.log('[DIRECT AUTO-SWIPE] Distance:', Math.abs(dragState.deltaX), 'Velocity:', velocity, 'hasDistance:', hasDistance, 'hasMomentum:', hasMomentum);
+        // Require BOTH significant distance AND some velocity, OR very high velocity
+        const shouldTriggerSwipe = (hasSignificantDistance && velocity > 100) || velocity > 800;
         
-        if (hasDistance || hasMomentum) {
+        console.log('[DIRECT AUTO-SWIPE] Distance:', Math.abs(dragState.deltaX), 'Velocity:', velocity, 'hasDistance:', hasSignificantDistance, 'hasMomentum:', hasSignificantMomentum, 'shouldTrigger:', shouldTriggerSwipe);
+        
+        if (shouldTriggerSwipe) {
           console.log('[DIRECT AUTO-SWIPE] Triggering swipe!');
           
           // Determine answer
