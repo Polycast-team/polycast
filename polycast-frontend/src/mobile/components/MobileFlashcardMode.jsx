@@ -305,93 +305,6 @@ const MobileFlashcardMode = ({
     }
   }, [isFlipped]);
 
-  // Direct touch end handler
-  const handleDirectTouchEnd = useCallback((e) => {
-    if (!isFlipped && touchStartPos.current) {
-      // Front side - handle tap for flipping
-      const now = Date.now();
-      const touchDuration = now - touchStartTime.current;
-      
-      if (touchDuration < 200) {
-        if (now - lastTapTime.current < 100) {
-          console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
-        } else {
-          console.log('[DIRECT TOUCH] Quick tap detected - executing flip');
-          e.preventDefault();
-          e.stopPropagation();
-          flipCard();
-        }
-      }
-      
-      touchStartPos.current = null;
-    } else if (isFlipped && dragStartPos.current) {
-      // Back side - handle swipe completion
-      console.log('[DIRECT DRAG] Touch end - isDragging:', isDragging.current, 'dragState:', dragState);
-      
-      if (isDragging.current) {
-        // Calculate velocity
-        let velocity = 0;
-        if (lastTouchPos.current && lastTouchTime.current) {
-          const now = Date.now();
-          const timeDiff = now - lastTouchTime.current;
-          
-          if (timeDiff < 100 && timeDiff > 0) {
-            const distanceX = Math.abs(dragState.deltaX);
-            velocity = distanceX / (timeDiff / 1000);
-            console.log('[DIRECT MOMENTUM] Velocity:', velocity, 'px/s');
-          }
-        }
-        
-        // Check for auto-swipe
-        const distanceThreshold = 40;
-        const velocityThreshold = 200;
-        const hasDistance = Math.abs(dragState.deltaX) > distanceThreshold;
-        const hasMomentum = velocity > velocityThreshold;
-        
-        console.log('[DIRECT AUTO-SWIPE] Distance:', Math.abs(dragState.deltaX), 'Velocity:', velocity, 'hasDistance:', hasDistance, 'hasMomentum:', hasMomentum);
-        
-        if (hasDistance || hasMomentum) {
-          console.log('[DIRECT AUTO-SWIPE] Triggering swipe!');
-          
-          // Determine answer
-          if (dragState.deltaX > 0) {
-            console.log('[DIRECT AUTO-SWIPE] Marking as correct');
-            markCard('correct');
-          } else {
-            console.log('[DIRECT AUTO-SWIPE] Marking as incorrect');
-            markCard('incorrect');
-          }
-          
-          // Animate off screen
-          const finalX = dragState.deltaX > 0 ? window.innerWidth + 100 : -window.innerWidth - 100;
-          setDragState(prev => ({
-            ...prev,
-            deltaX: finalX,
-            opacity: 0
-          }));
-          
-          // Reset after animation
-          setTimeout(() => {
-            setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
-            setCardEntryAnimation('card-enter');
-            setTimeout(() => setCardEntryAnimation(''), 400);
-          }, 300);
-        } else {
-          console.log('[DIRECT DRAG] Not enough distance/momentum - resetting');
-          setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
-        }
-      }
-      
-      // Reset drag tracking
-      dragStartPos.current = null;
-      lastTouchPos.current = null;
-      lastTouchTime.current = 0;
-      isDragging.current = false;
-    }
-  }, [flipCard, isFlipped, dragState, markCard]);
-
-  // Navigation functions removed - no longer needed since cards progress by answering only
-
   // Handle answer selection
   const markCard = useCallback((answer) => {
     if (dueCards.length === 0) return;
@@ -506,6 +419,93 @@ const MobileFlashcardMode = ({
       }
     }, 200);
   }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings]);
+
+  // Direct touch end handler
+  const handleDirectTouchEnd = useCallback((e) => {
+    if (!isFlipped && touchStartPos.current) {
+      // Front side - handle tap for flipping
+      const now = Date.now();
+      const touchDuration = now - touchStartTime.current;
+      
+      if (touchDuration < 200) {
+        if (now - lastTapTime.current < 100) {
+          console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
+        } else {
+          console.log('[DIRECT TOUCH] Quick tap detected - executing flip');
+          e.preventDefault();
+          e.stopPropagation();
+          flipCard();
+        }
+      }
+      
+      touchStartPos.current = null;
+    } else if (isFlipped && dragStartPos.current) {
+      // Back side - handle swipe completion
+      console.log('[DIRECT DRAG] Touch end - isDragging:', isDragging.current, 'dragState:', dragState);
+      
+      if (isDragging.current) {
+        // Calculate velocity
+        let velocity = 0;
+        if (lastTouchPos.current && lastTouchTime.current) {
+          const now = Date.now();
+          const timeDiff = now - lastTouchTime.current;
+          
+          if (timeDiff < 100 && timeDiff > 0) {
+            const distanceX = Math.abs(dragState.deltaX);
+            velocity = distanceX / (timeDiff / 1000);
+            console.log('[DIRECT MOMENTUM] Velocity:', velocity, 'px/s');
+          }
+        }
+        
+        // Check for auto-swipe
+        const distanceThreshold = 40;
+        const velocityThreshold = 200;
+        const hasDistance = Math.abs(dragState.deltaX) > distanceThreshold;
+        const hasMomentum = velocity > velocityThreshold;
+        
+        console.log('[DIRECT AUTO-SWIPE] Distance:', Math.abs(dragState.deltaX), 'Velocity:', velocity, 'hasDistance:', hasDistance, 'hasMomentum:', hasMomentum);
+        
+        if (hasDistance || hasMomentum) {
+          console.log('[DIRECT AUTO-SWIPE] Triggering swipe!');
+          
+          // Determine answer
+          if (dragState.deltaX > 0) {
+            console.log('[DIRECT AUTO-SWIPE] Marking as correct');
+            markCard('correct');
+          } else {
+            console.log('[DIRECT AUTO-SWIPE] Marking as incorrect');
+            markCard('incorrect');
+          }
+          
+          // Animate off screen
+          const finalX = dragState.deltaX > 0 ? window.innerWidth + 100 : -window.innerWidth - 100;
+          setDragState(prev => ({
+            ...prev,
+            deltaX: finalX,
+            opacity: 0
+          }));
+          
+          // Reset after animation
+          setTimeout(() => {
+            setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+            setCardEntryAnimation('card-enter');
+            setTimeout(() => setCardEntryAnimation(''), 400);
+          }, 300);
+        } else {
+          console.log('[DIRECT DRAG] Not enough distance/momentum - resetting');
+          setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+        }
+      }
+      
+      // Reset drag tracking
+      dragStartPos.current = null;
+      lastTouchPos.current = null;
+      lastTouchTime.current = 0;
+      isDragging.current = false;
+    }
+  }, [flipCard, isFlipped, dragState, markCard]);
+
+  // Navigation functions removed - no longer needed since cards progress by answering only
 
   // Quick action for easy marking
   const quickMarkEasy = useCallback(() => {
