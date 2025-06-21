@@ -30,6 +30,7 @@ const MobileFlashcardMode = ({
   const cardContainerRef = useRef(null);
   const gestureHandlerRef = useRef(null);
   const isProcessingTap = useRef(false);
+  const lastTapTime = useRef(0);
 
   // Get hardcoded cards for non-saving mode
   const getHardcodedCards = () => {
@@ -233,13 +234,31 @@ const MobileFlashcardMode = ({
 
   // Handle card flipping
   const flipCard = useCallback(() => {
+    const now = Date.now();
     console.log(`[MOBILE DEBUG] Flipping card from ${isFlipped} to ${!isFlipped}`);
     // Use function form to ensure immediate update
     setIsFlipped(prev => {
       console.log(`[MOBILE DEBUG] Flip state changing from ${prev} to ${!prev}`);
       return !prev;
     });
+    lastTapTime.current = now;
   }, [isFlipped]);
+
+  // Direct tap handler for immediate response
+  const handleDirectTouchStart = useCallback((e) => {
+    const now = Date.now();
+    
+    // Prevent double taps within 100ms
+    if (now - lastTapTime.current < 100) {
+      console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
+      return;
+    }
+    
+    console.log('[DIRECT TOUCH] Touch start detected - executing flip immediately');
+    e.preventDefault();
+    e.stopPropagation();
+    flipCard();
+  }, [flipCard]);
 
   // Enhanced navigation with animations
   const goToNextCard = useCallback(() => {
@@ -446,22 +465,17 @@ const MobileFlashcardMode = ({
       setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
     },
     onTap: (e, point) => {
-      // Simple tap handler - always allow immediate flip
-      if (isProcessingTap.current) {
-        console.log('[TAP DEBUG] Tap ignored - already processing');
+      // Gesture handler tap - secondary to direct tap handler
+      const now = Date.now();
+      if (now - lastTapTime.current < 100) {
+        console.log('[GESTURE TAP] Ignored - recent direct tap');
         return;
       }
       
-      isProcessingTap.current = true;
-      console.log('[TAP DEBUG] Tap detected - executing flip immediately');
+      console.log('[GESTURE TAP] Gesture tap detected - executing flip');
       e.preventDefault();
       e.stopPropagation();
       flipCard();
-      
-      // Reset processing flag after a short delay
-      setTimeout(() => {
-        isProcessingTap.current = false;
-      }, 100);
     },
     onTouchEnd: () => {
       console.log('[TOUCH END DEBUG] Touch ended, dragState:', dragState);
@@ -516,8 +530,11 @@ const MobileFlashcardMode = ({
     }
   }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped, markCard]);
 
-  // Initialize gesture handler
+  // Initialize gesture handler (disabled for now to test direct touch)
   useEffect(() => {
+    // Temporarily disable gesture handler to test direct touch
+    return () => {};
+    
     if (!cardContainerRef.current) return;
 
     gestureHandlerRef.current = new TouchGestureHandler(
@@ -613,6 +630,7 @@ const MobileFlashcardMode = ({
       <div className="mobile-card-container" ref={cardContainerRef}>
         <div 
           className={`mobile-flashcard ${swipeAnimation} ${cardEntryAnimation}`}
+          onTouchStart={handleDirectTouchStart}
           style={{
             transform: (() => {
               const baseTransform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
