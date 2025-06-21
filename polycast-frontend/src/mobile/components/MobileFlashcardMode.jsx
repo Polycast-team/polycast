@@ -248,31 +248,36 @@ const MobileFlashcardMode = ({
 
   // Direct touch start handler - record position and time
   const handleDirectTouchStart = useCallback((e) => {
+    // Only handle direct touch on front side (for flipping)
+    if (isFlipped) {
+      console.log('[DIRECT TOUCH] Ignoring touch start - card is flipped, letting gesture handler take over');
+      return;
+    }
+    
     const touch = e.touches[0];
     touchStartPos.current = { x: touch.clientX, y: touch.clientY };
     touchStartTime.current = Date.now();
-    console.log('[DIRECT TOUCH] Touch start recorded');
-  }, []);
+    console.log('[DIRECT TOUCH] Touch start recorded for flip');
+  }, [isFlipped]);
 
   // Direct touch end handler - check if it was a tap
   const handleDirectTouchEnd = useCallback((e) => {
-    if (!touchStartPos.current) return;
+    // Only handle direct touch on front side (for flipping)
+    if (isFlipped || !touchStartPos.current) {
+      console.log('[DIRECT TOUCH] Touch end ignored - card is flipped or no touch start');
+      touchStartPos.current = null;
+      return;
+    }
     
     const now = Date.now();
     const touchDuration = now - touchStartTime.current;
     
-    // If touch was very short (< 200ms) and didn't move much, treat as tap
+    // If touch was very short (< 200ms), treat as tap
     if (touchDuration < 200) {
-      // Only allow flipping if card is NOT already flipped (on front side)
-      if (isFlipped) {
-        console.log('[DIRECT TOUCH] Ignored - card is already flipped (on answer side)');
-        touchStartPos.current = null;
-        return;
-      }
-      
       // Prevent double taps within 100ms
       if (now - lastTapTime.current < 100) {
         console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
+        touchStartPos.current = null;
         return;
       }
       
@@ -452,7 +457,7 @@ const MobileFlashcardMode = ({
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
         const rotation = deltaX * 0.1; // Slight rotation based on drag
         const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
-        const swipeThreshold = 100;
+        const swipeThreshold = 60; // Lowered for easier swiping
         const isInSwipeZone = Math.abs(deltaX) > swipeThreshold;
         
         // Calculate proportional color intensity (0 to 1)
@@ -499,7 +504,9 @@ const MobileFlashcardMode = ({
       console.log('[TOUCH END DEBUG] Touch ended, dragState:', dragState);
       
       // Check if card was dragged far enough to trigger auto-swipe
-      const swipeThreshold = 100; // pixels
+      const swipeThreshold = 60; // pixels - lowered for easier swiping
+      
+      console.log('[AUTO-SWIPE DEBUG] Checking swipe: isDragging=', dragState.isDragging, 'deltaX=', dragState.deltaX, 'threshold=', swipeThreshold);
       
       if (dragState.isDragging && Math.abs(dragState.deltaX) > swipeThreshold) {
         console.log('[AUTO-SWIPE] Triggering auto-swipe with deltaX:', dragState.deltaX);
