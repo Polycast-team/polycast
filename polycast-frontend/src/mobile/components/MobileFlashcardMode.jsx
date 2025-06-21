@@ -625,8 +625,10 @@ const MobileFlashcardMode = ({
         />
       </div>
 
-      {/* Card Container */}
-      <div className="mobile-card-container" ref={cardContainerRef}>
+      {/* Card and Buttons Container */}
+      <div className="mobile-card-and-buttons-container">
+        {/* Card Container */}
+        <div className="mobile-card-container" ref={cardContainerRef}>
         <div 
           className={`mobile-flashcard ${swipeAnimation} ${cardEntryAnimation}`}
           onTouchStart={handleDirectTouchStart}
@@ -802,6 +804,7 @@ const MobileFlashcardMode = ({
             {isFlipped ? formatNextReviewTime(calculateNextReview(currentCard, 'easy').nextReviewDate) : '—'}
           </div>
         </button>
+      </div>
       </div>
 
       {/* Answer Feedback Overlay */}

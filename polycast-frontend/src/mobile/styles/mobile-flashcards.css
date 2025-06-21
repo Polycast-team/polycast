@@ -3,6 +3,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh; /* Use dynamic viewport height for mobile */
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   color: #ffffff;
   overflow: hidden;
@@ -94,25 +95,33 @@
   100% { transform: translateX(100%); }
 }
 
+/* Card and Buttons Container */
+.mobile-card-and-buttons-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+}
+
 /* Card Container */
 .mobile-card-container {
-  flex: 1; /* Take available space but allow room for buttons */
   display: flex;
-  align-items: flex-start; /* Align to top instead of center */
+  align-items: center;
   justify-content: center;
-  padding: 20px 20px 10px 20px; /* Less bottom padding */
+  padding: 20px 0;
   perspective: 1000px;
   position: relative;
   touch-action: none; /* Disable browser touch handling for better control */
   user-select: none;
-  min-height: 0; /* Allow shrinking */
 }
 
 .mobile-flashcard {
   width: 100%;
   max-width: 400px;
   aspect-ratio: 3/2;
-  max-height: 50vh; /* Limit height to ensure buttons are visible */
+  height: auto;
   position: relative;
   transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -395,11 +404,9 @@
 .mobile-answer-buttons {
   display: flex;
   gap: 12px;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  flex-shrink: 0; /* Don't shrink */
+  padding: 20px 0;
+  width: 100%;
+  max-width: 400px; /* Match card width */
 }
 
 .mobile-answer-btn {
