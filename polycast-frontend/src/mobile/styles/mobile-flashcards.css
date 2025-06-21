@@ -96,7 +96,7 @@
 
 /* Card Container */
 .mobile-card-container {
-  flex: 0 0 auto; /* Don't flex, fixed size */
+  flex: 1; /* Take available space but allow room for buttons */
   display: flex;
   align-items: flex-start; /* Align to top instead of center */
   justify-content: center;
@@ -105,13 +105,14 @@
   position: relative;
   touch-action: none; /* Disable browser touch handling for better control */
   user-select: none;
-  height: 60vh; /* Fixed height instead of flex: 1 */
+  min-height: 0; /* Allow shrinking */
 }
 
 .mobile-flashcard {
   width: 100%;
   max-width: 400px;
   aspect-ratio: 3/2;
+  max-height: 50vh; /* Limit height to ensure buttons are visible */
   position: relative;
   transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -398,7 +399,7 @@
   background: rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: auto; /* Push to bottom */
+  flex-shrink: 0; /* Don't shrink */
 }
 
 .mobile-answer-btn {

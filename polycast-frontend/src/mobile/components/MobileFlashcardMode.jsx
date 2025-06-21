@@ -742,23 +742,6 @@ const MobileFlashcardMode = ({
               )}
             </div>
             
-            {/* Swipe Arrows for Back of Card */}
-            {isFlipped && (
-              <div className="mobile-swipe-arrows">
-                <div className="mobile-swipe-arrow mobile-swipe-left">
-                  <div className="mobile-arrow-icon">←</div>
-                  <div className="mobile-arrow-label">Incorrect</div>
-                </div>
-                <div className="mobile-swipe-arrow mobile-swipe-right">
-                  <div className="mobile-arrow-icon">→</div>
-                  <div className="mobile-arrow-label">Correct</div>
-                </div>
-                <div className="mobile-swipe-arrow mobile-swipe-up">
-                  <div className="mobile-arrow-icon">↑</div>
-                  <div className="mobile-arrow-label">Easy</div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
         
