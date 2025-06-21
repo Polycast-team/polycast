@@ -31,6 +31,8 @@ const MobileFlashcardMode = ({
   const gestureHandlerRef = useRef(null);
   const isProcessingTap = useRef(false);
   const lastTapTime = useRef(0);
+  const touchStartPos = useRef(null);
+  const touchStartTime = useRef(0);
 
   // Get hardcoded cards for non-saving mode
   const getHardcodedCards = () => {
@@ -244,20 +246,38 @@ const MobileFlashcardMode = ({
     lastTapTime.current = now;
   }, [isFlipped]);
 
-  // Direct tap handler for immediate response
+  // Direct touch start handler - record position and time
   const handleDirectTouchStart = useCallback((e) => {
-    const now = Date.now();
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+    touchStartTime.current = Date.now();
+    console.log('[DIRECT TOUCH] Touch start recorded');
+  }, []);
+
+  // Direct touch end handler - check if it was a tap
+  const handleDirectTouchEnd = useCallback((e) => {
+    if (!touchStartPos.current) return;
     
-    // Prevent double taps within 100ms
-    if (now - lastTapTime.current < 100) {
-      console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
-      return;
+    const now = Date.now();
+    const touchDuration = now - touchStartTime.current;
+    
+    // If touch was very short (< 200ms) and didn't move much, treat as tap
+    if (touchDuration < 200) {
+      // Prevent double taps within 100ms
+      if (now - lastTapTime.current < 100) {
+        console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
+        return;
+      }
+      
+      console.log('[DIRECT TOUCH] Quick tap detected - executing flip');
+      e.preventDefault();
+      e.stopPropagation();
+      flipCard();
+    } else {
+      console.log('[DIRECT TOUCH] Long touch - letting gesture handler take over');
     }
     
-    console.log('[DIRECT TOUCH] Touch start detected - executing flip immediately');
-    e.preventDefault();
-    e.stopPropagation();
-    flipCard();
+    touchStartPos.current = null;
   }, [flipCard]);
 
   // Enhanced navigation with animations
@@ -465,17 +485,8 @@ const MobileFlashcardMode = ({
       setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
     },
     onTap: (e, point) => {
-      // Gesture handler tap - secondary to direct tap handler
-      const now = Date.now();
-      if (now - lastTapTime.current < 100) {
-        console.log('[GESTURE TAP] Ignored - recent direct tap');
-        return;
-      }
-      
-      console.log('[GESTURE TAP] Gesture tap detected - executing flip');
-      e.preventDefault();
-      e.stopPropagation();
-      flipCard();
+      // Tap handling disabled - using direct touch handler instead
+      console.log('[GESTURE TAP] Ignored - using direct touch handler');
     },
     onTouchEnd: () => {
       console.log('[TOUCH END DEBUG] Touch ended, dragState:', dragState);
@@ -530,11 +541,8 @@ const MobileFlashcardMode = ({
     }
   }, [goToNextCard, goToPrevCard, flipCard, quickMarkEasy, isFlipped, markCard]);
 
-  // Initialize gesture handler (disabled for now to test direct touch)
+  // Initialize gesture handler for drag/swipe only
   useEffect(() => {
-    // Temporarily disable gesture handler to test direct touch
-    return () => {};
-    
     if (!cardContainerRef.current) return;
 
     gestureHandlerRef.current = new TouchGestureHandler(
@@ -631,6 +639,7 @@ const MobileFlashcardMode = ({
         <div 
           className={`mobile-flashcard ${swipeAnimation} ${cardEntryAnimation}`}
           onTouchStart={handleDirectTouchStart}
+          onTouchEnd={handleDirectTouchEnd}
           style={{
             transform: (() => {
               const baseTransform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
