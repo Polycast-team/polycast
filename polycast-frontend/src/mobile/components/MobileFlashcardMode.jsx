@@ -841,10 +841,43 @@ const MobileFlashcardMode = ({
     return () => {};
   }, []);
 
-  // Calculate future due dates for calendar
+  // Calculate future due dates for calendar - now uses current session data
   const getCalendarData = () => {
     const today = new Date();
     const nextWeekDays = [];
+    
+    // Get all cards with current session updates
+    const currentCards = [];
+    
+    // Add cards from current session (dueCards) with their updated state
+    dueCards.forEach(card => {
+      currentCards.push(card);
+    });
+    
+    // Add cards from wordDefinitions (for non-saving mode) or availableCards
+    if (selectedProfile === 'non-saving') {
+      // For non-saving mode, use availableCards but exclude those already in dueCards
+      availableCards.forEach(card => {
+        const alreadyInSession = dueCards.some(sessionCard => 
+          sessionCard.key === card.key || sessionCard.wordSenseId === card.wordSenseId
+        );
+        if (!alreadyInSession) {
+          currentCards.push(card);
+        }
+      });
+    } else {
+      // For other profiles, use updated wordDefinitions data
+      Object.entries(wordDefinitions).forEach(([key, value]) => {
+        if (value && value.wordSenseId && value.inFlashcards) {
+          const alreadyInSession = dueCards.some(sessionCard => 
+            sessionCard.key === key || sessionCard.wordSenseId === value.wordSenseId
+          );
+          if (!alreadyInSession) {
+            currentCards.push({ ...value, key });
+          }
+        }
+      });
+    }
     
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
@@ -854,8 +887,8 @@ const MobileFlashcardMode = ({
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
       
-      // Find cards due on this day
-      const cardsForDay = availableCards.filter(card => {
+      // Find cards due on this day using current session data
+      const cardsForDay = currentCards.filter(card => {
         if (!card.srsData) return false;
         
         const dueDate = new Date(card.srsData.dueDate || card.srsData.nextReviewDate);
