@@ -146,6 +146,26 @@ const MobileFlashcardMode = ({
           nextReviewDate: new Date().toISOString(),
           currentStep: 0
         }
+      },
+      {
+        key: 'test_relearning',
+        word: 'test',
+        wordSenseId: 'test_relearning',
+        partOfSpeech: 'verb',
+        definition: 'A card in relearning status for testing',
+        inFlashcards: true,
+        exampleSentencesGenerated: 'This is a ~test~ card for relearning. // Esta es una tarjeta de ~prueba~ para reaprendizaje.',
+        srsData: {
+          status: 'relearning',
+          interval: 7, // Was 7 days but failed
+          easeFactor: 2.3,
+          correctCount: 2,
+          incorrectCount: 1,
+          lastReviewDate: new Date(Date.now() - 1000).toISOString(), // 1 second ago
+          nextReviewDate: new Date().toISOString(), // Due now
+          currentStep: 0, // First relearning step
+          lapses: 1
+        }
       }
     ];
   };
