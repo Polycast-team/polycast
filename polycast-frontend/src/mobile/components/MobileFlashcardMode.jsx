@@ -390,7 +390,10 @@ const MobileFlashcardMode = ({
         }).catch(err => {
           console.error('Audio play error:', err);
           setAudioState({ loading: false, error: null });
-          showError(`Failed to play audio: ${err.message}`);
+          // Don't show error for AbortError (interrupted by pause) - this is expected when swiping
+          if (err.name !== 'AbortError' && !err.message.includes('interrupted')) {
+            showError(`Failed to play audio: ${err.message}`);
+          }
         });
         
         return audio;
