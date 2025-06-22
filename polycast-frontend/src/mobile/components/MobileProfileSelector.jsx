@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { getHardcodedCards } from '../../utils/hardcodedCards';
 import { categorizeCards, getDueSeenCards } from '../../utils/cardSorting';
+import { getSRSSettings } from '../../utils/srsSettings';
 
 const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudying, onBack }) => {
   const [selectedProfile, setSelectedProfile] = useState(initialProfile || 'non-saving');
@@ -151,6 +152,23 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
     return `${diffDays}d`;
   };
 
+  // Calculate when a new card will be introduced based on its position in queue
+  const getIntroductionDate = (cardIndex) => {
+    const srsSettings = getSRSSettings();
+    const newCardsPerDay = srsSettings.newCardsPerDay || 5;
+    const daysFromToday = Math.floor(cardIndex / newCardsPerDay);
+    const today = new Date();
+    const introDate = new Date(today);
+    introDate.setDate(today.getDate() + daysFromToday);
+    
+    if (daysFromToday === 0) return 'Today';
+    if (daysFromToday === 1) return 'Tomorrow';
+    
+    // Format as "Mon 6/24" 
+    const options = { weekday: 'short', month: 'numeric', day: 'numeric' };
+    return introDate.toLocaleDateString('en-US', options);
+  };
+
   // Card list component
   const CardList = ({ cards, title, type }) => (
     <div style={{
@@ -231,7 +249,10 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
                   {type === 'new' ? (
                     <div>
                       <div>Freq: {card.frequency || 5}</div>
-                      <div style={{ marginTop: '2px' }}>#{index + 1}</div>
+                      <div style={{ marginTop: '2px', fontWeight: 'bold', color: '#2196f3' }}>
+                        {getIntroductionDate(index)}
+                      </div>
+                      <div style={{ marginTop: '1px' }}>#{index + 1}</div>
                     </div>
                   ) : (
                     <div>
