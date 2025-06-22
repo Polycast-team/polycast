@@ -203,7 +203,14 @@ export function formatNextReviewTime(nextReviewDate) {
   
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
-  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  
+  // Calculate days more accurately for midnight-based scheduling
+  // If the review date is set to midnight, count full calendar days
+  const todayMidnight = new Date(now);
+  todayMidnight.setHours(0, 0, 0, 0);
+  const reviewMidnight = new Date(reviewDate);
+  reviewMidnight.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((reviewMidnight - todayMidnight) / (24 * 60 * 60 * 1000));
   
   // Show clean intervals that match SRS_interval mapping
   // Handle edge cases where times might be slightly off due to processing time
@@ -215,7 +222,7 @@ export function formatNextReviewTime(nextReviewDate) {
     else return '10 min';
   }
   
-  // For days, use >= checks to handle midnight calculations
+  // For days, check from largest to smallest intervals
   if (diffDays >= 120) return '4 months';
   if (diffDays >= 60) return '2 months';
   if (diffDays >= 30) return '1 month';
