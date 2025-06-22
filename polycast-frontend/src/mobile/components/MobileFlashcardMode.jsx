@@ -605,6 +605,9 @@ const MobileFlashcardMode = ({
     todayMidnight.setHours(23, 59, 59, 999); // End of today
     const stillDueToday = updatedDueDate <= todayMidnight;
     
+    // Debug logging to see what's happening
+    console.log(`[SESSION DEBUG] Card "${currentCard.word}" - Due: ${updatedDueDate.toLocaleString()}, Today ends: ${todayMidnight.toLocaleString()}, Still due today: ${stillDueToday}, SRS_interval: ${updatedSrsData.SRS_interval}`);
+    
     // Calculate new due cards array
     let newDueCards;
     let newDueIndex;
@@ -612,12 +615,14 @@ const MobileFlashcardMode = ({
     if (stillDueToday && (updatedSrsData.SRS_interval <= 2)) {
       // Only keep in queue if due today AND still in minute-based intervals (1-2)
       // Move card to end of queue for re-review later today
+      console.log(`[SESSION DEBUG] Keeping card "${currentCard.word}" in today's session`);
       newDueCards = [...dueCards];
       newDueCards.splice(currentDueIndex, 1);
       newDueCards.push(updatedCard);
       newDueIndex = currentDueIndex >= newDueCards.length ? 0 : currentDueIndex;
     } else {
       // Remove card from today's queue (graduated to tomorrow or later)
+      console.log(`[SESSION DEBUG] Removing card "${currentCard.word}" from today's session`);
       newDueCards = dueCards.filter((_, index) => index !== currentDueIndex);
       newDueIndex = currentDueIndex >= newDueCards.length && newDueCards.length > 0 ? newDueCards.length - 1 : currentDueIndex;
     }
