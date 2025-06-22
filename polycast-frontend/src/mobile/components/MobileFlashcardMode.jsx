@@ -817,7 +817,10 @@ const MobileFlashcardMode = ({
           }}
         >
           {/* Front of Card */}
-          <div className="mobile-card-front">
+          <div 
+            className="mobile-card-front"
+            style={dragState.isDragging ? { display: 'none' } : {}}
+          >
             {currentCard.exampleSentencesGenerated ? (
               (() => {
                 const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
