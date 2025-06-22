@@ -930,6 +930,18 @@ async function initializeDatabase() {
             )
         `);
         
+        // Create audio_cache table for storing generated audio files
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS audio_cache (
+                id SERIAL PRIMARY KEY,
+                card_key VARCHAR(255) NOT NULL UNIQUE,
+                text_content TEXT NOT NULL,
+                audio_data BYTEA NOT NULL,
+                content_type VARCHAR(50) DEFAULT 'audio/mpeg',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        
         // Insert sample data for the 'cat' profile if it doesn't exist
         const profileCheck = await client.query('SELECT * FROM profiles WHERE profile_name = $1', ['cat']);
         if (profileCheck.rowCount === 0) {
@@ -1379,6 +1391,123 @@ app.post('/api/profile/:profile/words', async (req, res) => {
         });
     } finally {
         client.release();
+    }
+});
+
+// === Audio API Endpoints ===
+
+// Check if audio exists for a card
+app.get('/api/audio/:cardKey', async (req, res) => {
+    const { cardKey } = req.params;
+    
+    console.log(`[Audio API] GET request for audio: ${cardKey}`);
+    
+    try {
+        const client = await pool.connect();
+        try {
+            const result = await client.query(
+                'SELECT audio_data, content_type FROM audio_cache WHERE card_key = $1',
+                [cardKey]
+            );
+            
+            if (result.rowCount > 0) {
+                const { audio_data, content_type } = result.rows[0];
+                
+                console.log(`[Audio API] Found cached audio for ${cardKey}, size: ${audio_data.length} bytes`);
+                
+                // Create a data URL for the audio
+                const base64Audio = audio_data.toString('base64');
+                const audioUrl = `data:${content_type};base64,${base64Audio}`;
+                
+                res.json({ audioUrl });
+            } else {
+                console.log(`[Audio API] No cached audio found for ${cardKey}`);
+                res.status(404).json({ error: 'Audio not found' });
+            }
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error(`[Audio API] Error retrieving audio for ${cardKey}:`, err);
+        res.status(500).json({ error: 'Failed to retrieve audio' });
+    }
+});
+
+// Generate and cache audio using OpenAI TTS
+app.post('/api/generate-audio', async (req, res) => {
+    const { text, cardKey, profile } = req.body;
+    
+    console.log(`[Audio API] POST request to generate audio for card: ${cardKey}, profile: ${profile}`);
+    console.log(`[Audio API] Text to synthesize: "${text.substring(0, 50)}..."`);
+    
+    if (!text || !cardKey) {
+        return res.status(400).json({ error: 'Missing text or cardKey' });
+    }
+    
+    try {
+        // Check if audio already exists
+        const client = await pool.connect();
+        try {
+            const existingResult = await client.query(
+                'SELECT audio_data, content_type FROM audio_cache WHERE card_key = $1',
+                [cardKey]
+            );
+            
+            if (existingResult.rowCount > 0) {
+                console.log(`[Audio API] Audio already exists for ${cardKey}, returning cached version`);
+                const { audio_data, content_type } = existingResult.rows[0];
+                const base64Audio = audio_data.toString('base64');
+                const audioUrl = `data:${content_type};base64,${base64Audio}`;
+                return res.json({ audioUrl });
+            }
+            
+            // Generate new audio using OpenAI TTS
+            console.log(`[Audio API] Generating new audio for ${cardKey} using OpenAI TTS`);
+            
+            if (!process.env.OPENAI_API_KEY) {
+                throw new Error('OpenAI API key not configured');
+            }
+            
+            const OpenAI = require('openai');
+            const openai = new OpenAI({
+                apiKey: process.env.OPENAI_API_KEY
+            });
+            
+            const mp3Response = await openai.audio.speech.create({
+                model: 'tts-1',
+                voice: 'alloy',
+                input: text,
+                response_format: 'mp3'
+            });
+            
+            // Get the audio data as a buffer
+            const audioBuffer = Buffer.from(await mp3Response.arrayBuffer());
+            
+            console.log(`[Audio API] Generated audio for ${cardKey}, size: ${audioBuffer.length} bytes`);
+            
+            // Save to database
+            await client.query(
+                'INSERT INTO audio_cache (card_key, text_content, audio_data, content_type) VALUES ($1, $2, $3, $4)',
+                [cardKey, text, audioBuffer, 'audio/mpeg']
+            );
+            
+            console.log(`[Audio API] Cached audio for ${cardKey} in database`);
+            
+            // Create data URL and return
+            const base64Audio = audioBuffer.toString('base64');
+            const audioUrl = `data:audio/mpeg;base64,${base64Audio}`;
+            
+            res.json({ audioUrl });
+            
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error(`[Audio API] Error generating audio for ${cardKey}:`, err);
+        res.status(500).json({ 
+            error: 'Failed to generate audio', 
+            message: err.message 
+        });
     }
 });
 

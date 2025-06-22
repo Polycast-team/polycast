@@ -516,27 +516,26 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     
   }, [availableCards.length]); // Only re-run if the number of available cards changes
 
-  // Auto-play audio when card is flipped (disabled until backend endpoints are ready)
+  // Auto-play audio when card is flipped (if enabled in settings)
   useEffect(() => {
-    // TODO: Re-enable when backend audio endpoints are implemented
-    // if (isFlipped && srsSettings.autoPlayAudio && availableCards.length > 0) {
-    //   const currentSenseId = availableCards[currentIndex];
-    //   const wordDef = wordDefinitions[currentSenseId];
-    //   
-    //   if (wordDef && wordDef.exampleSentencesGenerated) {
-    //     const parts = wordDef.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-    //     const interval = wordDef?.srsData?.interval || 1;
-    //     const sentenceIndex = ((interval - 1) % 5) * 2;
-    //     const englishSentence = parts[sentenceIndex] || parts[0] || '';
-    //     
-    //     if (englishSentence) {
-    //       // Small delay to let the flip animation finish
-    //       setTimeout(() => {
-    //         generateAndPlayAudio(englishSentence, currentSenseId);
-    //       }, 300);
-    //     }
-    //   }
-    // }
+    if (isFlipped && srsSettings.autoPlayAudio && availableCards.length > 0) {
+      const currentSenseId = availableCards[currentIndex];
+      const wordDef = wordDefinitions[currentSenseId];
+      
+      if (wordDef && wordDef.exampleSentencesGenerated) {
+        const parts = wordDef.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+        const interval = wordDef?.srsData?.interval || 1;
+        const sentenceIndex = ((interval - 1) % 5) * 2;
+        const englishSentence = parts[sentenceIndex] || parts[0] || '';
+        
+        if (englishSentence) {
+          // Small delay to let the flip animation finish
+          setTimeout(() => {
+            generateAndPlayAudio(englishSentence, currentSenseId);
+          }, 300);
+        }
+      }
+    }
   }, [isFlipped, currentIndex, srsSettings.autoPlayAudio, availableCards, wordDefinitions]);
   
   // Calculate stats for the visualization
@@ -926,7 +925,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                           e.stopPropagation(); // Prevent card flip
                           handlePlayAudio();
                         }}
-                        disabled={true}
+                        disabled={audioState.loading || !currentCardData.exampleSentencesGenerated}
                         style={{
                           background: 'rgba(95, 114, 255, 0.2)',
                           border: '2px solid rgba(95, 114, 255, 0.5)',
@@ -935,13 +934,12 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                           borderRadius: '12px',
                           fontSize: '0.9rem',
                           fontWeight: '600',
-                          cursor: 'not-allowed',
+                          cursor: audioState.loading ? 'wait' : 'pointer',
                           transition: 'all 0.2s ease',
-                          marginBottom: '16px',
-                          opacity: 0.5
+                          marginBottom: '16px'
                         }}
                       >
-                        🔊 Audio (Backend Required)
+                        {audioState.loading ? '🔄 Loading...' : '🔊 Play Audio'}
                       </button>
                       
                        {/* SRS Answer buttons */}
