@@ -267,8 +267,17 @@ const MobileFlashcardMode = ({
     
     // Initialize session counts
     const newCards = due.filter(card => card.srsData?.isNew).length;
-    const learningCards = 0; // Nothing has been gotten wrong yet at start
-    const reviewCards = due.filter(card => !card.srsData?.isNew).length;
+    const learningCards = due.filter(card => 
+      card.srsData?.status === 'learning' || 
+      card.srsData?.status === 'relearning' ||
+      (card.srsData?.gotWrongThisSession && !card.srsData?.isNew)
+    ).length;
+    const reviewCards = due.filter(card => 
+      !card.srsData?.isNew && 
+      card.srsData?.status !== 'learning' && 
+      card.srsData?.status !== 'relearning' &&
+      !card.srsData?.gotWrongThisSession
+    ).length;
     
     setSessionCounts({
       newCount: newCards,
