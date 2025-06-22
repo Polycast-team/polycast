@@ -852,6 +852,8 @@ const MobileFlashcardMode = ({
     const today = new Date();
     const nextWeekDays = [];
     
+    console.log(`[CALENDAR DEBUG] Building calendar from ${today.toDateString()} for 7 days`);
+    
     // Get all cards with current session updates
     const currentCards = [];
     
@@ -896,7 +898,7 @@ const MobileFlashcardMode = ({
       });
     }
     
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 8; i++) { // Extended to 8 days to catch more future cards
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       date.setHours(0, 0, 0, 0);
@@ -909,7 +911,18 @@ const MobileFlashcardMode = ({
         if (!card.srsData) return false;
         
         const dueDate = new Date(card.srsData.dueDate || card.srsData.nextReviewDate);
-        return dueDate >= date && dueDate <= endOfDay;
+        
+        // Compare just the date parts, ignoring time
+        const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+        const dayDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const isInRange = dueDateOnly.getTime() === dayDateOnly.getTime();
+        
+        // Debug logging for date filtering
+        if (card.word === 'eat' || i >= 6) { // Log for eat card or last few days
+          console.log(`[DATE DEBUG] Day ${i} (${dayDateOnly.toDateString()}): Card "${card.word}" due ${dueDateOnly.toDateString()}, match: ${isInRange}`);
+        }
+        
+        return isInRange;
       });
       
       nextWeekDays.push({
@@ -977,7 +990,7 @@ const MobileFlashcardMode = ({
             alignItems: 'center',
             backgroundColor: '#f8f9fa'
           }}>
-            <h3 style={{ margin: 0, fontSize: '18px', color: '#333' }}>📅 Next 7 Days</h3>
+            <h3 style={{ margin: 0, fontSize: '18px', color: '#333' }}>📅 Next 8 Days</h3>
             <button 
               onClick={() => setShowCalendar(false)}
               style={{
