@@ -571,20 +571,26 @@ const MobileFlashcardMode = ({
     // Prepare all state updates to happen together
     const now = new Date();
     const updatedDueDate = new Date(updatedSrsData.nextReviewDate);
-    const stillDueToday = (updatedDueDate - now) < (24 * 60 * 60 * 1000);
+    
+    // Check if card is still due today (within next few hours, not full 24 hours)
+    // Cards with intervals like "1 day", "3 days" should be removed from today's session
+    const todayMidnight = new Date(now);
+    todayMidnight.setHours(23, 59, 59, 999); // End of today
+    const stillDueToday = updatedDueDate <= todayMidnight;
     
     // Calculate new due cards array
     let newDueCards;
     let newDueIndex;
     
-    if (stillDueToday && updatedSrsData.status !== 'review') {
-      // Move card to end of queue
+    if (stillDueToday && (updatedSrsData.SRS_interval <= 2)) {
+      // Only keep in queue if due today AND still in minute-based intervals (1-2)
+      // Move card to end of queue for re-review later today
       newDueCards = [...dueCards];
       newDueCards.splice(currentDueIndex, 1);
       newDueCards.push(updatedCard);
       newDueIndex = currentDueIndex >= newDueCards.length ? 0 : currentDueIndex;
     } else {
-      // Remove card from today's queue
+      // Remove card from today's queue (graduated to tomorrow or later)
       newDueCards = dueCards.filter((_, index) => index !== currentDueIndex);
       newDueIndex = currentDueIndex >= newDueCards.length && newDueCards.length > 0 ? newDueCards.length - 1 : currentDueIndex;
     }
