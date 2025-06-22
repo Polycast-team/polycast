@@ -30,6 +30,7 @@ const MobileFlashcardMode = ({
   const [answerFeedback, setAnswerFeedback] = useState({ show: false, type: '', text: '' });
   const [audioState, setAudioState] = useState({ loading: false, error: null });
   const [currentAudio, setCurrentAudio] = useState(null);
+  const [hasAutoPlayedThisFlip, setHasAutoPlayedThisFlip] = useState(false);
   const { error: popupError, showError, clearError } = useErrorHandler();
   
   // Refs for gesture handling
@@ -255,6 +256,10 @@ const MobileFlashcardMode = ({
     // Use function form to ensure immediate update
     setIsFlipped(prev => {
       console.log(`[MOBILE DEBUG] Flip state changing from ${prev} to ${!prev}`);
+      // Reset auto-play flag when flipping to front
+      if (prev === true) {
+        setHasAutoPlayedThisFlip(false);
+      }
       return !prev;
     });
     lastTapTime.current = now;
@@ -411,19 +416,23 @@ const MobileFlashcardMode = ({
     const englishSentence = parts[sentenceIndex] || parts[0] || '';
     
     if (englishSentence) {
+      // Reset the auto-play flag so manual plays don't affect auto-play
       generateAndPlayAudio(englishSentence, currentCard.key);
     }
   }, [dueCards, currentDueIndex, generateAndPlayAudio]);
 
-  // Auto-play audio when card is flipped
+  // Reset auto-play flag when card changes
   useEffect(() => {
-    if (isFlipped && dueCards.length > 0) {
+    setHasAutoPlayedThisFlip(false);
+  }, [currentDueIndex]);
+
+  // Auto-play audio when card is flipped (only once per flip)
+  useEffect(() => {
+    if (isFlipped && dueCards.length > 0 && !hasAutoPlayedThisFlip) {
       const currentCard = dueCards[currentDueIndex];
-      const cardKey = `${currentCard?.key}-${currentDueIndex}-${isFlipped}`;
       
-      // Only play if we haven't already played for this specific card flip
-      if (currentCard && currentCard.exampleSentencesGenerated && hasPlayedAudioForCard.current !== cardKey) {
-        hasPlayedAudioForCard.current = cardKey;
+      if (currentCard && currentCard.exampleSentencesGenerated) {
+        setHasAutoPlayedThisFlip(true); // Mark as played immediately to prevent duplicates
         
         const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
         const interval = currentCard?.srsData?.interval || 1;
@@ -437,11 +446,8 @@ const MobileFlashcardMode = ({
           }, 300);
         }
       }
-    } else {
-      // Reset when card is not flipped
-      hasPlayedAudioForCard.current = null;
     }
-  }, [isFlipped, dueCards, currentDueIndex]);
+  }, [isFlipped, dueCards, currentDueIndex, hasAutoPlayedThisFlip]);
 
   // Simple click handler for flipping (fallback for mouse clicks)
   const handleCardClick = useCallback((e) => {
