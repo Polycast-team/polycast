@@ -244,10 +244,49 @@ const MobileFlashcardMode = ({
     
     setDueCards(due);
     setCurrentDueIndex(0);
+    setCompletedSteps(0); // Reset progress when cards change
   }, [availableCards, todaysNewCards]);
 
   // Get SRS statistics
   const srsStats = React.useMemo(() => getReviewStats(availableCards), [availableCards]);
+
+  // Calculate card counts for Anki-style progress
+  const cardCounts = React.useMemo(() => {
+    const newCards = dueCards.filter(card => card.srsData?.status === 'new').length;
+    const learningCards = dueCards.filter(card => 
+      card.srsData?.status === 'learning' || card.srsData?.status === 'relearning'
+    ).length;
+    const reviewCards = dueCards.filter(card => card.srsData?.status === 'review').length;
+    
+    return { newCards, learningCards, reviewCards };
+  }, [dueCards]);
+
+  // Calculate total mathematical steps (assuming all correct answers)
+  const totalSteps = React.useMemo(() => {
+    let steps = 0;
+    dueCards.forEach(card => {
+      const status = card.srsData?.status;
+      const currentStep = card.srsData?.currentStep || 0;
+      
+      if (status === 'new') {
+        // New card: 1 step to learning + learning steps to review
+        steps += 1 + srsSettings.learningSteps.length;
+      } else if (status === 'learning') {
+        // Learning card: remaining learning steps to review
+        steps += srsSettings.learningSteps.length - currentStep;
+      } else if (status === 'relearning') {
+        // Relearning card: remaining relearning steps to review
+        steps += srsSettings.relearningSteps.length - currentStep;
+      } else if (status === 'review') {
+        // Review card: 1 step to complete
+        steps += 1;
+      }
+    });
+    return steps;
+  }, [dueCards, srsSettings]);
+
+  // Track completed steps for progress bar
+  const [completedSteps, setCompletedSteps] = useState(0);
 
   // Handle card flipping
   const flipCard = useCallback(() => {
@@ -510,6 +549,15 @@ const MobileFlashcardMode = ({
       cardsReviewed: prev.cardsReviewed + 1,
       correctAnswers: answer !== 'incorrect' ? prev.correctAnswers + 1 : prev.correctAnswers
     }));
+
+    // Increment completed steps based on card progression
+    const oldStatus = currentCard.srsData.status;
+    const newStatus = updatedSrsData.status;
+    const oldStep = currentCard.srsData.currentStep || 0;
+    const newStep = updatedSrsData.currentStep || 0;
+    
+    // Count this as a step completion
+    setCompletedSteps(prev => prev + 1);
     
     // If this was a new card, increment today's count
     if (currentCard.srsData.status === 'new') {
@@ -766,7 +814,9 @@ const MobileFlashcardMode = ({
         <div style={{color: 'red', fontSize: '10px'}}>V2.0-HC</div>
         <div className="mobile-header-stats">
           <div className="mobile-header-progress">
-            {currentDueIndex + 1} of {dueCards.length}
+            <span style={{color: '#5f72ff'}}>New: {cardCounts.newCards}</span> • 
+            <span style={{color: '#ef4444', marginLeft: '4px'}}>Learning: {cardCounts.learningCards}</span> • 
+            <span style={{color: '#10b981', marginLeft: '4px'}}>Review: {cardCounts.reviewCards}</span>
           </div>
           <div className="mobile-header-accuracy">
             {accuracy}% • {stats.cardsReviewed} done
@@ -779,7 +829,7 @@ const MobileFlashcardMode = ({
         <div 
           className="mobile-progress-bar"
           style={{ 
-            width: `${((currentDueIndex + 1) / dueCards.length) * 100}%` 
+            width: `${totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0}%` 
           }}
         />
       </div>
