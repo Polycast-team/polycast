@@ -33,6 +33,7 @@ const MobileFlashcardMode = ({
   const [currentAudio, setCurrentAudio] = useState(null);
   const [hasAutoPlayedThisFlip, setHasAutoPlayedThisFlip] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [processedCards, setProcessedCards] = useState([]); // Track cards processed in current session
   const { error: popupError, showError, clearError } = useErrorHandler();
   
   // Refs for gesture handling
@@ -656,6 +657,9 @@ const MobileFlashcardMode = ({
       console.log(`[SESSION DEBUG] Removing card "${currentCard.word}" from today's session`);
       newDueCards = dueCards.filter((_, index) => index !== currentDueIndex);
       newDueIndex = currentDueIndex >= newDueCards.length && newDueCards.length > 0 ? newDueCards.length - 1 : currentDueIndex;
+      
+      // Add the updated card to processedCards so it appears in calendar with new due date
+      setProcessedCards(prev => [...prev, updatedCard]);
     }
     
     // Batch all state updates together to prevent UI flashing
@@ -854,14 +858,22 @@ const MobileFlashcardMode = ({
       currentCards.push(card);
     });
     
+    // Add processed cards (cards that were answered and removed from session)
+    processedCards.forEach(card => {
+      currentCards.push(card);
+    });
+    
     // Add cards from wordDefinitions (for non-saving mode) or availableCards
     if (selectedProfile === 'non-saving') {
-      // For non-saving mode, use availableCards but exclude those already in dueCards
+      // For non-saving mode, use availableCards but exclude those already in dueCards or processedCards
       availableCards.forEach(card => {
         const alreadyInSession = dueCards.some(sessionCard => 
           sessionCard.key === card.key || sessionCard.wordSenseId === card.wordSenseId
         );
-        if (!alreadyInSession) {
+        const alreadyProcessed = processedCards.some(processedCard => 
+          processedCard.key === card.key || processedCard.wordSenseId === card.wordSenseId
+        );
+        if (!alreadyInSession && !alreadyProcessed) {
           currentCards.push(card);
         }
       });
@@ -872,7 +884,10 @@ const MobileFlashcardMode = ({
           const alreadyInSession = dueCards.some(sessionCard => 
             sessionCard.key === key || sessionCard.wordSenseId === value.wordSenseId
           );
-          if (!alreadyInSession) {
+          const alreadyProcessed = processedCards.some(processedCard => 
+            processedCard.key === key || processedCard.wordSenseId === value.wordSenseId
+          );
+          if (!alreadyInSession && !alreadyProcessed) {
             currentCards.push({ ...value, key });
           }
         }
@@ -904,7 +919,7 @@ const MobileFlashcardMode = ({
     }
     
     return nextWeekDays;
-  }, [dueCards, wordDefinitions, availableCards, selectedProfile]);
+  }, [dueCards, wordDefinitions, availableCards, selectedProfile, processedCards]);
 
   // Calendar Modal Component
   const CalendarModal = () => {
