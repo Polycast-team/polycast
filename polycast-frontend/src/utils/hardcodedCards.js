@@ -114,6 +114,248 @@ export const getHardcodedCards = () => {
         lastReviewDate: null,
         nextReviewDate: new Date().toISOString()
       }
+    },
+    {
+      key: 'walk1',
+      word: 'walk',
+      wordSenseId: 'walk1',
+      partOfSpeech: 'verb',
+      definition: 'To move at a regular pace by lifting and setting down each foot in turn',
+      inFlashcards: true,
+      frequency: 8, // Very common word
+      exampleSentencesGenerated: 'I like to ~walk~ in the park every evening. // Me gusta ~caminar~ en el parque todas las noches. // They ~walk~ to school together. // Ellos ~caminan~ juntos a la escuela. // She decided to ~walk~ instead of taking the bus. // Decidió ~caminar~ en lugar de tomar el autobús.',
+      srsData: {
+        isNew: false,
+        gotWrongThisSession: false,
+        SRS_interval: 4,
+        status: 'review',
+        correctCount: 3,
+        incorrectCount: 0,
+        dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(), // Due in 1 day
+        lastSeen: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        lastReviewDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        nextReviewDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    },
+    {
+      key: 'house1',
+      word: 'house',
+      wordSenseId: 'house1',
+      partOfSpeech: 'noun',
+      definition: 'A building for human habitation',
+      inFlashcards: true,
+      frequency: 8, // Very common word
+      exampleSentencesGenerated: 'They bought a new ~house~ last year. // Compraron una ~casa~ nueva el año pasado. // The ~house~ has three bedrooms. // La ~casa~ tiene tres dormitorios. // She painted the ~house~ blue. // Pintó la ~casa~ de azul.',
+      srsData: {
+        isNew: true,
+        gotWrongThisSession: false,
+        SRS_interval: 1,
+        status: 'new',
+        correctCount: 0,
+        incorrectCount: 0,
+        dueDate: null,
+        lastSeen: null,
+        lastReviewDate: null,
+        nextReviewDate: new Date().toISOString()
+      }
+    },
+    {
+      key: 'love1',
+      word: 'love',
+      wordSenseId: 'love1',
+      partOfSpeech: 'verb',
+      definition: 'To feel deep affection for someone or something',
+      inFlashcards: true,
+      frequency: 8, // Very common word
+      exampleSentencesGenerated: 'I ~love~ spending time with my family. // ~Amo~ pasar tiempo con mi familia. // They ~love~ watching movies together. // Les ~encanta~ ver películas juntos. // She loves to ~love~ and be loved. // A ella le encanta ~amar~ y ser amada.',
+      srsData: {
+        isNew: true,
+        gotWrongThisSession: false,
+        SRS_interval: 1,
+        status: 'new',
+        correctCount: 0,
+        incorrectCount: 0,
+        dueDate: null,
+        lastSeen: null,
+        lastReviewDate: null,
+        nextReviewDate: new Date().toISOString()
+      }
+    },
+    {
+      key: 'work1',
+      word: 'work',
+      wordSenseId: 'work1',
+      partOfSpeech: 'verb',
+      definition: 'To be engaged in physical or mental activity',
+      inFlashcards: true,
+      frequency: 7, // Common word
+      exampleSentencesGenerated: 'I ~work~ at a technology company. // ~Trabajo~ en una empresa de tecnología. // They ~work~ hard every day. // Ellos ~trabajan~ duro todos los días. // She loves her ~work~. // Ella ama su ~trabajo~.',
+      srsData: {
+        isNew: false,
+        gotWrongThisSession: false,
+        SRS_interval: 3,
+        status: 'review',
+        correctCount: 2,
+        incorrectCount: 0,
+        dueDate: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(), // Due in 6 hours
+        lastSeen: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
+        lastReviewDate: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
+        nextReviewDate: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()
+      }
+    },
+    {
+      key: 'time1',
+      word: 'time',
+      wordSenseId: 'time1',
+      partOfSpeech: 'noun',
+      definition: 'The indefinite continued progress of existence',
+      inFlashcards: true,
+      frequency: 9, // Core vocabulary
+      exampleSentencesGenerated: 'What ~time~ is it now? // ¿Qué ~hora~ es ahora? // We had a great ~time~ at the party. // La pasamos muy bien en la fiesta. // ~Time~ flies when you are having fun. // El ~tiempo~ vuela cuando te diviertes.',
+      srsData: {
+        isNew: true,
+        gotWrongThisSession: false,
+        SRS_interval: 1,
+        status: 'new',
+        correctCount: 0,
+        incorrectCount: 0,
+        dueDate: null,
+        lastSeen: null,
+        lastReviewDate: null,
+        nextReviewDate: new Date().toISOString()
+      }
+    },
+    {
+      key: 'good1',
+      word: 'good',
+      wordSenseId: 'good1',
+      partOfSpeech: 'adjective',
+      definition: 'Having the required qualities; of a high standard',
+      inFlashcards: true,
+      frequency: 10, // Most common
+      exampleSentencesGenerated: 'This is a ~good~ book to read. // Este es un ~buen~ libro para leer. // She is a ~good~ student. // Ella es una ~buena~ estudiante. // Have a ~good~ day! // ¡Que tengas un ~buen~ día!',
+      srsData: {
+        isNew: true,
+        gotWrongThisSession: false,
+        SRS_interval: 1,
+        status: 'new',
+        correctCount: 0,
+        incorrectCount: 0,
+        dueDate: null,
+        lastSeen: null,
+        lastReviewDate: null,
+        nextReviewDate: new Date().toISOString()
+      }
+    },
+    {
+      key: 'school1',
+      word: 'school',
+      wordSenseId: 'school1',
+      partOfSpeech: 'noun',
+      definition: 'An institution for educating children',
+      inFlashcards: true,
+      frequency: 8, // Very common
+      exampleSentencesGenerated: 'The children go to ~school~ every day. // Los niños van a la ~escuela~ todos los días. // She teaches at the local ~school~. // Ella enseña en la ~escuela~ local. // ~School~ starts at 8 AM. // La ~escuela~ comienza a las 8 AM.',
+      srsData: {
+        isNew: true,
+        gotWrongThisSession: false,
+        SRS_interval: 1,
+        status: 'new',
+        correctCount: 0,
+        incorrectCount: 0,
+        dueDate: null,
+        lastSeen: null,
+        lastReviewDate: null,
+        nextReviewDate: new Date().toISOString()
+      }
+    },
+    {
+      key: 'car1',
+      word: 'car',
+      wordSenseId: 'car1',
+      partOfSpeech: 'noun',
+      definition: 'A motor vehicle with four wheels',
+      inFlashcards: true,
+      frequency: 7, // Common
+      exampleSentencesGenerated: 'He drives his ~car~ to work. // Él maneja su ~carro~ al trabajo. // The ~car~ is parked outside. // El ~carro~ está estacionado afuera. // They bought a new ~car~. // Compraron un ~carro~ nuevo.',
+      srsData: {
+        isNew: true,
+        gotWrongThisSession: false,
+        SRS_interval: 1,
+        status: 'new',
+        correctCount: 0,
+        incorrectCount: 0,
+        dueDate: null,
+        lastSeen: null,
+        lastReviewDate: null,
+        nextReviewDate: new Date().toISOString()
+      }
+    },
+    {
+      key: 'food1',
+      word: 'food',
+      wordSenseId: 'food1',
+      partOfSpeech: 'noun',
+      definition: 'Any nutritious substance that people or animals eat',
+      inFlashcards: true,
+      frequency: 8, // Very common
+      exampleSentencesGenerated: 'The ~food~ at this restaurant is delicious. // La ~comida~ en este restaurante está deliciosa. // We need to buy ~food~ for dinner. // Necesitamos comprar ~comida~ para la cena. // Healthy ~food~ is important. // La ~comida~ saludable es importante.',
+      srsData: {
+        isNew: false,
+        gotWrongThisSession: false,
+        SRS_interval: 2,
+        status: 'learning',
+        correctCount: 1,
+        incorrectCount: 0,
+        dueDate: new Date(Date.now() + 45 * 60 * 1000).toISOString(), // Due in 45 minutes
+        lastSeen: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+        lastReviewDate: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+        nextReviewDate: new Date(Date.now() + 45 * 60 * 1000).toISOString()
+      }
+    },
+    {
+      key: 'friend1',
+      word: 'friend',
+      wordSenseId: 'friend1',
+      partOfSpeech: 'noun',
+      definition: 'A person you like and know well',
+      inFlashcards: true,
+      frequency: 7, // Common
+      exampleSentencesGenerated: 'She is my best ~friend~. // Ella es mi mejor ~amiga~. // I met my ~friend~ at the cafe. // Me encontré con mi ~amigo~ en el café. // Good ~friends~ are hard to find. // Los buenos ~amigos~ son difíciles de encontrar.',
+      srsData: {
+        isNew: true,
+        gotWrongThisSession: false,
+        SRS_interval: 1,
+        status: 'new',
+        correctCount: 0,
+        incorrectCount: 0,
+        dueDate: null,
+        lastSeen: null,
+        lastReviewDate: null,
+        nextReviewDate: new Date().toISOString()
+      }
+    },
+    {
+      key: 'learn1',
+      word: 'learn',
+      wordSenseId: 'learn1',
+      partOfSpeech: 'verb',
+      definition: 'To acquire knowledge or skill through study or experience',
+      inFlashcards: true,
+      frequency: 6, // Moderately common
+      exampleSentencesGenerated: 'I want to ~learn~ Spanish this year. // Quiero ~aprender~ español este año. // Children ~learn~ quickly. // Los niños ~aprenden~ rápidamente. // She loves to ~learn~ new things. // A ella le encanta ~aprender~ cosas nuevas.',
+      srsData: {
+        isNew: true,
+        gotWrongThisSession: false,
+        SRS_interval: 1,
+        status: 'new',
+        correctCount: 0,
+        incorrectCount: 0,
+        dueDate: null,
+        lastSeen: null,
+        lastReviewDate: null,
+        nextReviewDate: new Date().toISOString()
+      }
     }
   ];
 };
