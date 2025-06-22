@@ -206,9 +206,14 @@ export function formatNextReviewTime(nextReviewDate) {
   const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
   
   // Show clean intervals that match SRS_interval mapping
-  if (diffMins === 1) return '1 min';
-  if (diffMins === 10) return '10 min';
-  if (diffMins < 60) return `${diffMins} min`;
+  // Handle edge cases where times might be slightly off due to processing time
+  if (diffMins <= 1) return '1 min';
+  if (diffMins >= 9 && diffMins <= 11) return '10 min';
+  if (diffMins < 60) {
+    // For other minute values, round to nearest interval
+    if (diffMins < 5) return '1 min';
+    else return '10 min';
+  }
   
   // For days, use >= checks to handle midnight calculations
   if (diffDays >= 120) return '4 months';
