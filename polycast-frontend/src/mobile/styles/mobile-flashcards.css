@@ -127,8 +127,13 @@
   transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   cursor: pointer;
-  will-change: transform;
+  will-change: transform, opacity;
   -webkit-tap-highlight-color: transparent;
+  /* Hardware acceleration */
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .mobile-flashcard.flipped {
@@ -848,7 +853,17 @@
   line-height: 1;
 }
 
-/* Animation when dragging */
+/* Animation when dragging - optimized with CSS */
+.mobile-flashcard[data-drag-direction="left"] {
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.25);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.mobile-flashcard[data-drag-direction="right"] {
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.5), 0 0 60px rgba(34, 197, 94, 0.25);
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
 .mobile-flashcard[data-drag-direction="left"] .mobile-swipe-left {
   opacity: 1;
   transform: translateY(-50%) scale(1.2);
