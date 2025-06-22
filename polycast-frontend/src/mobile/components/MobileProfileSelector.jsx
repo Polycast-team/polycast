@@ -63,10 +63,12 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
     fetchProfileData();
   }, [selectedProfile]);
 
-  // Get available cards (same logic as MobileFlashcardMode)
+  // Get available cards for profile selector (initial state)
   const getAvailableCards = () => {
     if (selectedProfile === 'non-saving') {
-      return getHardcodedCards();
+      // For profile selector, show initial state (all cards as new)
+      // Filter out test cards that are already in learning state
+      return getHardcodedCards().filter(card => card.srsData.isNew);
     }
     return Object.values(wordDefinitions).filter(def => 
       def && def.wordSenseId && def.inFlashcards
@@ -175,18 +177,10 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
                 <div className="mobile-stat">
                   <div className="mobile-stat-number">
                     {availableCards.filter(card => 
-                      card && card.srsData && !card.srsData.isNew && card.srsData.gotWrongThisSession
+                      card && card.srsData && !card.srsData.isNew
                     ).length}
                   </div>
-                  <div className="mobile-stat-label">Learning</div>
-                </div>
-                <div className="mobile-stat">
-                  <div className="mobile-stat-number">
-                    {availableCards.filter(card => 
-                      card && card.srsData && !card.srsData.isNew && !card.srsData.gotWrongThisSession
-                    ).length}
-                  </div>
-                  <div className="mobile-stat-label">Review</div>
+                  <div className="mobile-stat-label">Due</div>
                 </div>
               </div>
               
