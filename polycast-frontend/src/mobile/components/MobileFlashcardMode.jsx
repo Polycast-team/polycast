@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import { calculateNextReview, getDueCards, getReviewStats, formatNextReviewTime } from '../../utils/srsAlgorithm';
 import { getSRSSettings } from '../../utils/srsSettings';
 import { TouchGestureHandler } from '../utils/touchGestures';
+import ErrorPopup from '../../components/ErrorPopup';
+import { useErrorHandler } from '../../hooks/useErrorHandler';
 
 const MobileFlashcardMode = ({ 
   selectedProfile, 
@@ -28,6 +30,7 @@ const MobileFlashcardMode = ({
   const [answerFeedback, setAnswerFeedback] = useState({ show: false, type: '', text: '' });
   const [audioState, setAudioState] = useState({ loading: false, error: null });
   const [currentAudio, setCurrentAudio] = useState(null);
+  const { error: popupError, showError, clearError } = useErrorHandler();
   
   // Refs for gesture handling
   const cardContainerRef = useRef(null);
@@ -375,7 +378,8 @@ const MobileFlashcardMode = ({
       
     } catch (error) {
       console.error('Audio generation error:', error);
-      setAudioState({ loading: false, error: 'Failed to generate audio' });
+      setAudioState({ loading: false, error: null });
+      showError(`Failed to generate audio: ${error.message}`);
     }
   }, [audioState.loading, currentAudio, selectedProfile]);
 
@@ -950,18 +954,8 @@ const MobileFlashcardMode = ({
         </div>
       )}
 
-      {/* Audio Error Overlay */}
-      {audioState.error && (
-        <div className="mobile-audio-error">
-          ❌ {audioState.error}
-          <button 
-            className="mobile-audio-error-close"
-            onClick={() => setAudioState({ loading: false, error: null })}
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      {/* Error Popup */}
+      <ErrorPopup error={popupError} onClose={clearError} />
     </div>
   );
 };

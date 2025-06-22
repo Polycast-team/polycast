@@ -4,6 +4,8 @@ import './FlashcardMode.css';
 import { calculateNextReview, getDueCards, getReviewStats, formatNextReviewTime } from '../utils/srsAlgorithm';
 import { getSRSSettings } from '../utils/srsSettings';
 import SRSSettings from './SRSSettings';
+import ErrorPopup from './ErrorPopup';
+import { useErrorHandler } from '../hooks/useErrorHandler';
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -27,6 +29,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   const [cardAnimation, setCardAnimation] = useState('');
   const [audioState, setAudioState] = useState({ loading: false, error: null });
   const [currentAudio, setCurrentAudio] = useState(null);
+  const { error: popupError, showError, clearError } = useErrorHandler();
   
   // Reference to track which cards have been processed to avoid infinite re-renders
   const processedCardsRef = useRef('');
@@ -86,7 +89,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           }
         } catch (error) {
           console.error('Error loading daily SRS data:', error);
-          alert(`ERROR: Database connection failed for profile "${selectedProfile}". Cannot load SRS data. Please check your connection and try again.`);
+          showError(`Database connection failed for profile "${selectedProfile}". Cannot load SRS data. Please check your connection and try again.`);
           setTodaysNewCards(0);
         }
       }
@@ -472,7 +475,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       
     } catch (error) {
       console.error('Audio generation error:', error);
-      setAudioState({ loading: false, error: 'Failed to generate audio' });
+      setAudioState({ loading: false, error: null });
+      showError(`Failed to generate audio: ${error.message}`);
     }
   };
 
@@ -1030,6 +1034,9 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
            </div>
          </>
        )}
+
+       {/* Error Popup */}
+       <ErrorPopup error={popupError} onClose={clearError} />
      </div>
    );
 };

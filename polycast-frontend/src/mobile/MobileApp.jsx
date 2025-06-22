@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import MobileProfileSelector from './components/MobileProfileSelector.jsx';
 import MobileFlashcardMode from './components/MobileFlashcardMode.jsx';
+import ErrorPopup from '../components/ErrorPopup';
+import { useErrorHandler } from '../hooks/useErrorHandler';
 import './styles/mobile.css';
 import './styles/mobile-login.css';
 import './styles/mobile-profile.css';
@@ -10,6 +12,7 @@ const MobileApp = () => {
   const [currentMode, setCurrentMode] = useState('profile'); // 'profile' or 'flashcards'
   const [selectedProfile, setSelectedProfile] = useState('non-saving');
   const [wordDefinitions, setWordDefinitions] = useState({});
+  const { error: popupError, showError, clearError } = useErrorHandler();
 
 
   // Handle starting study session
@@ -39,7 +42,7 @@ const MobileApp = () => {
           console.log(`[MOBILE] Saved SRS updates for profile: ${selectedProfile}`);
         } catch (error) {
           console.error('Error saving SRS updates:', error);
-          alert(`ERROR: Failed to save progress for profile "${selectedProfile}". Your study progress may be lost. Please check your connection.`);
+          showError(`Failed to save progress for profile "${selectedProfile}". Your study progress may be lost. Please check your connection.`);
         }
       }, 500);
     }
@@ -82,6 +85,9 @@ const MobileApp = () => {
           PolyCast Mobile • For full features, use desktop version
         </div>
       </div>
+
+      {/* Error Popup */}
+      <ErrorPopup error={popupError} onClose={clearError} />
     </div>
   );
 };

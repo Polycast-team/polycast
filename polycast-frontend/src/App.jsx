@@ -11,6 +11,8 @@ import TranscriptionDisplay from './components/TranscriptionDisplay';
 import DictionaryTable from './components/DictionaryTable';
 import FlashcardMode from './components/FlashcardMode';
 import VideoMode from './components/VideoMode';
+import ErrorPopup from './components/ErrorPopup';
+import { useErrorHandler } from './hooks/useErrorHandler';
 
 // App now receives an array of target languages and room setup as props
 function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom }) {
@@ -71,7 +73,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
         derivedSelectedWords);
     } catch (error) {
       console.error(`Error fetching profile data for ${profile}:`, error);
-      alert(`ERROR: Failed to load profile data for "${profile}". Please check your connection and try again.`);
+      showError(`Failed to load profile data for "${profile}". Please check your connection and try again.`);
     }
   }, []);
   
@@ -124,6 +126,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
   const notificationTimeoutRef = useRef(null);
   const modeRef = useRef(appMode === 'text');
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
+  const { error: popupError, showError, clearError } = useErrorHandler();
 
   // Ensure mutual exclusivity between transcript and translation checkboxes
   useEffect(() => {
@@ -1104,6 +1107,9 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
           </div>
         </div>
       )}
+
+      {/* Error Popup */}
+      <ErrorPopup error={popupError} onClose={clearError} />
     </div>
   )
 }
