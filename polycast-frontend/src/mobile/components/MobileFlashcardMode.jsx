@@ -43,6 +43,7 @@ const MobileFlashcardMode = ({
   const lastTouchTime = useRef(0);
   const isDragging = useRef(false);
   const dragStartPos = useRef(null);
+  const hasPlayedAudioForCard = useRef(null);
 
   // Get hardcoded cards for non-saving mode
   const getHardcodedCards = () => {
@@ -317,9 +318,13 @@ const MobileFlashcardMode = ({
 
   // Generate and play audio for the current sentence
   const generateAndPlayAudio = useCallback(async (text, cardKey) => {
-    if (!text || audioState.loading) return;
+    // Check loading state directly from ref to avoid dependency issues
+    if (!text) return;
     
-    setAudioState({ loading: true, error: null });
+    setAudioState(prev => {
+      if (prev.loading) return prev; // Already loading, skip
+      return { loading: true, error: null };
+    });
     
     try {
       // First, check if audio already exists in backend
@@ -357,31 +362,40 @@ const MobileFlashcardMode = ({
       }
       
       // Play the audio
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
-      
-      const audio = new Audio(audioUrl);
-      setCurrentAudio(audio);
-      
-      audio.onended = () => {
-        setAudioState({ loading: false, error: null });
-      };
-      
-      audio.onerror = () => {
-        setAudioState({ loading: false, error: 'Failed to play audio' });
-      };
-      
-      await audio.play();
-      setAudioState({ loading: false, error: null });
+      setCurrentAudio(prevAudio => {
+        if (prevAudio) {
+          prevAudio.pause();
+          prevAudio.currentTime = 0;
+        }
+        
+        const audio = new Audio(audioUrl);
+        
+        audio.onended = () => {
+          setAudioState({ loading: false, error: null });
+        };
+        
+        audio.onerror = () => {
+          setAudioState({ loading: false, error: null });
+          showError('Failed to play audio');
+        };
+        
+        audio.play().then(() => {
+          setAudioState({ loading: false, error: null });
+        }).catch(err => {
+          console.error('Audio play error:', err);
+          setAudioState({ loading: false, error: null });
+          showError(`Failed to play audio: ${err.message}`);
+        });
+        
+        return audio;
+      });
       
     } catch (error) {
       console.error('Audio generation error:', error);
       setAudioState({ loading: false, error: null });
       showError(`Failed to generate audio: ${error.message}`);
     }
-  }, [audioState.loading, currentAudio, selectedProfile]);
+  }, [selectedProfile, showError]);
 
   // Play audio button handler
   const handlePlayAudio = useCallback(() => {
@@ -402,7 +416,12 @@ const MobileFlashcardMode = ({
   useEffect(() => {
     if (isFlipped && dueCards.length > 0) {
       const currentCard = dueCards[currentDueIndex];
-      if (currentCard && currentCard.exampleSentencesGenerated) {
+      const cardKey = `${currentCard?.key}-${currentDueIndex}-${isFlipped}`;
+      
+      // Only play if we haven't already played for this specific card flip
+      if (currentCard && currentCard.exampleSentencesGenerated && hasPlayedAudioForCard.current !== cardKey) {
+        hasPlayedAudioForCard.current = cardKey;
+        
         const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
         const interval = currentCard?.srsData?.interval || 1;
         const sentenceIndex = ((interval - 1) % 5) * 2;
@@ -415,8 +434,11 @@ const MobileFlashcardMode = ({
           }, 300);
         }
       }
+    } else {
+      // Reset when card is not flipped
+      hasPlayedAudioForCard.current = null;
     }
-  }, [isFlipped, dueCards, currentDueIndex, generateAndPlayAudio]);
+  }, [isFlipped, dueCards, currentDueIndex]);
 
   // Simple click handler for flipping (fallback for mouse clicks)
   const handleCardClick = useCallback((e) => {

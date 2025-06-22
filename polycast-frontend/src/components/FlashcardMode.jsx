@@ -413,10 +413,13 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   };
 
   // Generate and play audio for the current sentence
-  const generateAndPlayAudio = async (text, cardKey) => {
-    if (!text || audioState.loading) return;
+  const generateAndPlayAudio = useCallback(async (text, cardKey) => {
+    if (!text) return;
     
-    setAudioState({ loading: true, error: null });
+    setAudioState(prev => {
+      if (prev.loading) return prev; // Already loading, skip
+      return { loading: true, error: null };
+    });
     
     try {
       // First, check if audio already exists in backend
@@ -454,31 +457,40 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       }
       
       // Play the audio
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
-      
-      const audio = new Audio(audioUrl);
-      setCurrentAudio(audio);
-      
-      audio.onended = () => {
-        setAudioState({ loading: false, error: null });
-      };
-      
-      audio.onerror = () => {
-        setAudioState({ loading: false, error: 'Failed to play audio' });
-      };
-      
-      await audio.play();
-      setAudioState({ loading: false, error: null });
+      setCurrentAudio(prevAudio => {
+        if (prevAudio) {
+          prevAudio.pause();
+          prevAudio.currentTime = 0;
+        }
+        
+        const audio = new Audio(audioUrl);
+        
+        audio.onended = () => {
+          setAudioState({ loading: false, error: null });
+        };
+        
+        audio.onerror = () => {
+          setAudioState({ loading: false, error: null });
+          showError('Failed to play audio');
+        };
+        
+        audio.play().then(() => {
+          setAudioState({ loading: false, error: null });
+        }).catch(err => {
+          console.error('Audio play error:', err);
+          setAudioState({ loading: false, error: null });
+          showError(`Failed to play audio: ${err.message}`);
+        });
+        
+        return audio;
+      });
       
     } catch (error) {
       console.error('Audio generation error:', error);
       setAudioState({ loading: false, error: null });
       showError(`Failed to generate audio: ${error.message}`);
     }
-  };
+  }, [selectedProfile, showError]);
 
   // Play audio button handler
   const handlePlayAudio = () => {
