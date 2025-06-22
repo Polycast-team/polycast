@@ -15,6 +15,7 @@ const MobileFlashcardMode = ({
   const [currentDueIndex, setCurrentDueIndex] = useState(0);
   const [dueCards, setDueCards] = useState([]);
   const [todaysNewCards, setTodaysNewCards] = useState(0);
+  const [sessionCounts, setSessionCounts] = useState({ newCount: 0, learningCount: 0, reviewCount: 0 });
   const [isFlipped, setIsFlipped] = useState(false);
   const [srsSettings] = useState(getSRSSettings());
   const [stats, setStats] = useState({
@@ -60,9 +61,10 @@ const MobileFlashcardMode = ({
         inFlashcards: true,
         exampleSentencesGenerated: 'I like to ~run~ in the morning for exercise. // Me gusta ~correr~ por la mañana para hacer ejercicio. // She decided to ~run~ to catch the bus. // Decidió ~correr~ para alcanzar el autobús. // They ~run~ together every weekend. // Ellos ~corren~ juntos todos los fines de semana. // The dog loves to ~run~ in the park. // Al perro le encanta ~correr~ en el parque. // He can ~run~ very fast. // Él puede ~correr~ muy rápido.',
         srsData: {
+          isNew: true,
+          gotWrongThisSession: false,
+          SRS_interval: 1,
           status: 'new',
-          interval: 0,
-          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
@@ -78,9 +80,10 @@ const MobileFlashcardMode = ({
         inFlashcards: true,
         exampleSentencesGenerated: 'I ~eat~ breakfast every morning at seven. // ~Como~ desayuno todas las mañanas a las siete. // They ~eat~ dinner together as a family. // Ellos ~cenan~ juntos como familia. // She likes to ~eat~ healthy foods. // A ella le gusta ~comer~ alimentos saludables. // We usually ~eat~ lunch at noon. // Normalmente ~comemos~ el almuerzo al mediodía. // The children ~eat~ too much candy. // Los niños ~comen~ demasiados dulces.',
         srsData: {
+          isNew: true,
+          gotWrongThisSession: false,
+          SRS_interval: 1,
           status: 'new',
-          interval: 0,
-          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
@@ -96,9 +99,10 @@ const MobileFlashcardMode = ({
         inFlashcards: true,
         exampleSentencesGenerated: 'I read a fascinating ~book~ about space exploration. // Leí un ~libro~ fascinante sobre exploración espacial. // She bought a new ~book~ from the bookstore. // Compró un ~libro~ nuevo en la librería. // The ~book~ on the table belongs to my sister. // El ~libro~ sobre la mesa pertenece a mi hermana. // He wrote his first ~book~ last year. // Escribió su primer ~libro~ el año pasado. // This ~book~ has over 500 pages. // Este ~libro~ tiene más de 500 páginas.',
         srsData: {
+          isNew: true,
+          gotWrongThisSession: false,
+          SRS_interval: 1,
           status: 'new',
-          interval: 0,
-          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
@@ -114,9 +118,10 @@ const MobileFlashcardMode = ({
         inFlashcards: true,
         exampleSentencesGenerated: 'She feels very ~happy~ about her new job. // Se siente muy ~feliz~ por su nuevo trabajo. // The children are ~happy~ to see their grandparents. // Los niños están ~felices~ de ver a sus abuelos. // I am ~happy~ to help you with this project. // Estoy ~feliz~ de ayudarte con este proyecto. // They look ~happy~ together in the photo. // Se ven ~felices~ juntos en la foto. // We were ~happy~ to receive your invitation. // Estuvimos ~felices~ de recibir tu invitación.',
         srsData: {
+          isNew: true,
+          gotWrongThisSession: false,
+          SRS_interval: 1,
           status: 'new',
-          interval: 0,
-          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
@@ -132,9 +137,10 @@ const MobileFlashcardMode = ({
         inFlashcards: true,
         exampleSentencesGenerated: 'Please drink more ~water~ to stay hydrated. // Por favor, bebe más ~agua~ para mantenerte hidratado. // The ~water~ in the lake is crystal clear. // El ~agua~ del lago está cristalina. // She filled the glass with cold ~water~. // Llenó el vaso con ~agua~ fría. // Plants need ~water~ and sunlight to grow. // Las plantas necesitan ~agua~ y luz solar para crecer. // The bottle contains filtered ~water~. // La botella contiene ~agua~ filtrada.',
         srsData: {
+          isNew: true,
+          gotWrongThisSession: false,
+          SRS_interval: 1,
           status: 'new',
-          interval: 0,
-          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
@@ -150,14 +156,14 @@ const MobileFlashcardMode = ({
         inFlashcards: true,
         exampleSentencesGenerated: 'This is a ~test~ card for relearning. // Esta es una tarjeta de ~prueba~ para reaprendizaje.',
         srsData: {
-          status: 'learning',
-          interval: 10, // Currently at 10 minutes (was reset after failure)
-          intervalIndex: 0, // Back to 10 minutes after failure
+          isNew: false,
+          gotWrongThisSession: true,
+          SRS_interval: 1, // Reset to 1 after failure
+          status: 'relearning',
           correctCount: 2,
           incorrectCount: 1,
           lastReviewDate: new Date(Date.now() - 1000).toISOString(), // 1 second ago
-          nextReviewDate: new Date().toISOString(), // Due now
-          lapses: 1
+          nextReviewDate: new Date().toISOString() // Due now
         }
       }
     ];
@@ -179,9 +185,10 @@ const MobileFlashcardMode = ({
         const cardWithSRS = { ...value, key };
         if (!cardWithSRS.srsData) {
           cardWithSRS.srsData = {
+            isNew: true,
+            gotWrongThisSession: false,
+            SRS_interval: 1,
             status: 'new',
-            interval: 0,
-            intervalIndex: 0,
             correctCount: 0,
             incorrectCount: 0,
             lastReviewDate: null,
@@ -257,21 +264,21 @@ const MobileFlashcardMode = ({
     setDueCards(due);
     setCurrentDueIndex(0);
     setCompletedSteps(0); // Reset progress when cards change
+    
+    // Initialize session counts
+    const newCards = due.filter(card => card.srsData?.isNew).length;
+    const learningCards = 0; // Nothing has been gotten wrong yet at start
+    const reviewCards = due.filter(card => !card.srsData?.isNew).length;
+    
+    setSessionCounts({
+      newCount: newCards,
+      learningCount: learningCards,
+      reviewCount: reviewCards
+    });
   }, [availableCards, todaysNewCards]);
 
   // Get SRS statistics
   const srsStats = React.useMemo(() => getReviewStats(availableCards), [availableCards]);
-
-  // Calculate card counts for Anki-style progress (memoized for toolbar stability)
-  const cardCounts = React.useMemo(() => {
-    const newCards = dueCards.filter(card => card.srsData?.status === 'new').length;
-    const learningCards = dueCards.filter(card => 
-      card.srsData?.status === 'learning' || card.srsData?.status === 'relearning'
-    ).length;
-    const reviewCards = dueCards.filter(card => card.srsData?.status === 'review').length;
-    
-    return { newCards, learningCards, reviewCards };
-  }, [dueCards]);
 
   // Calculate accuracy inline for headerStats
   const headerStats = React.useMemo(() => {
@@ -279,11 +286,11 @@ const MobileFlashcardMode = ({
     return {
       accuracy,
       cardsReviewed: stats.cardsReviewed,
-      newCards: cardCounts.newCards,
-      learningCards: cardCounts.learningCards,
-      reviewCards: cardCounts.reviewCards
+      newCards: sessionCounts.newCount,
+      learningCards: sessionCounts.learningCount,
+      reviewCards: sessionCounts.reviewCount
     };
-  }, [stats.cardsReviewed, stats.correctAnswers, cardCounts.newCards, cardCounts.learningCards, cardCounts.reviewCards]);
+  }, [stats.cardsReviewed, stats.correctAnswers, sessionCounts.newCount, sessionCounts.learningCount, sessionCounts.reviewCount]);
 
   // Calculate total mathematical steps (assuming all correct answers) - memoized for stability
   const totalSteps = React.useMemo(() => {
@@ -335,25 +342,26 @@ const MobileFlashcardMode = ({
     console.log(`[SRS] Card "${currentCard.word}" (${currentCard.srsData.status}):`, {
       current: {
         status: currentCard.srsData.status,
-        interval: currentCard.srsData.interval,
-        intervalIndex: currentCard.srsData.intervalIndex
+        isNew: currentCard.srsData.isNew,
+        gotWrongThisSession: currentCard.srsData.gotWrongThisSession,
+        SRS_interval: currentCard.srsData.SRS_interval
       },
       ifIncorrect: {
         status: incorrectResult.status,
-        interval: incorrectResult.interval,
-        intervalIndex: incorrectResult.intervalIndex,
+        gotWrongThisSession: incorrectResult.gotWrongThisSession,
+        SRS_interval: incorrectResult.SRS_interval,
         nextReview: formatNextReviewTime(incorrectResult.nextReviewDate)
       },
       ifCorrect: {
         status: correctResult.status,
-        interval: correctResult.interval,
-        intervalIndex: correctResult.intervalIndex,
+        gotWrongThisSession: correctResult.gotWrongThisSession,
+        SRS_interval: correctResult.SRS_interval,
         nextReview: formatNextReviewTime(correctResult.nextReviewDate)
       },
       ifEasy: {
         status: easyResult.status,
-        interval: easyResult.interval,
-        intervalIndex: easyResult.intervalIndex,
+        gotWrongThisSession: easyResult.gotWrongThisSession,
+        SRS_interval: easyResult.SRS_interval,
         nextReview: formatNextReviewTime(easyResult.nextReviewDate)
       }
     });
@@ -612,15 +620,50 @@ const MobileFlashcardMode = ({
     console.log(`[SRS RESULT] Card "${currentCard.word}" updated:`, {
       from: {
         status: currentCard.srsData.status,
-        interval: currentCard.srsData.interval,
-        intervalIndex: currentCard.srsData.intervalIndex
+        isNew: currentCard.srsData.isNew,
+        gotWrongThisSession: currentCard.srsData.gotWrongThisSession,
+        SRS_interval: currentCard.srsData.SRS_interval
       },
       to: {
         status: updatedSrsData.status,
-        interval: updatedSrsData.interval,
-        intervalIndex: updatedSrsData.intervalIndex,
+        isNew: updatedSrsData.isNew,
+        gotWrongThisSession: updatedSrsData.gotWrongThisSession,
+        SRS_interval: updatedSrsData.SRS_interval,
         nextReview: formatNextReviewTime(updatedSrsData.nextReviewDate)
       }
+    });
+    
+    // Update session counts based on card transitions
+    setSessionCounts(prevCounts => {
+      const newCounts = { ...prevCounts };
+      
+      // Handle transitions from current card state
+      if (currentCard.srsData.isNew) {
+        // New card answered
+        newCounts.newCount -= 1;
+        if (answer === 'incorrect') {
+          newCounts.learningCount += 1;
+        } else {
+          newCounts.reviewCount += 1;
+        }
+      } else {
+        // Non-new card answered
+        const wasRelearning = currentCard.srsData.gotWrongThisSession;
+        const willBeRelearning = updatedSrsData.gotWrongThisSession;
+        
+        if (wasRelearning && !willBeRelearning) {
+          // Was relearning, now learning → relearning to review
+          newCounts.learningCount -= 1;
+          newCounts.reviewCount += 1;
+        } else if (!wasRelearning && willBeRelearning) {
+          // Was learning, now relearning → review to relearning  
+          newCounts.reviewCount -= 1;
+          newCounts.learningCount += 1;
+        }
+        // If both same state, no count change needed
+      }
+      
+      return newCounts;
     });
     
     // Update the card in wordDefinitions with new SRS data

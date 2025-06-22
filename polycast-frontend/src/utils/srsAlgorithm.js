@@ -7,8 +7,7 @@ import { getSRSSettings } from './srsSettings';
 
 /**
  * Calculate the next review date and update SRS data based on user's answer
- * Simple SRS: new → 10min → 1day → 3days → 7days → 14days → 30days...
- * Any incorrect answer resets to 10 minutes
+ * Simple SRS system with SRS_interval progression
  * @param {Object} card - The flashcard with srsData
  * @param {string} answer - 'incorrect', 'correct', or 'easy'
  * @returns {Object} Updated srsData
@@ -17,47 +16,73 @@ export function calculateNextReview(card, answer) {
   const srsData = { ...card.srsData };
   const now = new Date();
   
-  // Simple progression: 10min → 1day → 3days → 7days → 14days → 30days...
-  const intervals = [10, 1, 3, 7, 14, 30, 60, 120]; // first is minutes, rest are days
+  // Time intervals mapping: SRS_interval → actual time
+  const timeIntervals = {
+    1: { minutes: 10 },      // 10 minutes
+    2: { days: 1 },          // 1 day
+    3: { days: 3 },          // 3 days
+    4: { days: 7 },          // 7 days
+    5: { days: 14 },         // 14 days
+    6: { days: 30 },         // 30 days
+    7: { days: 60 },         // 60 days
+    8: { days: 120 }         // 120 days
+  };
   
   const updated = { ...srsData };
   updated.lastReviewDate = now.toISOString();
   
-  if (answer === 'incorrect') {
-    // Any incorrect answer resets to 10 minutes
-    updated.status = 'learning';
-    updated.intervalIndex = 0;
-    updated.interval = intervals[0];
-    updated.lapses = (updated.lapses || 0) + 1;
-    updated.nextReviewDate = addMinutes(now, intervals[0]).toISOString();
-    updated.incorrectCount = (updated.incorrectCount || 0) + 1;
-  } else if (answer === 'correct') {
-    const currentIndex = updated.intervalIndex || 0;
-    const nextIndex = Math.min(currentIndex + 1, intervals.length - 1);
+  // Handle new card first answer
+  if (updated.isNew) {
+    updated.isNew = false;
+    updated.SRS_interval = 1;
     
-    updated.status = nextIndex === 0 ? 'learning' : 'review';
-    updated.intervalIndex = nextIndex;
-    updated.interval = intervals[nextIndex];
-    updated.correctCount = (updated.correctCount || 0) + 1;
-    
-    if (nextIndex === 0) {
-      // 10 minutes
-      updated.nextReviewDate = addMinutes(now, intervals[nextIndex]).toISOString();
-    } else {
-      // Days
-      updated.nextReviewDate = addDays(now, intervals[nextIndex]).toISOString();
+    if (answer === 'incorrect') {
+      updated.gotWrongThisSession = true;
+      updated.SRS_interval = 1;
+    } else if (answer === 'correct') {
+      updated.gotWrongThisSession = false;
+      updated.SRS_interval += 1;
+    } else if (answer === 'easy') {
+      updated.gotWrongThisSession = false;
+      updated.SRS_interval += 2;
     }
-  } else if (answer === 'easy') {
-    // Easy skips ahead more aggressively
-    const currentIndex = updated.intervalIndex || 0;
-    const nextIndex = Math.min(currentIndex + 2, intervals.length - 1);
-    
-    updated.status = 'review';
-    updated.intervalIndex = nextIndex;
-    updated.interval = intervals[nextIndex];
-    updated.correctCount = (updated.correctCount || 0) + 1;
-    updated.nextReviewDate = addDays(now, intervals[nextIndex]).toISOString();
+  } else {
+    // Handle non-new cards
+    if (answer === 'incorrect') {
+      updated.gotWrongThisSession = true;
+      updated.SRS_interval = 1;
+    } else if (answer === 'correct') {
+      updated.gotWrongThisSession = false;
+      updated.SRS_interval += 1;
+    } else if (answer === 'easy') {
+      updated.gotWrongThisSession = false;
+      updated.SRS_interval += 2;
+    }
   }
+  
+  // Cap the interval at maximum
+  updated.SRS_interval = Math.min(updated.SRS_interval, 8);
+  
+  // Calculate next review date
+  const interval = timeIntervals[updated.SRS_interval];
+  if (interval.minutes) {
+    updated.nextReviewDate = addMinutes(now, interval.minutes).toISOString();
+  } else {
+    updated.nextReviewDate = addDays(now, interval.days).toISOString();
+  }
+  
+  // Set status for display
+  if (updated.isNew) {
+    updated.status = 'new';
+  } else if (updated.gotWrongThisSession) {
+    updated.status = 'relearning';
+  } else {
+    updated.status = 'learning';
+  }
+  
+  // Update counters
+  updated.correctCount = (updated.correctCount || 0) + (answer !== 'incorrect' ? 1 : 0);
+  updated.incorrectCount = (updated.incorrectCount || 0) + (answer === 'incorrect' ? 1 : 0);
   
   return updated;
 }
