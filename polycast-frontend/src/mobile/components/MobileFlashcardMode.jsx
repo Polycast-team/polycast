@@ -62,12 +62,11 @@ const MobileFlashcardMode = ({
         srsData: {
           status: 'new',
           interval: 0,
-          easeFactor: 2.5,
+          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
-          nextReviewDate: new Date().toISOString(),
-          currentStep: 0
+          nextReviewDate: new Date().toISOString()
         }
       },
       {
@@ -81,12 +80,11 @@ const MobileFlashcardMode = ({
         srsData: {
           status: 'new',
           interval: 0,
-          easeFactor: 2.5,
+          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
-          nextReviewDate: new Date().toISOString(),
-          currentStep: 0
+          nextReviewDate: new Date().toISOString()
         }
       },
       {
@@ -100,12 +98,11 @@ const MobileFlashcardMode = ({
         srsData: {
           status: 'new',
           interval: 0,
-          easeFactor: 2.5,
+          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
-          nextReviewDate: new Date().toISOString(),
-          currentStep: 0
+          nextReviewDate: new Date().toISOString()
         }
       },
       {
@@ -119,12 +116,11 @@ const MobileFlashcardMode = ({
         srsData: {
           status: 'new',
           interval: 0,
-          easeFactor: 2.5,
+          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
-          nextReviewDate: new Date().toISOString(),
-          currentStep: 0
+          nextReviewDate: new Date().toISOString()
         }
       },
       {
@@ -138,12 +134,11 @@ const MobileFlashcardMode = ({
         srsData: {
           status: 'new',
           interval: 0,
-          easeFactor: 2.5,
+          intervalIndex: 0,
           correctCount: 0,
           incorrectCount: 0,
           lastReviewDate: null,
-          nextReviewDate: new Date().toISOString(),
-          currentStep: 0
+          nextReviewDate: new Date().toISOString()
         }
       },
       {
@@ -155,14 +150,13 @@ const MobileFlashcardMode = ({
         inFlashcards: true,
         exampleSentencesGenerated: 'This is a ~test~ card for relearning. // Esta es una tarjeta de ~prueba~ para reaprendizaje.',
         srsData: {
-          status: 'relearning',
-          interval: 7, // Was 7 days but failed
-          easeFactor: 2.3,
+          status: 'learning',
+          interval: 10, // Currently at 10 minutes (was reset after failure)
+          intervalIndex: 0, // Back to 10 minutes after failure
           correctCount: 2,
           incorrectCount: 1,
           lastReviewDate: new Date(Date.now() - 1000).toISOString(), // 1 second ago
           nextReviewDate: new Date().toISOString(), // Due now
-          currentStep: 0, // First relearning step
           lapses: 1
         }
       }
@@ -187,12 +181,11 @@ const MobileFlashcardMode = ({
           cardWithSRS.srsData = {
             status: 'new',
             interval: 0,
-            easeFactor: 2.5,
+            intervalIndex: 0,
             correctCount: 0,
             incorrectCount: 0,
             lastReviewDate: null,
-            nextReviewDate: nowDateRef.current, // Due now
-            currentStep: 0
+            nextReviewDate: nowDateRef.current // Due now
           };
         }
         cards.push(cardWithSRS);
@@ -343,26 +336,25 @@ const MobileFlashcardMode = ({
       current: {
         status: currentCard.srsData.status,
         interval: currentCard.srsData.interval,
-        currentStep: currentCard.srsData.currentStep,
-        easeFactor: currentCard.srsData.easeFactor
+        intervalIndex: currentCard.srsData.intervalIndex
       },
       ifIncorrect: {
         status: incorrectResult.status,
         interval: incorrectResult.interval,
-        nextReview: formatNextReviewTime(incorrectResult.nextReviewDate),
-        currentStep: incorrectResult.currentStep
+        intervalIndex: incorrectResult.intervalIndex,
+        nextReview: formatNextReviewTime(incorrectResult.nextReviewDate)
       },
       ifCorrect: {
         status: correctResult.status,
         interval: correctResult.interval,
-        nextReview: formatNextReviewTime(correctResult.nextReviewDate),
-        currentStep: correctResult.currentStep
+        intervalIndex: correctResult.intervalIndex,
+        nextReview: formatNextReviewTime(correctResult.nextReviewDate)
       },
       ifEasy: {
         status: easyResult.status,
         interval: easyResult.interval,
-        nextReview: formatNextReviewTime(easyResult.nextReviewDate),
-        currentStep: easyResult.currentStep
+        intervalIndex: easyResult.intervalIndex,
+        nextReview: formatNextReviewTime(easyResult.nextReviewDate)
       }
     });
     
@@ -621,12 +613,12 @@ const MobileFlashcardMode = ({
       from: {
         status: currentCard.srsData.status,
         interval: currentCard.srsData.interval,
-        currentStep: currentCard.srsData.currentStep
+        intervalIndex: currentCard.srsData.intervalIndex
       },
       to: {
         status: updatedSrsData.status,
         interval: updatedSrsData.interval,
-        currentStep: updatedSrsData.currentStep,
+        intervalIndex: updatedSrsData.intervalIndex,
         nextReview: formatNextReviewTime(updatedSrsData.nextReviewDate)
       }
     });

@@ -7,6 +7,8 @@ import { getSRSSettings } from './srsSettings';
 
 /**
  * Calculate the next review date and update SRS data based on user's answer
+ * Simple SRS: new → 10min → 1day → 3days → 7days → 14days → 30days...
+ * Any incorrect answer resets to 10 minutes
  * @param {Object} card - The flashcard with srsData
  * @param {string} answer - 'incorrect', 'correct', or 'easy'
  * @returns {Object} Updated srsData
@@ -14,190 +16,52 @@ import { getSRSSettings } from './srsSettings';
 export function calculateNextReview(card, answer) {
   const srsData = { ...card.srsData };
   const now = new Date();
-  const settings = getSRSSettings();
   
-  // Handle different card states
-  switch (srsData.status) {
-    case 'new':
-      return handleNewCard(srsData, answer, now, settings);
-    case 'learning':
-      return handleLearningCard(srsData, answer, now, settings);
-    case 'review':
-      return handleReviewCard(srsData, answer, now, settings);
-    case 'relearning':
-      return handleRelearningCard(srsData, answer, now, settings);
-    default:
-      console.error('Unknown card status:', srsData.status);
-      return srsData;
-  }
-}
-
-/**
- * Handle a new card being reviewed for the first time
- */
-function handleNewCard(srsData, answer, now, settings) {
+  // Simple progression: 10min → 1day → 3days → 7days → 14days → 30days...
+  const intervals = [10, 1, 3, 7, 14, 30, 60, 120]; // first is minutes, rest are days
+  
   const updated = { ...srsData };
   updated.lastReviewDate = now.toISOString();
   
-  switch (answer) {
-    case 'incorrect':
-      // Stay in learning mode, review again in 1 minute (immediate review)
-      updated.status = 'learning';
-      updated.interval = 0;
-      updated.currentStep = 0;
-      updated.nextReviewDate = addMinutes(now, 1).toISOString();
-      break;
-      
-    case 'correct':
-      // Move to learning mode, start at first step
-      updated.status = 'learning';
-      updated.interval = 0;
-      updated.repetitions = 1;
-      updated.currentStep = 0;
-      updated.nextReviewDate = addMinutes(now, settings.learningSteps[0]).toISOString();
-      break;
-      
-    case 'easy':
-      // Graduate immediately to review mode
-      updated.status = 'review';
-      updated.interval = settings.easyInterval;
-      updated.repetitions = 1;
-      updated.easeFactor = settings.startingEase + 0.1; // Slightly increase ease for easy cards
-      updated.nextReviewDate = addDays(now, settings.easyInterval).toISOString();
-      break;
+  if (answer === 'incorrect') {
+    // Any incorrect answer resets to 10 minutes
+    updated.status = 'learning';
+    updated.intervalIndex = 0;
+    updated.interval = intervals[0];
+    updated.lapses = (updated.lapses || 0) + 1;
+    updated.nextReviewDate = addMinutes(now, intervals[0]).toISOString();
+    updated.incorrectCount = (updated.incorrectCount || 0) + 1;
+  } else if (answer === 'correct') {
+    const currentIndex = updated.intervalIndex || 0;
+    const nextIndex = Math.min(currentIndex + 1, intervals.length - 1);
+    
+    updated.status = nextIndex === 0 ? 'learning' : 'review';
+    updated.intervalIndex = nextIndex;
+    updated.interval = intervals[nextIndex];
+    updated.correctCount = (updated.correctCount || 0) + 1;
+    
+    if (nextIndex === 0) {
+      // 10 minutes
+      updated.nextReviewDate = addMinutes(now, intervals[nextIndex]).toISOString();
+    } else {
+      // Days
+      updated.nextReviewDate = addDays(now, intervals[nextIndex]).toISOString();
+    }
+  } else if (answer === 'easy') {
+    // Easy skips ahead more aggressively
+    const currentIndex = updated.intervalIndex || 0;
+    const nextIndex = Math.min(currentIndex + 2, intervals.length - 1);
+    
+    updated.status = 'review';
+    updated.intervalIndex = nextIndex;
+    updated.interval = intervals[nextIndex];
+    updated.correctCount = (updated.correctCount || 0) + 1;
+    updated.nextReviewDate = addDays(now, intervals[nextIndex]).toISOString();
   }
   
   return updated;
 }
 
-/**
- * Handle a card in learning phase (just started learning)
- */
-function handleLearningCard(srsData, answer, now, settings) {
-  const updated = { ...srsData };
-  updated.lastReviewDate = now.toISOString();
-  const currentStep = updated.currentStep || 0;
-  
-  switch (answer) {
-    case 'incorrect':
-      // Reset to beginning of learning phase with 1 minute review
-      updated.repetitions = 0;
-      updated.lapses++;
-      updated.currentStep = 0;
-      updated.nextReviewDate = addMinutes(now, 1).toISOString();
-      break;
-      
-    case 'correct':
-      if (currentStep < settings.learningSteps.length - 1) {
-        // Move to next learning step
-        updated.currentStep = currentStep + 1;
-        updated.repetitions++;
-        updated.nextReviewDate = addMinutes(now, settings.learningSteps[currentStep + 1]).toISOString();
-      } else {
-        // Completed all learning steps, graduate to review mode
-        updated.status = 'review';
-        updated.interval = settings.graduatingInterval;
-        updated.repetitions++;
-        updated.easeFactor = settings.startingEase;
-        updated.nextReviewDate = addDays(now, settings.graduatingInterval).toISOString();
-        delete updated.currentStep;
-      }
-      break;
-      
-    case 'easy':
-      // Graduate immediately with longer interval
-      updated.status = 'review';
-      updated.interval = settings.easyInterval;
-      updated.repetitions++;
-      updated.easeFactor = settings.startingEase + 0.1;
-      updated.nextReviewDate = addDays(now, settings.easyInterval).toISOString();
-      delete updated.currentStep;
-      break;
-  }
-  
-  return updated;
-}
-
-/**
- * Handle a card in review phase (main spaced repetition)
- */
-function handleReviewCard(srsData, answer, now, settings) {
-  const updated = { ...srsData };
-  updated.lastReviewDate = now.toISOString();
-  
-  switch (answer) {
-    case 'incorrect':
-      // Move to relearning phase
-      updated.status = 'relearning';
-      updated.lapses++;
-      updated.repetitions = 0;
-      updated.currentStep = 0;
-      updated.interval = Math.max(settings.minimumInterval, Math.round(updated.interval * settings.lapseMultiplier));
-      updated.easeFactor = Math.max(1.3, updated.easeFactor - 0.2);
-      updated.nextReviewDate = addMinutes(now, settings.relearningSteps[0]).toISOString();
-      break;
-      
-    case 'correct':
-      // Continue with spaced repetition
-      updated.repetitions++;
-      updated.interval = Math.min(settings.maximumInterval, Math.round(updated.interval * updated.easeFactor));
-      updated.nextReviewDate = addDays(now, updated.interval).toISOString();
-      break;
-      
-    case 'easy':
-      // Increase interval more and boost ease factor
-      updated.repetitions++;
-      updated.interval = Math.min(settings.maximumInterval, Math.round(updated.interval * updated.easeFactor * settings.easyBonus));
-      updated.easeFactor = Math.min(2.5, updated.easeFactor + 0.15);
-      updated.nextReviewDate = addDays(now, updated.interval).toISOString();
-      break;
-  }
-  
-  return updated;
-}
-
-/**
- * Handle a card being relearned after forgetting
- */
-function handleRelearningCard(srsData, answer, now, settings) {
-  const updated = { ...srsData };
-  updated.lastReviewDate = now.toISOString();
-  const currentStep = updated.currentStep || 0;
-  
-  switch (answer) {
-    case 'incorrect':
-      // Reset to beginning of relearning with 1 minute immediate review
-      updated.currentStep = 0;
-      updated.nextReviewDate = addMinutes(now, 1).toISOString();
-      break;
-      
-    case 'correct':
-      if (currentStep < settings.relearningSteps.length - 1) {
-        // Move to next relearning step
-        updated.currentStep = currentStep + 1;
-        updated.nextReviewDate = addMinutes(now, settings.relearningSteps[currentStep + 1]).toISOString();
-      } else {
-        // Graduate back to review with reduced interval
-        updated.status = 'review';
-        updated.interval = Math.max(settings.minimumInterval, Math.floor(updated.interval * settings.lapseMultiplier));
-        updated.repetitions = 1;
-        updated.nextReviewDate = addDays(now, updated.interval).toISOString();
-        delete updated.currentStep;
-      }
-      break;
-      
-    case 'easy':
-      // Graduate back to review with less penalty
-      updated.status = 'review';
-      updated.interval = Math.max(settings.minimumInterval, Math.floor(updated.interval * 0.7));
-      updated.repetitions = 1;
-      updated.nextReviewDate = addDays(now, updated.interval).toISOString();
-      delete updated.currentStep;
-      break;
-  }
-  
-  return updated;
-}
 
 /**
  * Get cards due for review, sorted by priority
