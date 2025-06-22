@@ -99,25 +99,6 @@ export const getHardcodedCards = () => {
         lastReviewDate: null,
         nextReviewDate: new Date().toISOString()
       }
-    },
-    {
-      key: 'test_relearning',
-      word: 'test',
-      wordSenseId: 'test_relearning',
-      partOfSpeech: 'verb',
-      definition: 'A card in relearning status for testing',
-      inFlashcards: true,
-      exampleSentencesGenerated: 'This is a ~test~ card for relearning. // Esta es una tarjeta de ~prueba~ para reaprendizaje.',
-      srsData: {
-        isNew: false,
-        gotWrongThisSession: true,
-        SRS_interval: 1, // Reset to 1 after failure
-        status: 'relearning',
-        correctCount: 2,
-        incorrectCount: 1,
-        lastReviewDate: new Date(Date.now() - 1000).toISOString(), // 1 second ago
-        nextReviewDate: new Date().toISOString() // Due now
-      }
     }
   ];
 };
