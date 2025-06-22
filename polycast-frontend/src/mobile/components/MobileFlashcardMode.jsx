@@ -253,40 +253,44 @@ const MobileFlashcardMode = ({
     lastTapTime.current = now;
   }, [isFlipped]);
 
-  // Direct touch start handler
+  // Direct touch start handler (works for both touch and mouse)
   const handleDirectTouchStart = useCallback((e) => {
-    const touch = e.touches[0];
+    // Get coordinates from either touch or mouse event
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const now = Date.now();
     
     if (!isFlipped) {
       // Front side - handle tap for flipping
-      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+      touchStartPos.current = { x: clientX, y: clientY };
       touchStartTime.current = now;
-      console.log('[DIRECT TOUCH] Touch start recorded for flip');
+      console.log('[DIRECT TOUCH] Touch/click start recorded for flip');
     } else {
       // Back side - handle drag for swiping
-      dragStartPos.current = { x: touch.clientX, y: touch.clientY };
-      lastTouchPos.current = { x: touch.clientX, y: touch.clientY };
+      dragStartPos.current = { x: clientX, y: clientY };
+      lastTouchPos.current = { x: clientX, y: clientY };
       lastTouchTime.current = now;
-      isDragging.current = false; // Will become true in touchmove
-      console.log('[DIRECT DRAG] Touch start recorded for drag at:', touch.clientX, touch.clientY);
+      isDragging.current = false; // Will become true in touchmove/mousemove
+      console.log('[DIRECT DRAG] Touch/click start recorded for drag at:', clientX, clientY);
     }
   }, [isFlipped]);
 
-  // Direct touch move handler for dragging
+  // Direct touch move handler for dragging (works for both touch and mouse)
   const handleDirectTouchMove = useCallback((e) => {
     if (!isFlipped || !dragStartPos.current) return;
     
-    const touch = e.touches[0];
+    // Get coordinates from either touch or mouse event
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const now = Date.now();
     
-    const deltaX = touch.clientX - dragStartPos.current.x;
-    const deltaY = touch.clientY - dragStartPos.current.y;
+    const deltaX = clientX - dragStartPos.current.x;
+    const deltaY = clientY - dragStartPos.current.y;
     
     // Only track horizontal movement
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 5) {
       isDragging.current = true;
-      lastTouchPos.current = { x: touch.clientX, y: touch.clientY };
+      lastTouchPos.current = { x: clientX, y: clientY };
       lastTouchTime.current = now;
       
       const rotation = deltaX * 0.1;
@@ -539,7 +543,7 @@ const MobileFlashcardMode = ({
     }, 200);
   }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings, showAnswerFeedback]);
 
-  // Direct touch end handler
+  // Direct touch end handler (works for both touch and mouse)
   const handleDirectTouchEnd = useCallback((e) => {
     if (!isFlipped && touchStartPos.current) {
       // Front side - handle tap for flipping
@@ -550,7 +554,7 @@ const MobileFlashcardMode = ({
         if (now - lastTapTime.current < 100) {
           console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
         } else {
-          console.log('[DIRECT TOUCH] Quick tap detected - executing flip');
+          console.log('[DIRECT TOUCH] Quick tap/click detected - executing flip');
           e.preventDefault();
           e.stopPropagation();
           flipCard();
@@ -730,6 +734,10 @@ const MobileFlashcardMode = ({
           onTouchStart={handleDirectTouchStart}
           onTouchMove={handleDirectTouchMove}
           onTouchEnd={handleDirectTouchEnd}
+          onMouseDown={handleDirectTouchStart}
+          onMouseMove={handleDirectTouchMove}
+          onMouseUp={handleDirectTouchEnd}
+          onMouseLeave={handleDirectTouchEnd}
           style={{
             transform: (() => {
               const baseTransform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
