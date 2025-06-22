@@ -245,31 +245,21 @@ const MobileFlashcardMode = ({
     setDueCards(due);
     setCurrentDueIndex(0);
     setCompletedSteps(0); // Reset progress when cards change
-    
-    // Set initial card counts only when we have new due cards (not during refreshes)
-    const newCards = due.filter(card => card.srsData?.status === 'new').length;
-    const learningCards = due.filter(card => 
-      card.srsData?.status === 'learning' || card.srsData?.status === 'relearning'
-    ).length;
-    const reviewCards = due.filter(card => card.srsData?.status === 'review').length;
-    
-    setInitialCardCounts({ newCards, learningCards, reviewCards });
-    setCardsProcessed({ newCards: 0, learningCards: 0, reviewCards: 0 }); // Reset processed counts
   }, [availableCards, todaysNewCards]);
 
   // Get SRS statistics
   const srsStats = React.useMemo(() => getReviewStats(availableCards), [availableCards]);
 
-  // Store initial card counts to prevent recalculation during session
-  const [initialCardCounts, setInitialCardCounts] = useState({ newCards: 0, learningCards: 0, reviewCards: 0 });
-  const [cardsProcessed, setCardsProcessed] = useState({ newCards: 0, learningCards: 0, reviewCards: 0 });
-
-  // Calculate display card counts (initial minus processed)
-  const cardCounts = React.useMemo(() => ({
-    newCards: Math.max(0, initialCardCounts.newCards - cardsProcessed.newCards),
-    learningCards: Math.max(0, initialCardCounts.learningCards - cardsProcessed.learningCards + cardsProcessed.newCards), // New cards become learning
-    reviewCards: Math.max(0, initialCardCounts.reviewCards - cardsProcessed.reviewCards)
-  }), [initialCardCounts, cardsProcessed]);
+  // Calculate card counts for Anki-style progress (memoized for toolbar stability)
+  const cardCounts = React.useMemo(() => {
+    const newCards = dueCards.filter(card => card.srsData?.status === 'new').length;
+    const learningCards = dueCards.filter(card => 
+      card.srsData?.status === 'learning' || card.srsData?.status === 'relearning'
+    ).length;
+    const reviewCards = dueCards.filter(card => card.srsData?.status === 'review').length;
+    
+    return { newCards, learningCards, reviewCards };
+  }, [dueCards]);
 
   // Calculate accuracy inline for headerStats
   const headerStats = React.useMemo(() => {
@@ -592,15 +582,6 @@ const MobileFlashcardMode = ({
       newDueIndex = currentDueIndex >= newDueCards.length && newDueCards.length > 0 ? newDueCards.length - 1 : currentDueIndex;
     }
     
-    // Update processed counts based on original card status
-    const oldStatus = currentCard.srsData.status;
-    setCardsProcessed(prev => ({
-      ...prev,
-      newCards: oldStatus === 'new' ? prev.newCards + 1 : prev.newCards,
-      learningCards: (oldStatus === 'learning' || oldStatus === 'relearning') ? prev.learningCards + 1 : prev.learningCards,
-      reviewCards: oldStatus === 'review' ? prev.reviewCards + 1 : prev.reviewCards
-    }));
-
     // Batch all state updates together to prevent UI flashing
     setWordDefinitions(prev => ({
       ...prev,
