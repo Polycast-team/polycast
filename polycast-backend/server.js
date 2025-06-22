@@ -768,45 +768,49 @@ Do NOT provide multiple definitions or explanations outside the JSON.`;
             let flashcardContent = '';
             try {
                 // Using the exact format requested by the user
-                const flashcardPrompt = `Return three example sentences using the word '${word}' in the context of '${parsedResponse.definition}' with each sentence separated by '//.' after the three sentences, provide a frequency rating of 1-5 for how common that word is, followed by a frequency rating for how common that definition is for that word. use the following criteria: 
+                const flashcardPrompt = `Return three example sentences using the word '${word}' in the context of '${parsedResponse.definition}' with each sentence separated by '//.' after the three sentences, provide a frequency rating of 1-10 for how common that word is, followed by a frequency rating for how common that definition is for that word. use the following criteria: 
 
-Vocabulary Frequency (1–5):
+Frequency scale: 1=extremely rare, 10=ubiquitous. Most words are 1-3, very few are 9-10.
+
+Vocabulary Frequency (1–10):
 
 Rate how common the word is in general vocabulary, considering how likely it is to appear in everyday conversation, school materials, news articles, and basic media.
 
-1: Highly rare or technical; almost never appears outside specific fields
+1: Extremely rare or highly technical; almost never appears outside specific fields
+2: Very uncommon; appears rarely in specialized contexts
+3: Somewhat uncommon; appears occasionally in books or niche conversations
+4: Less common; part of educated vocabulary but not basic
+5: Neutral; moderately common in educated discourse
+6: Fairly common; heard regularly by most educated speakers
+7: Common; part of general vocabulary
+8: Very common; core vocabulary known by nearly all fluent speakers
+9: Extremely common; basic everyday vocabulary
+10: Ubiquitous; fundamental words used constantly
 
-2: Somewhat uncommon; appears occasionally in books or niche conversations
-
-3: Neutral; part of educated vocabulary but not basic
-
-4: Common; heard regularly by most speakers
-
-5: Core/basic vocabulary known and used by nearly all fluent speakers
-
-Definition Frequency (1–5):
+Definition Frequency (1–10):
 
 Rate how common this specific meaning of the word is compared to its other meanings.
 
-1: Obscure or outdated definition
-
-2: Infrequently used definition
-
-3: Less typical but still recognized
-
-4: One of the common meanings
-
-5: Most typical or dominant meaning
+1: Extremely obscure or outdated definition
+2: Very rarely used definition
+3: Infrequently used definition
+4: Less typical but still recognized
+5: Moderately common definition
+6: Fairly common definition
+7: One of the common meanings
+8: Very common meaning
+9: Primary or dominant meaning
+10: The most typical and ubiquitous meaning
 
 Additional Tips Phrase it as a ranking relative to other words and meanings, not percentages.
 
 You can also give a few examples in your prompt to calibrate Gemini:
 
-"apple" as a fruit = 5, "deciduous" = 2, "syzygy" = 1
+"apple" as a fruit = 8, "deciduous" = 3, "syzygy" = 1
 
-"run" meaning "to jog" = 5, "run" meaning "to operate a play" = 3, "run" meaning "a small stream" = 2"
+"run" meaning "to jog" = 8, "run" meaning "to operate a business" = 6, "run" meaning "a small stream" = 3"
 
-your final output should look something like this: [example sentence 1]//[example sentence 2]//[example sentence 3]//4//4`;
+your final output should look something like this: [example sentence 1]//[example sentence 2]//[example sentence 3]//6//7`;
                 
                 flashcardContent = await generateTextWithGemini(flashcardPrompt, 0.2);
                 console.log(`[Dictionary API] Flashcard content for "${word}": ${flashcardContent}`);

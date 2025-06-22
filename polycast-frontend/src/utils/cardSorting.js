@@ -28,8 +28,8 @@ export function categorizeCards(allCards) {
   
   // Sort new cards by frequency (most common first, i.e., higher numbers first)
   newCards.sort((a, b) => {
-    const freqA = a.frequency || 3; // Default to neutral if no frequency
-    const freqB = b.frequency || 3;
+    const freqA = a.frequency || 5; // Default to neutral if no frequency (1-10 scale)
+    const freqB = b.frequency || 5;
     return freqB - freqA;
   });
   

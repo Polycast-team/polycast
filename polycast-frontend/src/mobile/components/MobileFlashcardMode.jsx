@@ -168,7 +168,7 @@ const MobileFlashcardMode = ({
     // Log card order with frequency values
     console.log('[CARD ORDER] Due cards:', due.map(card => ({
       word: card.word,
-      frequency: card.frequency || 3, // 1-5 scale, 5 = most common
+      frequency: card.frequency || 5, // 1-10 scale, 10 = most common
       isNew: card.srsData?.isNew,
       dueDate: card.srsData?.dueDate || card.srsData?.nextReviewDate
     })));

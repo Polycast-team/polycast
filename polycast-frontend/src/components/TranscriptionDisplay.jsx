@@ -855,10 +855,10 @@ const TranscriptionDisplay = ({
           exampleSentencesRaw: wordData.exampleSentencesRaw || wordData.example || contextSentence,
           example: wordData.example || contextSentence,
           
-          // Frequency ratings from Gemini (1-5 scale, 5 = most common)
-          wordFrequency: wordData.wordFrequency || 3,
-          definitionFrequency: wordData.definitionFrequency || 3,
-          frequency: wordData.wordFrequency || 3, // Use wordFrequency for SRS sorting
+          // Frequency ratings from Gemini (1-10 scale, 10 = most common)
+          wordFrequency: wordData.wordFrequency || 5,
+          definitionFrequency: wordData.definitionFrequency || 5,
+          frequency: wordData.wordFrequency || 5, // Use wordFrequency for SRS sorting
           
           // SRS (Spaced Repetition System) fields
           srsData: {
