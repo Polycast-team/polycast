@@ -646,13 +646,13 @@ const MobileFlashcardMode = ({
         if (shouldTriggerSwipe) {
           console.log('[DIRECT AUTO-SWIPE] Triggering swipe!');
           
-          // Determine answer
+          // Determine answer (reversed: left = correct, right = incorrect)
           if (dragState.deltaX > 0) {
-            console.log('[DIRECT AUTO-SWIPE] Marking as correct');
-            markCard('correct');
-          } else {
-            console.log('[DIRECT AUTO-SWIPE] Marking as incorrect');
+            console.log('[DIRECT AUTO-SWIPE] Marking as incorrect (swipe right)');
             markCard('incorrect');
+          } else {
+            console.log('[DIRECT AUTO-SWIPE] Marking as correct (swipe left)');
+            markCard('correct');
           }
           
           // Animate off screen
@@ -800,17 +800,17 @@ const MobileFlashcardMode = ({
             })(),
             opacity: dragState.opacity,
             transition: dragState.isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease',
-            // Add proportional color feedback based on drag distance
+            // Add proportional color feedback based on drag distance (reversed: left = green, right = red)
             boxShadow: dragState.colorIntensity > 0 
               ? dragState.deltaX > 0 
-                ? `0 0 ${30 * dragState.colorIntensity}px rgba(34, 197, 94, ${dragState.colorIntensity}), 0 0 ${60 * dragState.colorIntensity}px rgba(34, 197, 94, ${dragState.colorIntensity * 0.5})` // Proportional green
-                : `0 0 ${30 * dragState.colorIntensity}px rgba(239, 68, 68, ${dragState.colorIntensity}), 0 0 ${60 * dragState.colorIntensity}px rgba(239, 68, 68, ${dragState.colorIntensity * 0.5})`  // Proportional red
+                ? `0 0 ${30 * dragState.colorIntensity}px rgba(239, 68, 68, ${dragState.colorIntensity}), 0 0 ${60 * dragState.colorIntensity}px rgba(239, 68, 68, ${dragState.colorIntensity * 0.5})` // Right = red (incorrect)
+                : `0 0 ${30 * dragState.colorIntensity}px rgba(34, 197, 94, ${dragState.colorIntensity}), 0 0 ${60 * dragState.colorIntensity}px rgba(34, 197, 94, ${dragState.colorIntensity * 0.5})`  // Left = green (correct)
               : undefined,
             // Add proportional background color overlay
             backgroundColor: dragState.colorIntensity > 0 
               ? dragState.deltaX > 0 
-                ? `rgba(34, 197, 94, ${dragState.colorIntensity * 0.1})` // Proportional green background
-                : `rgba(239, 68, 68, ${dragState.colorIntensity * 0.1})`  // Proportional red background
+                ? `rgba(239, 68, 68, ${dragState.colorIntensity * 0.1})` // Right = red background (incorrect)
+                : `rgba(34, 197, 94, ${dragState.colorIntensity * 0.1})`  // Left = green background (correct)
               : undefined
           }}
         >
