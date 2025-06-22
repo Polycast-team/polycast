@@ -676,7 +676,9 @@ const MobileFlashcardMode = ({
       }, 50);
       
       // Handle queue refresh if needed (less frequent operation)
-      if (newDueCards.length === 0) {
+      // Don't auto-refresh if card graduated to day+ intervals - user should be done for today
+      const cardGraduated = updatedSrsData.SRS_interval >= 3;
+      if (newDueCards.length === 0 && !cardGraduated) {
         setTimeout(() => {
           // Clear processing flag before refresh
           processingCardRef.current = false;
@@ -696,6 +698,7 @@ const MobileFlashcardMode = ({
             refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: maxNewForRefresh }, true);
           }
           
+          console.log(`[SESSION DEBUG] Auto-refreshing queue: found ${refreshedDueCards.length} cards`);
           setDueCards(refreshedDueCards);
           setCurrentDueIndex(0);
           
