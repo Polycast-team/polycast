@@ -409,8 +409,8 @@ const MobileFlashcardMode = ({
     if (!currentCard || !currentCard.exampleSentencesGenerated) return;
     
     const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-    const interval = currentCard?.srsData?.interval || 1;
-    const sentenceIndex = ((interval - 1) % 5) * 2;
+    const srsInterval = currentCard?.srsData?.SRS_interval || 1;
+    const sentenceIndex = ((srsInterval - 1) % 5) * 2;
     const englishSentence = parts[sentenceIndex] || parts[0] || '';
     
     if (englishSentence) {
@@ -435,8 +435,8 @@ const MobileFlashcardMode = ({
         setHasAutoPlayedThisFlip(true); // Mark as played immediately to prevent duplicates
         
         const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-        const interval = currentCard?.srsData?.interval || 1;
-        const sentenceIndex = ((interval - 1) % 5) * 2;
+        const srsInterval = currentCard?.srsData?.SRS_interval || 1;
+        const sentenceIndex = ((srsInterval - 1) % 5) * 2;
         const englishSentence = parts[sentenceIndex] || parts[0] || '';
         
         if (englishSentence) {
