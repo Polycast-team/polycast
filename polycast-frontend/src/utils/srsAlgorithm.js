@@ -200,8 +200,17 @@ export function formatNextReviewTime(nextReviewDate) {
   const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
   const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
   
+  // Show clean intervals that match SRS_interval mapping
   if (diffMins < 60) return `${diffMins} min`;
+  if (diffDays === 1) return '1 day';
+  if (diffDays === 3) return '3 days';
+  if (diffDays === 7) return '7 days';
+  if (diffDays === 14) return '14 days';
+  if (diffDays === 30) return '30 days';
+  if (diffDays === 60) return '60 days';
+  if (diffDays === 120) return '120 days';
+  
+  // Fallback for other intervals
   if (diffHours < 24) return `${diffHours} hours`;
-  if (diffDays === 1) return 'Tomorrow';
   return `${diffDays} days`;
 }
