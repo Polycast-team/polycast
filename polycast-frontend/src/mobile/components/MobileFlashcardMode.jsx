@@ -144,6 +144,14 @@ const MobileFlashcardMode = ({
       due = getDueCards(availableCards, { newPerDay: maxNewToday }, true);
     }
     
+    // Log card order with frequency values
+    console.log('[CARD ORDER] Due cards:', due.map(card => ({
+      word: card.word,
+      frequency: card.frequency || 5,
+      isNew: card.srsData?.isNew,
+      dueDate: card.srsData?.dueDate || card.srsData?.nextReviewDate
+    })));
+    
     setDueCards(due);
     setCurrentDueIndex(0);
     setCompletedSteps(0); // Reset progress when cards change
@@ -235,25 +243,26 @@ const MobileFlashcardMode = ({
         status: currentCard.srsData.status,
         isNew: currentCard.srsData.isNew,
         gotWrongThisSession: currentCard.srsData.gotWrongThisSession,
-        SRS_interval: currentCard.srsData.SRS_interval
+        SRS_interval: currentCard.srsData.SRS_interval,
+        frequency: currentCard.frequency
       },
       ifIncorrect: {
         status: incorrectResult.status,
         gotWrongThisSession: incorrectResult.gotWrongThisSession,
         SRS_interval: incorrectResult.SRS_interval,
-        nextReview: formatNextReviewTime(incorrectResult.nextReviewDate)
+        nextReview: formatNextReviewTime(incorrectResult.dueDate || incorrectResult.nextReviewDate)
       },
       ifCorrect: {
         status: correctResult.status,
         gotWrongThisSession: correctResult.gotWrongThisSession,
         SRS_interval: correctResult.SRS_interval,
-        nextReview: formatNextReviewTime(correctResult.nextReviewDate)
+        nextReview: formatNextReviewTime(correctResult.dueDate || correctResult.nextReviewDate)
       },
       ifEasy: {
         status: easyResult.status,
         gotWrongThisSession: easyResult.gotWrongThisSession,
         SRS_interval: easyResult.SRS_interval,
-        nextReview: formatNextReviewTime(easyResult.nextReviewDate)
+        nextReview: formatNextReviewTime(easyResult.dueDate || easyResult.nextReviewDate)
       }
     });
     
@@ -270,16 +279,16 @@ const MobileFlashcardMode = ({
 
     return {
       incorrect: {
-        time: formatNextReviewTime(incorrectResult.nextReviewDate),
-        debugDate: formatDebugDate(incorrectResult.nextReviewDate)
+        time: formatNextReviewTime(incorrectResult.dueDate || incorrectResult.nextReviewDate),
+        debugDate: formatDebugDate(incorrectResult.dueDate || incorrectResult.nextReviewDate)
       },
       correct: {
-        time: formatNextReviewTime(correctResult.nextReviewDate),
-        debugDate: formatDebugDate(correctResult.nextReviewDate)
+        time: formatNextReviewTime(correctResult.dueDate || correctResult.nextReviewDate),
+        debugDate: formatDebugDate(correctResult.dueDate || correctResult.nextReviewDate)
       },
       easy: {
-        time: formatNextReviewTime(easyResult.nextReviewDate),
-        debugDate: formatDebugDate(easyResult.nextReviewDate)
+        time: formatNextReviewTime(easyResult.dueDate || easyResult.nextReviewDate),
+        debugDate: formatDebugDate(easyResult.dueDate || easyResult.nextReviewDate)
       }
     };
   }, [dueCards, currentDueIndex]);
@@ -597,7 +606,7 @@ const MobileFlashcardMode = ({
     
     // Prepare all state updates to happen together
     const now = new Date();
-    const updatedDueDate = new Date(updatedSrsData.nextReviewDate);
+    const updatedDueDate = new Date(updatedSrsData.dueDate || updatedSrsData.nextReviewDate);
     
     // Check if card is still due today (within next few hours, not full 24 hours)
     // Cards with intervals like "1 day", "3 days" should be removed from today's session

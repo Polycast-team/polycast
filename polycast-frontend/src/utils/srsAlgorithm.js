@@ -31,6 +31,7 @@ export function calculateNextReview(card, answer) {
   
   const updated = { ...srsData };
   updated.lastReviewDate = now.toISOString();
+  updated.lastSeen = now.toISOString();
   
   // Handle new card first answer
   if (updated.isNew) {
@@ -67,9 +68,11 @@ export function calculateNextReview(card, answer) {
   // Calculate next review date
   const interval = timeIntervals[updated.SRS_interval];
   if (interval.minutes) {
-    updated.nextReviewDate = addMinutes(now, interval.minutes).toISOString();
+    updated.dueDate = addMinutes(now, interval.minutes).toISOString();
+    updated.nextReviewDate = updated.dueDate; // Keep for backwards compatibility
   } else {
-    updated.nextReviewDate = addDays(now, interval.days).toISOString();
+    updated.dueDate = addDays(now, interval.days).toISOString();
+    updated.nextReviewDate = updated.dueDate; // Keep for backwards compatibility
   }
   
   // Set status for display
@@ -106,30 +109,36 @@ export function getDueCards(allCards, overrides = {}, includeWaiting = false) {
   
   // Separate cards by status and due date
   const strictlyDueCards = cardsWithSRS.filter(card => {
-    const dueDate = new Date(card.srsData.nextReviewDate);
+    const dueDate = new Date(card.srsData.dueDate || card.srsData.nextReviewDate);
     return dueDate <= now && card.srsData.status !== 'new';
   });
   
   // Learning cards that are waiting (not yet due but in learning phase)
   const waitingLearningCards = cardsWithSRS.filter(card => {
-    const dueDate = new Date(card.srsData.nextReviewDate);
+    const dueDate = new Date(card.srsData.dueDate || card.srsData.nextReviewDate);
     return dueDate > now && 
            (card.srsData.status === 'learning' || card.srsData.status === 'relearning') &&
            (dueDate - now) < (24 * 60 * 60 * 1000); // Due within 24 hours
   });
   
+  // Get new cards, sorted by frequency if available
   const newCards = cardsWithSRS.filter(card => card.srsData.status === 'new');
+  newCards.sort((a, b) => {
+    const freqA = a.frequency || 5;
+    const freqB = b.frequency || 5;
+    return freqA - freqB; // Lower frequency value = more common = higher priority
+  });
   
-  // Sort strictly due cards by priority: relearning > learning > review
-  const relearning = strictlyDueCards.filter(c => c.srsData.status === 'relearning');
-  const learning = strictlyDueCards.filter(c => c.srsData.status === 'learning');
-  const review = strictlyDueCards.filter(c => c.srsData.status === 'review');
+  // Sort due cards by due date (earliest first)
+  strictlyDueCards.sort((a, b) => {
+    const dateA = new Date(a.srsData.dueDate || a.srsData.nextReviewDate);
+    const dateB = new Date(b.srsData.dueDate || b.srsData.nextReviewDate);
+    return dateA - dateB;
+  });
   
-  // Base queue: priority cards + new cards (limited)
+  // Base queue: due cards first (sorted by date), then new cards (sorted by frequency)
   const baseQueue = [
-    ...relearning,
-    ...learning,
-    ...review,
+    ...strictlyDueCards,
     ...newCards.slice(0, maxNew)
   ];
   
@@ -137,7 +146,9 @@ export function getDueCards(allCards, overrides = {}, includeWaiting = false) {
   if (includeWaiting && baseQueue.length === 0) {
     // Sort waiting cards by how close they are to being due
     const sortedWaitingCards = waitingLearningCards.sort((a, b) => {
-      return new Date(a.srsData.nextReviewDate) - new Date(b.srsData.nextReviewDate);
+      const dateA = new Date(a.srsData.dueDate || a.srsData.nextReviewDate);
+      const dateB = new Date(b.srsData.dueDate || b.srsData.nextReviewDate);
+      return dateA - dateB;
     });
     return sortedWaitingCards;
   }
@@ -167,7 +178,7 @@ export function getReviewStats(allCards) {
     const status = card.srsData.status;
     stats[status]++;
     
-    const dueDate = new Date(card.srsData.nextReviewDate);
+    const dueDate = new Date(card.srsData.dueDate || card.srsData.nextReviewDate);
     if (dueDate <= now) {
       stats.dueToday++;
     }
