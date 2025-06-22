@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { getHardcodedCards } from '../../utils/hardcodedCards';
+import { categorizeCards, getDueSeenCards } from '../../utils/cardSorting';
 
 const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudying, onBack }) => {
   const [selectedProfile, setSelectedProfile] = useState(initialProfile || 'non-saving');
   const [wordDefinitions, setWordDefinitions] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showNewCards, setShowNewCards] = useState(false);
+  const [showDueCards, setShowDueCards] = useState(false);
 
   // Available profiles (same as desktop)
   const profiles = [
@@ -70,9 +73,44 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
       // Filter out test cards that are already in learning state
       return getHardcodedCards().filter(card => card.srsData.isNew);
     }
-    return Object.values(wordDefinitions).filter(def => 
-      def && def.wordSenseId && def.inFlashcards
-    );
+    
+    const cards = [];
+    Object.entries(wordDefinitions).forEach(([key, value]) => {
+      if (value && value.wordSenseId && value.inFlashcards) {
+        const cardWithSRS = { ...value, key };
+        
+        // Ensure frequency field exists (use wordFrequency if available)
+        if (!cardWithSRS.frequency && cardWithSRS.wordFrequency) {
+          cardWithSRS.frequency = cardWithSRS.wordFrequency;
+        }
+        
+        if (!cardWithSRS.srsData) {
+          cardWithSRS.srsData = {
+            isNew: true,
+            gotWrongThisSession: false,
+            SRS_interval: 1,
+            status: 'new',
+            correctCount: 0,
+            incorrectCount: 0,
+            dueDate: null,
+            lastSeen: null,
+            lastReviewDate: null,
+            nextReviewDate: new Date().toISOString()
+          };
+        }
+        cards.push(cardWithSRS);
+      }
+    });
+    return cards;
+  };
+
+  // Get categorized cards for display
+  const getCategorizedCards = () => {
+    const allCards = getAvailableCards();
+    const { seenCards, newCards } = categorizeCards(allCards);
+    const dueCards = getDueSeenCards(seenCards);
+    
+    return { newCards, dueCards, seenCards };
   };
 
   // Count available flashcards
@@ -88,6 +126,124 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
       onStartStudying(selectedProfile, dataToPass);
     }
   };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = date - now;
+    
+    if (diffMs <= 0) return 'Due now';
+    
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    if (diffDays === 0) {
+      const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+      if (diffHours === 0) {
+        const diffMins = Math.floor(diffMs / (60 * 1000));
+        return `${diffMins}m`;
+      }
+      return `${diffHours}h`;
+    }
+    return `${diffDays}d`;
+  };
+
+  // Card list component
+  const CardList = ({ cards, title, type }) => (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.8)',
+      zIndex: 1000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        maxWidth: '90vw',
+        maxHeight: '80vh',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <div style={{
+          padding: '15px 20px',
+          borderBottom: '1px solid #eee',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          backgroundColor: '#f8f9fa'
+        }}>
+          <h3 style={{ margin: 0, fontSize: '18px', color: '#333' }}>{title}</h3>
+          <button 
+            onClick={() => {
+              setShowNewCards(false);
+              setShowDueCards(false);
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '24px',
+              cursor: 'pointer',
+              color: '#666'
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{
+          overflow: 'auto',
+          padding: '10px'
+        }}>
+          {cards.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+              No {type} cards
+            </div>
+          ) : (
+            cards.map((card, index) => (
+              <div key={card.key || card.wordSenseId || index} style={{
+                padding: '12px 15px',
+                margin: '5px 0',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#333' }}>
+                    {card.word}
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#666', marginTop: '2px' }}>
+                    {card.definition || 'No definition'}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', fontSize: '12px', color: '#888' }}>
+                  {type === 'new' ? (
+                    <div>
+                      <div>Freq: {card.frequency || 5}</div>
+                      <div style={{ marginTop: '2px' }}>#{index + 1}</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div>Due: {formatDate(card.srsData?.dueDate || card.srsData?.nextReviewDate)}</div>
+                      <div style={{ marginTop: '2px' }}>#{index + 1}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="mobile-profile-selector">
@@ -193,6 +349,58 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
                   <span className="mobile-start-text">Start Studying</span>
                 </div>
               </button>
+              
+              {/* Card Order Buttons */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '10px', 
+                marginTop: '15px',
+                justifyContent: 'space-between'
+              }}>
+                <button 
+                  onClick={() => setShowNewCards(true)}
+                  style={{
+                    flex: 1,
+                    padding: '12px 8px',
+                    backgroundColor: '#e3f2fd',
+                    border: '1px solid #2196f3',
+                    borderRadius: '8px',
+                    color: '#1976d2',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span>📝</span>
+                  <span>New Cards Order</span>
+                </button>
+                
+                <button 
+                  onClick={() => setShowDueCards(true)}
+                  style={{
+                    flex: 1,
+                    padding: '12px 8px',
+                    backgroundColor: '#fff3e0',
+                    border: '1px solid #ff9800',
+                    borderRadius: '8px',
+                    color: '#f57c00',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span>⏰</span>
+                  <span>Due Cards Order</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="mobile-empty-state">
@@ -213,6 +421,29 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
           )}
         </div>
       )}
+      
+      {/* Card List Modals */}
+      {showNewCards && (() => {
+        const { newCards } = getCategorizedCards();
+        return (
+          <CardList 
+            cards={newCards} 
+            title={`New Cards (${newCards.length}) - Sorted by Frequency`}
+            type="new"
+          />
+        );
+      })()}
+      
+      {showDueCards && (() => {
+        const { dueCards } = getCategorizedCards();
+        return (
+          <CardList 
+            cards={dueCards} 
+            title={`Due Cards (${dueCards.length}) - Sorted by Due Date`}
+            type="due"
+          />
+        );
+      })()}
     </div>
   );
 };
