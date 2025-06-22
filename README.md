@@ -1,0 +1,260 @@
+# Polycast - Real-Time Language Learning Platform
+
+A comprehensive language learning application that combines real-time transcription, translation, and spaced repetition flashcards with AI-powered content generation.
+
+## 🎯 Overview
+
+Polycast is a full-stack language learning platform designed for immersive learning experiences. It features real-time audio/video processing with AI transcription, intelligent flashcard generation using spaced repetition algorithms, and mobile-optimized study sessions.
+
+## 🏗️ Architecture
+
+### Frontend (`polycast-frontend`)
+- **Framework**: React 18 + Vite
+- **Deployment**: Netlify
+- **Key Features**:
+  - Responsive desktop and mobile interfaces
+  - Real-time WebSocket communication
+  - Touch gesture support for mobile flashcards
+  - Audio recording and playback
+  - Progressive Web App capabilities
+
+### Backend (`polycast-backend`)
+- **Framework**: Node.js + Express
+- **Deployment**: Render
+- **Key Services**:
+  - WebSocket server for real-time communication
+  - Audio processing with OpenAI Whisper
+  - Text-to-speech with OpenAI TTS
+  - Redis for session management
+  - PostgreSQL for user data persistence
+
+## 🔧 Core Features
+
+### 1. Real-Time Transcription & Translation
+- **Audio Mode**: Live audio recording with real-time transcription
+- **Video Mode**: Screen sharing with synchronized transcription
+- **Multi-language Support**: Automatic language detection and translation
+- **Services**: OpenAI Whisper (transcription), DeepL (translation)
+
+### 2. Intelligent Dictionary System
+- **Comprehensive Database**: 26 JSON files (a-z.json) containing detailed word definitions
+- **AI Enhancement**: Gemini API provides frequency ratings (1-10 scale) and example sentences
+- **Smart Lookup**: Clickable words in transcriptions with instant definitions
+- **Definition Sources**: Primary dictionary JSON, fallback to AI generation
+
+### 3. Spaced Repetition System (SRS)
+- **Algorithm**: Customized SRS with 9 interval levels
+- **Card Types**: New cards, learning cards, review cards
+- **Frequency-Based Sorting**: New cards sorted by word frequency (10 = most common)
+- **Due Date Management**: Automatic scheduling based on performance
+- **Session Limits**: Configurable daily new card limits
+
+### 4. Mobile Flashcard Interface
+- **Touch Gestures**: Swipe left (wrong), swipe right (correct), tap to flip
+- **Visual Feedback**: Color-coded responses, smooth animations
+- **Audio Integration**: Text-to-speech playback for pronunciation
+- **Progress Tracking**: Session statistics and learning analytics
+
+### 5. Profile Management
+- **Multiple Profiles**: Cat, Dog, Mouse, Horse, Lizard + Non-saving mode
+- **Data Persistence**: Individual progress tracking per profile
+- **Cloud Sync**: Automatic backup of flashcard progress
+- **Non-saving Mode**: Temporary sessions with hardcoded cards for testing
+
+## 📁 Project Structure
+
+```
+polycast-main/
+├── polycast-frontend/
+│   ├── src/
+│   │   ├── components/          # Desktop React components
+│   │   ├── mobile/             # Mobile-specific components
+│   │   │   ├── components/     # Mobile flashcard interface
+│   │   │   ├── styles/         # Mobile CSS
+│   │   │   └── utils/          # Touch gesture handlers
+│   │   ├── utils/              # SRS algorithm, card sorting
+│   │   └── hooks/              # Error handling, state management
+│   └── public/                 # Static assets
+└── polycast-backend/
+    ├── services/               # Core business logic
+    │   ├── whisperService.js   # Audio transcription
+    │   ├── llmService.js       # AI text processing
+    │   ├── redisService.js     # Session management
+    │   └── audioConvertService.js # Audio format handling
+    ├── dictionary-data/        # Word definition JSON files
+    └── config/                 # Environment configuration
+```
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- Redis server
+- PostgreSQL database
+- API keys: OpenAI, DeepL, Google Gemini
+
+### Frontend Setup
+```bash
+cd polycast-frontend
+npm install
+npm run dev
+```
+
+### Backend Setup
+```bash
+cd polycast-backend
+npm install
+
+# Create .env file
+OPENAI_API_KEY=your_openai_key
+DEEPL_API_KEY=your_deepl_key
+GEMINI_API_KEY=your_gemini_key
+REDIS_URL=your_redis_url
+DATABASE_URL=your_postgres_url
+
+npm start
+```
+
+## 🎮 Usage
+
+### Desktop Mode
+1. Select language pair and room
+2. Choose audio or video mode
+3. Start recording/streaming
+4. Click transcribed words for definitions
+5. Add words to flashcards for later study
+
+### Mobile Mode
+1. Select study profile
+2. Start flashcard session
+3. Use gestures: tap to flip, swipe for answers
+4. Audio playback available for pronunciation
+5. Track progress with session statistics
+
+## 🔄 SRS Algorithm Details
+
+### Card States
+- **New**: Never studied (frequency-sorted, 10 = highest priority)
+- **Learning**: Short intervals (1-10 minutes)
+- **Review**: Long intervals (days to months)
+
+### Intervals
+- Level 1: 1 minute
+- Level 2: 5 minutes
+- Level 3: 20 minutes
+- Level 4: 1 hour
+- Level 5: 4 hours
+- Level 6: 1 day
+- Level 7: 3 days
+- Level 8: 1 week
+- Level 9: 2+ weeks
+
+### Frequency Integration
+- New cards sorted by Gemini frequency ratings
+- Higher frequency = earlier introduction
+- Ensures common words are learned first
+
+## 🎨 Mobile Interface Features
+
+### Touch Gestures
+- **Single Tap**: Flip card to show answer
+- **Swipe Right**: Mark correct (green feedback)
+- **Swipe Left**: Mark incorrect (red feedback)
+- **Long Press**: Access quick actions menu
+
+### Visual Feedback
+- Color-coded swipe indicators
+- Smooth card transitions
+- Progress indicators
+- Session statistics display
+
+## 📊 Data Flow
+
+### Word Addition Process
+1. User clicks word in transcription
+2. Dictionary JSON lookup for definition
+3. Gemini API call for frequency + examples
+4. Card creation with SRS data structure
+5. Addition to user's flashcard deck
+
+### Study Session Flow
+1. Load due cards (past due date)
+2. Load new cards (frequency-sorted)
+3. Present cards with daily limits
+4. Update SRS data based on responses
+5. Calculate next review dates
+6. Save progress to database
+
+## 🔧 Configuration
+
+### SRS Settings
+- `newCardsPerDay`: Daily limit for new cards (default: 5)
+- `maxCardsPerSession`: Total session limit (default: 50)
+- `audioAutoplay`: Automatic pronunciation (default: true)
+
+### Environment Variables
+- `OPENAI_API_KEY`: Required for Whisper & TTS
+- `DEEPL_API_KEY`: Required for translation
+- `GEMINI_API_KEY`: Required for frequency analysis
+- `REDIS_URL`: Session storage
+- `DATABASE_URL`: User data persistence
+
+## 🚀 Deployment
+
+### Frontend (Netlify)
+- Automatic deployment from Git
+- Build command: `npm run build`
+- Publish directory: `dist`
+- Redirects configured for SPA routing
+
+### Backend (Render)
+- Node.js service deployment
+- Environment variables configured
+- WebSocket support enabled
+- Redis and PostgreSQL addons
+
+## 🧪 Testing
+
+### Hardcoded Cards (Non-saving Mode)
+- 10 new cards with frequencies 6-10
+- 6 review cards with various due dates
+- Perfect for testing SRS algorithm
+- No database persistence required
+
+### Debug Features
+- Array export functionality
+- Console logging for SRS calculations
+- Card order preview buttons
+- Development mode indicators
+
+## 📱 Mobile Optimization
+
+### Performance
+- Optimized touch event handling
+- Reduced animations for smoother experience
+- Efficient card loading and caching
+- Background audio processing
+
+### UX Design
+- Large touch targets for accessibility
+- Clear visual feedback for all actions
+- Intuitive gesture-based interface
+- Responsive design for all screen sizes
+
+## 🤝 Contributing
+
+### Code Structure
+- Follow existing naming conventions
+- Use functional React components with hooks
+- Implement proper error handling
+- Add console logging for debugging
+
+### SRS Integration
+- Always use `frequency` field for card sorting
+- Maintain SRS data structure consistency
+- Update due dates after each review
+- Handle edge cases for new vs. review cards
+
+---
+
+*Polycast combines the power of real-time AI processing with proven spaced repetition techniques to create an immersive language learning experience optimized for both desktop and mobile use.*

@@ -32,6 +32,7 @@ const MobileFlashcardMode = ({
   const [audioState, setAudioState] = useState({ loading: false, error: null });
   const [currentAudio, setCurrentAudio] = useState(null);
   const [hasAutoPlayedThisFlip, setHasAutoPlayedThisFlip] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const { error: popupError, showError, clearError } = useErrorHandler();
   
   // Refs for gesture handling
@@ -840,6 +841,138 @@ const MobileFlashcardMode = ({
     return () => {};
   }, []);
 
+  // Calculate future due dates for calendar
+  const getCalendarData = () => {
+    const today = new Date();
+    const nextWeekDays = [];
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      date.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      // Find cards due on this day
+      const cardsForDay = availableCards.filter(card => {
+        if (!card.srsData) return false;
+        
+        const dueDate = new Date(card.srsData.dueDate || card.srsData.nextReviewDate);
+        return dueDate >= date && dueDate <= endOfDay;
+      });
+      
+      nextWeekDays.push({
+        date,
+        cards: cardsForDay,
+        dayName: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short' }),
+        dateStr: date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
+      });
+    }
+    
+    return nextWeekDays;
+  };
+
+  // Calendar Modal Component
+  const CalendarModal = () => {
+    const calendarData = getCalendarData();
+    
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          maxWidth: '95vw',
+          maxHeight: '80vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <div style={{
+            padding: '15px 20px',
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#f8f9fa'
+          }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: '#333' }}>📅 Next 7 Days</h3>
+            <button 
+              onClick={() => setShowCalendar(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#666'
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div style={{
+            overflow: 'auto',
+            padding: '10px'
+          }}>
+            {calendarData.map((day, index) => (
+              <div key={index} style={{
+                padding: '12px 15px',
+                margin: '5px 0',
+                backgroundColor: day.cards.length > 0 ? '#f0f9ff' : '#f8f9fa',
+                borderRadius: '8px',
+                borderLeft: `4px solid ${day.cards.length > 0 ? '#2196f3' : '#e5e7eb'}`
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: day.cards.length > 0 ? '8px' : '0'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#333' }}>
+                      {day.dayName}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>
+                      {day.dateStr}
+                    </div>
+                  </div>
+                  <div style={{
+                    backgroundColor: day.cards.length > 0 ? '#2196f3' : '#9ca3af',
+                    color: 'white',
+                    borderRadius: '12px',
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}>
+                    {day.cards.length} cards
+                  </div>
+                </div>
+                {day.cards.length > 0 && (
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    {day.cards.slice(0, 3).map(card => card.word).join(', ')}
+                    {day.cards.length > 3 && ` +${day.cards.length - 3} more`}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Calculate session stats
   const sessionDuration = Math.floor((new Date() - stats.sessionStartTime) / 1000 / 60);
 
@@ -896,6 +1029,21 @@ const MobileFlashcardMode = ({
       <div className="mobile-flashcard-header">
         <button className="mobile-back-btn" onClick={onBack}>
           ← Back
+        </button>
+        <button 
+          className="mobile-calendar-btn" 
+          onClick={() => setShowCalendar(true)}
+          style={{
+            background: 'none',
+            border: '1px solid #2196f3',
+            borderRadius: '6px',
+            padding: '4px 8px',
+            fontSize: '14px',
+            color: '#2196f3',
+            cursor: 'pointer'
+          }}
+        >
+          📅
         </button>
         <div style={{color: 'red', fontSize: '10px'}}>V2.0-HC</div>
         <div className="mobile-header-stats">
@@ -1137,6 +1285,9 @@ const MobileFlashcardMode = ({
           {answerFeedback.text}
         </div>
       )}
+
+      {/* Calendar Modal */}
+      {showCalendar && <CalendarModal />}
 
       {/* Error Popup */}
       <ErrorPopup error={popupError} onClose={clearError} />
