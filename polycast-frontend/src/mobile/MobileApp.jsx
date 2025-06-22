@@ -24,7 +24,7 @@ const MobileApp = () => {
   }, []);
 
   // Handle updating word definitions from flashcard mode
-  const handleSetWordDefinitions = (newDefinitions) => {
+  const handleSetWordDefinitions = useCallback((newDefinitions) => {
     setWordDefinitions(newDefinitions);
     
     // Save to backend if not in non-saving mode
@@ -46,12 +46,12 @@ const MobileApp = () => {
         }
       }, 500);
     }
-  };
+  }, [selectedProfile, showError]);
 
   // Handle returning to profile selection
-  const handleBackToProfile = () => {
+  const handleBackToProfile = useCallback(() => {
     setCurrentMode('profile');
-  };
+  }, []);
 
   return (
     <div className="mobile-app">

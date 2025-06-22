@@ -44,6 +44,9 @@ const MobileFlashcardMode = ({
   const isDragging = useRef(false);
   const dragStartPos = useRef(null);
   const hasPlayedAudioForCard = useRef(null);
+  
+  // Stable date for new cards - only calculate once
+  const nowDateRef = useRef(new Date().toISOString());
 
   // Get hardcoded cards for non-saving mode
   const getHardcodedCards = () => {
@@ -171,7 +174,7 @@ const MobileFlashcardMode = ({
             correctCount: 0,
             incorrectCount: 0,
             lastReviewDate: null,
-            nextReviewDate: new Date().toISOString(), // Due now
+            nextReviewDate: nowDateRef.current, // Due now
             currentStep: 0
           };
         }
