@@ -791,15 +791,9 @@ const MobileFlashcardMode = ({
           onMouseLeave={handleDirectTouchEnd}
           onClick={handleCardClick}
           style={{
-            transform: (() => {
-              const baseTransform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
-              const dragTransform = dragState.isDragging 
-                ? `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg)` 
-                : '';
-              const finalTransform = dragState.isDragging ? `${dragTransform} ${baseTransform}` : baseTransform;
-              console.log('[TRANSFORM DEBUG]', { dragState, isFlipped, finalTransform });
-              return finalTransform;
-            })(),
+            transform: dragState.isDragging 
+              ? `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg)`
+              : (isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'),
             opacity: dragState.opacity,
             transition: dragState.isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease',
             // Add proportional color feedback: deltaX < 0 (left) = red (incorrect), deltaX > 0 (right) = green (correct)
@@ -865,7 +859,7 @@ const MobileFlashcardMode = ({
           {/* Back of Card */}
           <div 
             className="mobile-card-back"
-            style={dragState.isDragging ? { transform: 'rotateY(0deg)' } : {}}
+            style={dragState.isDragging ? { transform: 'rotateY(180deg)' } : {}}
           >
             <div className="mobile-card-content">
               {currentCard.exampleSentencesGenerated ? (
