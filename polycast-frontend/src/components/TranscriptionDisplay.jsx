@@ -718,6 +718,7 @@ const TranscriptionDisplay = ({
       }
     } catch (error) {
       console.error(`Error saving profile data:`, error);
+      alert(`ERROR: Failed to save profile data. Your progress may be lost. Please check your connection and try again.`);
     }
   };
   
@@ -990,6 +991,7 @@ START NOW:`;
       }, 100);
     } catch (error) {
       console.error(`Error creating flashcard for ${word}:`, error);
+      alert(`ERROR: Failed to create flashcard for "${word}". Please try again.`);
     }
   };
 
@@ -1075,6 +1077,7 @@ START NOW:`;
       }
     } catch (error) {
       console.error(`Error removing word from dictionary: ${error}`);
+      alert(`ERROR: Failed to remove word from dictionary. Please try again.`);
     }
   };
 

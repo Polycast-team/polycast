@@ -37,8 +37,16 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
         }
         
         const data = await response.json();
-        const flashcards = data.flashcards || {};
         
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid response format from server');
+        }
+        
+        if (!data.flashcards || typeof data.flashcards !== 'object') {
+          throw new Error('No flashcards data received from server');
+        }
+        
+        const flashcards = data.flashcards;
         setWordDefinitions(flashcards);
         
         console.log(`[MOBILE] Loaded ${Object.keys(flashcards).length} flashcards for profile: ${selectedProfile}`);

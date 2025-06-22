@@ -71,6 +71,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
         derivedSelectedWords);
     } catch (error) {
       console.error(`Error fetching profile data for ${profile}:`, error);
+      alert(`ERROR: Failed to load profile data for "${profile}". Please check your connection and try again.`);
     }
   }, []);
   

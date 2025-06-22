@@ -39,6 +39,7 @@ const MobileApp = () => {
           console.log(`[MOBILE] Saved SRS updates for profile: ${selectedProfile}`);
         } catch (error) {
           console.error('Error saving SRS updates:', error);
+          alert(`ERROR: Failed to save progress for profile "${selectedProfile}". Your study progress may be lost. Please check your connection.`);
         }
       }, 500);
     }
