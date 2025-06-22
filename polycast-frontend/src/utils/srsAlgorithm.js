@@ -181,7 +181,11 @@ function addMinutes(date, minutes) {
 }
 
 function addDays(date, days) {
-  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+  const targetDate = new Date(date);
+  targetDate.setDate(targetDate.getDate() + days);
+  // Set to beginning of day (midnight) so it's available anytime that day
+  targetDate.setHours(0, 0, 0, 0);
+  return targetDate;
 }
 
 /**
