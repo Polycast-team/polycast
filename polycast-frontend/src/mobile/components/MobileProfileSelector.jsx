@@ -159,7 +159,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
                 <div className="mobile-stat">
                   <div className="mobile-stat-number">
                     {Object.values(wordDefinitions).filter(def => 
-                      def && def.srsData && def.srsData.status === 'new'
+                      def && def.srsData && def.srsData.isNew
                     ).length}
                   </div>
                   <div className="mobile-stat-label">New</div>
@@ -167,10 +167,18 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
                 <div className="mobile-stat">
                   <div className="mobile-stat-number">
                     {Object.values(wordDefinitions).filter(def => 
-                      def && def.srsData && (def.srsData.status === 'learning' || def.srsData.status === 'review')
+                      def && def.srsData && !def.srsData.isNew && def.srsData.gotWrongThisSession
                     ).length}
                   </div>
-                  <div className="mobile-stat-label">Due</div>
+                  <div className="mobile-stat-label">Learning</div>
+                </div>
+                <div className="mobile-stat">
+                  <div className="mobile-stat-number">
+                    {Object.values(wordDefinitions).filter(def => 
+                      def && def.srsData && !def.srsData.isNew && !def.srsData.gotWrongThisSession
+                    ).length}
+                  </div>
+                  <div className="mobile-stat-label">Review</div>
                 </div>
               </div>
               
