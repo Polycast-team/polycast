@@ -365,10 +365,6 @@ const MobileFlashcardMode = ({
     }
   }, [isFlipped]);
 
-  // RAF throttling for smooth drag updates
-  const rafRef = useRef(null);
-  const pendingDragState = useRef(null);
-  
   // Direct touch move handler for dragging (works for both touch and mouse)
   const handleDirectTouchMove = useCallback((e) => {
     if (!isFlipped || !dragStartPos.current) return;
@@ -389,27 +385,18 @@ const MobileFlashcardMode = ({
       
       const rotation = deltaX * 0.1;
       const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
-      const colorIntensity = Math.min(1, Math.abs(deltaX) / 200);
+      const colorIntensity = Math.min(1, Math.abs(deltaX) / 200); // Adjusted for new threshold
       
-      // Store pending state
-      pendingDragState.current = {
+      console.log('[DIRECT DRAG] Moving - deltaX:', deltaX, 'rotation:', rotation);
+      
+      setDragState({
         isDragging: true,
         deltaX,
         deltaY: 0,
         rotation,
         opacity,
         colorIntensity
-      };
-      
-      // Throttle state updates using RAF
-      if (!rafRef.current) {
-        rafRef.current = requestAnimationFrame(() => {
-          if (pendingDragState.current) {
-            setDragState(pendingDragState.current);
-          }
-          rafRef.current = null;
-        });
-      }
+      });
       
       e.preventDefault(); // Prevent scrolling
     }
@@ -790,12 +777,6 @@ const MobileFlashcardMode = ({
         }
       }
       
-      // Clean up any pending RAF
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      
       // Reset drag tracking
       dragStartPos.current = null;
       lastTouchPos.current = null;
@@ -869,53 +850,6 @@ const MobileFlashcardMode = ({
   const baseWord = currentCard.word || currentCard.wordSenseId?.replace(/\d+$/, '');
   const defNumber = currentCard.definitionNumber || currentCard.wordSenseId?.match(/\d+$/)?.[0] || '';
   const interval = currentCard?.srsData?.interval || 1;
-  
-  // Memoize expensive style calculations
-  const cardStyle = React.useMemo(() => {
-    const baseStyle = {
-      transform: dragState.isDragging 
-        ? `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg)`
-        : (isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'),
-      opacity: dragState.opacity,
-      transition: dragState.isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease'
-    };
-    
-    if (dragState.colorIntensity > 0) {
-      const isLeft = dragState.deltaX < 0;
-      const color = isLeft ? '239, 68, 68' : '34, 197, 94';
-      const intensity = dragState.colorIntensity;
-      
-      baseStyle.boxShadow = `0 0 ${30 * intensity}px rgba(${color}, ${intensity}), 0 0 ${60 * intensity}px rgba(${color}, ${intensity * 0.5})`;
-      baseStyle.backgroundColor = `rgba(${color}, ${intensity * 0.1})`;
-    }
-    
-    return baseStyle;
-  }, [dragState.isDragging, dragState.deltaX, dragState.rotation, dragState.opacity, dragState.colorIntensity, isFlipped]);
-  
-  // Memoize parsed example content
-  const parsedExampleContent = React.useMemo(() => {
-    if (!currentCard?.exampleSentencesGenerated) return null;
-    
-    const parts = currentCard.exampleSentencesGenerated
-      .split('//')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-      
-    const sentenceIndex = ((interval - 1) % 5) * 2;
-    const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-    const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
-    const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
-    const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, '<span class="mobile-highlighted-word">$1</span>');
-    const exampleNumber = ((interval - 1) % 5) + 1;
-    
-    return { 
-      englishSentence, 
-      nativeTranslation, 
-      clozeSentence, 
-      highlightedSentence,
-      exampleNumber 
-    };
-  }, [currentCard?.exampleSentencesGenerated, interval]);
 
   return (
     <div className="mobile-flashcard-mode">
@@ -959,30 +893,58 @@ const MobileFlashcardMode = ({
           onMouseUp={handleDirectTouchEnd}
           onMouseLeave={handleDirectTouchEnd}
           onClick={handleCardClick}
-          style={cardStyle}
+          style={{
+            transform: dragState.isDragging 
+              ? `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg)`
+              : (isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'),
+            opacity: dragState.opacity,
+            transition: dragState.isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease',
+            // Add proportional color feedback: deltaX < 0 (left) = red (incorrect), deltaX > 0 (right) = green (correct)
+            boxShadow: dragState.colorIntensity > 0 
+              ? dragState.deltaX < 0 
+                ? `0 0 ${30 * dragState.colorIntensity}px rgba(239, 68, 68, ${dragState.colorIntensity}), 0 0 ${60 * dragState.colorIntensity}px rgba(239, 68, 68, ${dragState.colorIntensity * 0.5})` // Left = red (incorrect)
+                : `0 0 ${30 * dragState.colorIntensity}px rgba(34, 197, 94, ${dragState.colorIntensity}), 0 0 ${60 * dragState.colorIntensity}px rgba(34, 197, 94, ${dragState.colorIntensity * 0.5})`  // Right = green (correct)
+              : undefined,
+            // Add proportional background color overlay
+            backgroundColor: dragState.colorIntensity > 0 
+              ? dragState.deltaX < 0 
+                ? `rgba(239, 68, 68, ${dragState.colorIntensity * 0.1})` // Left = red background (incorrect)
+                : `rgba(34, 197, 94, ${dragState.colorIntensity * 0.1})`  // Right = green background (correct)
+              : undefined
+          }}
         >
           {/* Front of Card */}
           <div 
             className="mobile-card-front"
             style={dragState.isDragging ? { display: 'none' } : {}}
           >
-            {parsedExampleContent ? (
-              <div className="mobile-card-content">
-                <div className="mobile-card-sentence">
-                  {parsedExampleContent.clozeSentence}
-                </div>
-                {parsedExampleContent.nativeTranslation && (
-                  <div 
-                    className="mobile-card-translation"
-                    dangerouslySetInnerHTML={{ 
-                      __html: parsedExampleContent.nativeTranslation.replace(/~([^~]+)~/g, '<span class="mobile-highlighted-word">$1</span>') 
-                    }}
-                  />
-                )}
-                <div className="mobile-card-hint">
-                  Tap to reveal answer
-                </div>
-              </div>
+            {currentCard.exampleSentencesGenerated ? (
+              (() => {
+                const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+                const sentenceIndex = ((interval - 1) % 5) * 2;
+                const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+                const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
+                const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
+                
+                return (
+                  <div className="mobile-card-content">
+                    <div className="mobile-card-sentence">
+                      {clozeSentence}
+                    </div>
+                    {nativeTranslation && (
+                      <div 
+                        className="mobile-card-translation"
+                        dangerouslySetInnerHTML={{ 
+                          __html: nativeTranslation.replace(/~([^~]+)~/g, '<span class="mobile-highlighted-word">$1</span>') 
+                        }}
+                      />
+                    )}
+                    <div className="mobile-card-hint">
+                      Tap to reveal answer
+                    </div>
+                  </div>
+                );
+              })()
             ) : (
               <div className="mobile-card-content">
                 <div className="mobile-card-word">
@@ -1003,28 +965,40 @@ const MobileFlashcardMode = ({
             style={dragState.isDragging ? { transform: 'rotateY(0deg)' } : {}}
           >
             <div className="mobile-card-content">
-              {parsedExampleContent ? (
-                <div className="mobile-card-answer">
-                  <div className="mobile-example-label">
-                    Example {parsedExampleContent.exampleNumber}:
-                  </div>
-                  <div 
-                    className="mobile-example-sentence"
-                    dangerouslySetInnerHTML={{ __html: parsedExampleContent.highlightedSentence }}
-                  />
-                  {currentCard.disambiguatedDefinition && (
-                    <div className="mobile-card-definition">
-                      {currentCard.disambiguatedDefinition.definition}
+              {currentCard.exampleSentencesGenerated ? (
+                (() => {
+                  const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+                  const sentenceIndex = ((interval - 1) % 5) * 2;
+                  const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+                  const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
+                    return `<span class="mobile-highlighted-word">${word}</span>`;
+                  });
+                  const exampleNumber = ((interval - 1) % 5) + 1;
+                  
+                  return (
+                    <div className="mobile-card-answer">
+                      <div className="mobile-example-label">
+                        Example {exampleNumber}:
+                      </div>
+                      <div 
+                        className="mobile-example-sentence"
+                        dangerouslySetInnerHTML={{ __html: highlightedSentence }}
+                      />
+                      {currentCard.disambiguatedDefinition && (
+                        <div className="mobile-card-definition">
+                          {currentCard.disambiguatedDefinition.definition}
+                        </div>
+                      )}
+                      <button 
+                        className="mobile-audio-btn"
+                        onClick={handlePlayAudio}
+                        disabled={audioState.loading}
+                      >
+                        {audioState.loading ? '🔄' : '🔊'} Play Audio
+                      </button>
                     </div>
-                  )}
-                  <button 
-                    className="mobile-audio-btn"
-                    onClick={handlePlayAudio}
-                    disabled={audioState.loading}
-                  >
-                    {audioState.loading ? '🔄' : '🔊'} Play Audio
-                  </button>
-                </div>
+                  );
+                })()
               ) : (
                 <div className="mobile-card-answer">
                   <div className="mobile-card-word-large">
