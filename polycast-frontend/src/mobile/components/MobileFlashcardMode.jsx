@@ -408,6 +408,16 @@ const MobileFlashcardMode = ({
     }
   }, [isFlipped, dueCards, currentDueIndex, generateAndPlayAudio]);
 
+  // Simple click handler for flipping (fallback for mouse clicks)
+  const handleCardClick = useCallback((e) => {
+    if (!isFlipped && !isDragging.current) {
+      console.log('[CARD CLICK] Simple click detected - flipping card');
+      e.preventDefault();
+      e.stopPropagation();
+      flipCard();
+    }
+  }, [isFlipped, flipCard]);
+
   // Show answer feedback
   const showAnswerFeedback = useCallback((answer) => {
     const feedbackData = {
@@ -550,7 +560,7 @@ const MobileFlashcardMode = ({
       const now = Date.now();
       const touchDuration = now - touchStartTime.current;
       
-      if (touchDuration < 200) {
+      if (touchDuration < 500) { // Increased timeout for mouse clicks
         if (now - lastTapTime.current < 100) {
           console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
         } else {
@@ -738,6 +748,7 @@ const MobileFlashcardMode = ({
           onMouseMove={handleDirectTouchMove}
           onMouseUp={handleDirectTouchEnd}
           onMouseLeave={handleDirectTouchEnd}
+          onClick={handleCardClick}
           style={{
             transform: (() => {
               const baseTransform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
