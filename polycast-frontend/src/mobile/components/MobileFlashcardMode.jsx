@@ -265,18 +265,13 @@ const MobileFlashcardMode = ({
     setCurrentDueIndex(0);
     setCompletedSteps(0); // Reset progress when cards change
     
-    // Initialize session counts
+    // Initialize session counts based on our simple SRS system
     const newCards = due.filter(card => card.srsData?.isNew).length;
     const learningCards = due.filter(card => 
-      card.srsData?.status === 'learning' || 
-      card.srsData?.status === 'relearning' ||
-      (card.srsData?.gotWrongThisSession && !card.srsData?.isNew)
+      card.srsData?.gotWrongThisSession && !card.srsData?.isNew
     ).length;
     const reviewCards = due.filter(card => 
-      !card.srsData?.isNew && 
-      card.srsData?.status !== 'learning' && 
-      card.srsData?.status !== 'relearning' &&
-      !card.srsData?.gotWrongThisSession
+      !card.srsData?.isNew && !card.srsData?.gotWrongThisSession
     ).length;
     
     setSessionCounts({
@@ -646,30 +641,31 @@ const MobileFlashcardMode = ({
     setSessionCounts(prevCounts => {
       const newCounts = { ...prevCounts };
       
-      // Handle transitions from current card state
-      if (currentCard.srsData.isNew) {
-        // New card answered
-        newCounts.newCount -= 1;
-        if (answer === 'incorrect') {
-          newCounts.learningCount += 1;
-        } else {
-          newCounts.reviewCount += 1;
-        }
-      } else {
-        // Non-new card answered
-        const wasRelearning = currentCard.srsData.gotWrongThisSession;
-        const willBeRelearning = updatedSrsData.gotWrongThisSession;
-        
-        if (wasRelearning && !willBeRelearning) {
-          // Was relearning, now learning → relearning to review
-          newCounts.learningCount -= 1;
-          newCounts.reviewCount += 1;
-        } else if (!wasRelearning && willBeRelearning) {
-          // Was learning, now relearning → review to relearning  
-          newCounts.reviewCount -= 1;
-          newCounts.learningCount += 1;
-        }
-        // If both same state, no count change needed
+      // Current card state
+      const wasNew = currentCard.srsData.isNew;
+      const wasLearning = currentCard.srsData.gotWrongThisSession && !wasNew;
+      const wasReview = !wasNew && !currentCard.srsData.gotWrongThisSession;
+      
+      // New card state after answer
+      const isNowNew = updatedSrsData.isNew; // Should always be false after answering
+      const isNowLearning = updatedSrsData.gotWrongThisSession && !isNowNew;
+      const isNowReview = !isNowNew && !updatedSrsData.gotWrongThisSession;
+      
+      // Decrement the old category
+      if (wasNew) newCounts.newCount = Math.max(0, newCounts.newCount - 1);
+      else if (wasLearning) newCounts.learningCount = Math.max(0, newCounts.learningCount - 1);
+      else if (wasReview) newCounts.reviewCount = Math.max(0, newCounts.reviewCount - 1);
+      
+      // Only increment if the card is still due today (not graduated to tomorrow or later)
+      const now = new Date();
+      const updatedDueDate = new Date(updatedSrsData.nextReviewDate);
+      const stillDueToday = (updatedDueDate - now) < (24 * 60 * 60 * 1000);
+      
+      if (stillDueToday) {
+        // Increment the new category
+        if (isNowNew) newCounts.newCount += 1; // This should never happen
+        else if (isNowLearning) newCounts.learningCount += 1;
+        else if (isNowReview) newCounts.reviewCount += 1;
       }
       
       return newCounts;
