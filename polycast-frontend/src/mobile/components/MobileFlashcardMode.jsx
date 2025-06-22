@@ -289,7 +289,7 @@ const MobileFlashcardMode = ({
   const [completedSteps, setCompletedSteps] = useState(0);
   
   // Track when we're in the middle of processing a card to prevent premature completion
-  const [isProcessingCard, setIsProcessingCard] = useState(false);
+  const [lastCardProcessedTime, setLastCardProcessedTime] = useState(0);
 
   // Handle card flipping
   const flipCard = useCallback(() => {
@@ -529,8 +529,8 @@ const MobileFlashcardMode = ({
     const currentCard = dueCards[currentDueIndex];
     if (!currentCard) return;
     
-    // Mark that we're processing a card
-    setIsProcessingCard(true);
+    // Mark when we processed this card
+    setLastCardProcessedTime(Date.now());
     
     // Show visual feedback
     showAnswerFeedback(answer, currentCard);
@@ -648,13 +648,11 @@ const MobileFlashcardMode = ({
             setTimeout(() => setCardEntryAnimation(''), 400);
           }
           
-          // Clear processing flag
-          setIsProcessingCard(false);
+          // Processing complete
         }, 500);
       }
       
-      // Also clear processing flag for non-refresh path
-      setTimeout(() => setIsProcessingCard(false), 300);
+      // Processing complete for non-refresh path
     }, 200);
   }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings, showAnswerFeedback]);
 
@@ -771,7 +769,9 @@ const MobileFlashcardMode = ({
   const sessionDuration = Math.floor((new Date() - stats.sessionStartTime) / 1000 / 60);
   const accuracy = stats.cardsReviewed > 0 ? Math.round((stats.correctAnswers / stats.cardsReviewed) * 100) : 0;
 
-  if (dueCards.length === 0 && !isProcessingCard) {
+  // Only show completion if no cards AND enough time has passed since last processing
+  const timeSinceLastProcess = Date.now() - lastCardProcessedTime;
+  if (dueCards.length === 0 && timeSinceLastProcess > 1000) {
     return (
       <div className="mobile-flashcard-mode">
         <div className="mobile-flashcard-header">
