@@ -457,12 +457,18 @@ const MobileFlashcardMode = ({
     }
   }, [isFlipped, flipCard]);
 
-  // Show answer feedback
-  const showAnswerFeedback = useCallback((answer) => {
+  // Show answer feedback with SRS timing
+  const showAnswerFeedback = useCallback((answer, currentCard) => {
+    if (!currentCard) return;
+    
+    // Calculate what the next review time would be for this answer
+    const updatedSrsData = calculateNextReview(currentCard, answer);
+    const timeText = formatNextReviewTime(updatedSrsData.nextReviewDate);
+    
     const feedbackData = {
-      correct: { type: 'correct', text: 'Correct!' },
-      incorrect: { type: 'incorrect', text: 'Incorrect' },
-      easy: { type: 'easy', text: 'Easy!' }
+      correct: { type: 'correct', text: timeText },
+      incorrect: { type: 'incorrect', text: timeText },
+      easy: { type: 'easy', text: timeText }
     };
     
     const feedback = feedbackData[answer];
@@ -482,7 +488,7 @@ const MobileFlashcardMode = ({
     if (!currentCard) return;
     
     // Show visual feedback
-    showAnswerFeedback(answer);
+    showAnswerFeedback(answer, currentCard);
     
     // Calculate next review using SRS algorithm
     const updatedSrsData = calculateNextReview(currentCard, answer);
