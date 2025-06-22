@@ -865,7 +865,7 @@ const MobileFlashcardMode = ({
           {/* Back of Card */}
           <div 
             className="mobile-card-back"
-            style={dragState.isDragging ? { transform: 'scaleX(-1)' } : {}}
+            style={dragState.isDragging ? { transform: 'rotateY(0deg)' } : {}}
           >
             <div className="mobile-card-content">
               {currentCard.exampleSentencesGenerated ? (
