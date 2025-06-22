@@ -317,6 +317,20 @@ const MobileFlashcardMode = ({
     return totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
   }, [completedSteps, totalSteps]);
 
+  // Calculate button times based on current card
+  const buttonTimes = React.useMemo(() => {
+    if (!dueCards.length || !dueCards[currentDueIndex]) {
+      return { incorrect: '1 min', correct: '10 min', easy: '4 days' };
+    }
+    
+    const currentCard = dueCards[currentDueIndex];
+    return {
+      incorrect: formatNextReviewTime(calculateNextReview(currentCard, 'incorrect').nextReviewDate),
+      correct: formatNextReviewTime(calculateNextReview(currentCard, 'correct').nextReviewDate),
+      easy: formatNextReviewTime(calculateNextReview(currentCard, 'easy').nextReviewDate)
+    };
+  }, [dueCards, currentDueIndex]);
+
   // Handle card flipping
   const flipCard = useCallback(() => {
     const now = Date.now();
@@ -627,15 +641,20 @@ const MobileFlashcardMode = ({
     
     // Single timeout for all card transition logic
     setTimeout(() => {
+      // Reset flip state first, then update cards
       setIsFlipped(false);
-      setDueCards(newDueCards);
-      setCurrentDueIndex(newDueIndex);
       
-      // Trigger entry animation for next card if there is one
-      if (newDueCards.length > 0) {
-        setCardEntryAnimation('card-enter');
-        setTimeout(() => setCardEntryAnimation(''), 400);
-      }
+      // Small delay to ensure flip completes before changing cards
+      setTimeout(() => {
+        setDueCards(newDueCards);
+        setCurrentDueIndex(newDueIndex);
+        
+        // Trigger entry animation for next card if there is one
+        if (newDueCards.length > 0) {
+          setCardEntryAnimation('card-enter');
+          setTimeout(() => setCardEntryAnimation(''), 400);
+        }
+      }, 50);
       
       // Handle queue refresh if needed (less frequent operation)
       if (newDueCards.length === 0) {
@@ -1034,7 +1053,7 @@ const MobileFlashcardMode = ({
         >
           <div className="mobile-btn-emoji">❌</div>
           <div className="mobile-btn-label">Incorrect</div>
-          <div className="mobile-btn-time">1 min</div>
+          <div className="mobile-btn-time">{buttonTimes.incorrect}</div>
         </button>
         
         <button 
@@ -1044,7 +1063,7 @@ const MobileFlashcardMode = ({
         >
           <div className="mobile-btn-emoji">✓</div>
           <div className="mobile-btn-label">Correct</div>
-          <div className="mobile-btn-time">10 min</div>
+          <div className="mobile-btn-time">{buttonTimes.correct}</div>
         </button>
         
         <button 
@@ -1054,7 +1073,7 @@ const MobileFlashcardMode = ({
         >
           <div className="mobile-btn-emoji">⭐</div>
           <div className="mobile-btn-label">Easy</div>
-          <div className="mobile-btn-time">4 days</div>
+          <div className="mobile-btn-time">{buttonTimes.easy}</div>
         </button>
       </div>
 
