@@ -209,15 +209,16 @@ export function formatNextReviewTime(nextReviewDate) {
   if (diffMins === 1) return '1 min';
   if (diffMins === 10) return '10 min';
   if (diffMins < 60) return `${diffMins} min`;
-  if (diffDays === 1) return '1 day';
-  if (diffDays === 3) return '3 days';
-  if (diffDays === 7) return '1 week';
-  if (diffDays === 14) return '2 weeks';
-  if (diffDays === 30) return '1 month';
-  if (diffDays === 60) return '2 months';
-  if (diffDays === 120) return '4 months';
   
-  // Fallback for other intervals
-  if (diffHours < 24) return `${diffHours} hours`;
-  return `${diffDays} days`;
+  // For days, use >= checks to handle midnight calculations
+  if (diffDays >= 120) return '4 months';
+  if (diffDays >= 60) return '2 months';
+  if (diffDays >= 30) return '1 month';
+  if (diffDays >= 14) return '2 weeks';
+  if (diffDays >= 7) return '1 week';
+  if (diffDays >= 3) return '3 days';
+  if (diffDays >= 1) return '1 day';
+  
+  // Should never get here, but just in case
+  return '1 day';
 }
