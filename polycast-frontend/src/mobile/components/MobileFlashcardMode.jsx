@@ -261,14 +261,17 @@ const MobileFlashcardMode = ({
     return { newCards, learningCards, reviewCards };
   }, [dueCards]);
 
-  // Stable header stats to prevent toolbar flashing
-  const headerStats = React.useMemo(() => ({
-    accuracy,
-    cardsReviewed: stats.cardsReviewed,
-    newCards: cardCounts.newCards,
-    learningCards: cardCounts.learningCards,
-    reviewCards: cardCounts.reviewCards
-  }), [accuracy, stats.cardsReviewed, cardCounts.newCards, cardCounts.learningCards, cardCounts.reviewCards]);
+  // Calculate accuracy inline for headerStats
+  const headerStats = React.useMemo(() => {
+    const accuracy = stats.cardsReviewed > 0 ? Math.round((stats.correctAnswers / stats.cardsReviewed) * 100) : 0;
+    return {
+      accuracy,
+      cardsReviewed: stats.cardsReviewed,
+      newCards: cardCounts.newCards,
+      learningCards: cardCounts.learningCards,
+      reviewCards: cardCounts.reviewCards
+    };
+  }, [stats.cardsReviewed, stats.correctAnswers, cardCounts.newCards, cardCounts.learningCards, cardCounts.reviewCards]);
 
   // Calculate total mathematical steps (assuming all correct answers) - memoized for stability
   const totalSteps = React.useMemo(() => {
@@ -765,7 +768,6 @@ const MobileFlashcardMode = ({
 
   // Calculate session stats
   const sessionDuration = Math.floor((new Date() - stats.sessionStartTime) / 1000 / 60);
-  const accuracy = stats.cardsReviewed > 0 ? Math.round((stats.correctAnswers / stats.cardsReviewed) * 100) : 0;
 
   // Only show completion if no cards AND enough time has passed since last processing
   const timeSinceLastProcess = Date.now() - lastCardProcessedTime;
@@ -790,7 +792,7 @@ const MobileFlashcardMode = ({
               <div className="mobile-summary-label">Cards Reviewed</div>
             </div>
             <div className="mobile-summary-stat">
-              <div className="mobile-summary-number">{accuracy}%</div>
+              <div className="mobile-summary-number">{headerStats.accuracy}%</div>
               <div className="mobile-summary-label">Accuracy</div>
             </div>
             <div className="mobile-summary-stat">
