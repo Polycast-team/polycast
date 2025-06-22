@@ -250,7 +250,7 @@ const MobileFlashcardMode = ({
   // Get SRS statistics
   const srsStats = React.useMemo(() => getReviewStats(availableCards), [availableCards]);
 
-  // Calculate card counts for Anki-style progress
+  // Calculate card counts for Anki-style progress (memoized for toolbar stability)
   const cardCounts = React.useMemo(() => {
     const newCards = dueCards.filter(card => card.srsData?.status === 'new').length;
     const learningCards = dueCards.filter(card => 
@@ -261,7 +261,16 @@ const MobileFlashcardMode = ({
     return { newCards, learningCards, reviewCards };
   }, [dueCards]);
 
-  // Calculate total mathematical steps (assuming all correct answers)
+  // Stable header stats to prevent toolbar flashing
+  const headerStats = React.useMemo(() => ({
+    accuracy,
+    cardsReviewed: stats.cardsReviewed,
+    newCards: cardCounts.newCards,
+    learningCards: cardCounts.learningCards,
+    reviewCards: cardCounts.reviewCards
+  }), [accuracy, stats.cardsReviewed, cardCounts.newCards, cardCounts.learningCards, cardCounts.reviewCards]);
+
+  // Calculate total mathematical steps (assuming all correct answers) - memoized for stability
   const totalSteps = React.useMemo(() => {
     let steps = 0;
     dueCards.forEach(card => {
@@ -290,6 +299,11 @@ const MobileFlashcardMode = ({
   
   // Track when we're in the middle of processing a card to prevent premature completion
   const [lastCardProcessedTime, setLastCardProcessedTime] = useState(0);
+
+  // Stable progress calculation to prevent progress bar flashing
+  const progressPercentage = React.useMemo(() => {
+    return totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+  }, [completedSteps, totalSteps]);
 
   // Handle card flipping
   const flipCard = useCallback(() => {
@@ -544,28 +558,42 @@ const MobileFlashcardMode = ({
       srsData: updatedSrsData
     };
     
+    // Prepare all state updates to happen together
+    const now = new Date();
+    const updatedDueDate = new Date(updatedSrsData.nextReviewDate);
+    const stillDueToday = (updatedDueDate - now) < (24 * 60 * 60 * 1000);
+    
+    // Calculate new due cards array
+    let newDueCards;
+    let newDueIndex;
+    
+    if (stillDueToday && updatedSrsData.status !== 'review') {
+      // Move card to end of queue
+      newDueCards = [...dueCards];
+      newDueCards.splice(currentDueIndex, 1);
+      newDueCards.push(updatedCard);
+      newDueIndex = currentDueIndex >= newDueCards.length ? 0 : currentDueIndex;
+    } else {
+      // Remove card from today's queue
+      newDueCards = dueCards.filter((_, index) => index !== currentDueIndex);
+      newDueIndex = currentDueIndex >= newDueCards.length && newDueCards.length > 0 ? newDueCards.length - 1 : currentDueIndex;
+    }
+    
+    // Batch all state updates together to prevent UI flashing
     setWordDefinitions(prev => ({
       ...prev,
       [currentCard.key]: updatedCard
     }));
     
-    // Update stats
     setStats(prev => ({
       ...prev,
       cardsReviewed: prev.cardsReviewed + 1,
       correctAnswers: answer !== 'incorrect' ? prev.correctAnswers + 1 : prev.correctAnswers
     }));
 
-    // Increment completed steps based on card progression
-    const oldStatus = currentCard.srsData.status;
-    const newStatus = updatedSrsData.status;
-    const oldStep = currentCard.srsData.currentStep || 0;
-    const newStep = updatedSrsData.currentStep || 0;
-    
-    // Count this as a step completion
     setCompletedSteps(prev => prev + 1);
     
-    // If this was a new card, increment today's count
+    // Update new cards count if necessary
     if (currentCard.srsData.status === 'new') {
       const newCount = todaysNewCards + 1;
       setTodaysNewCards(newCount);
@@ -582,47 +610,20 @@ const MobileFlashcardMode = ({
       }
     }
     
-    // Move to next card with animation
+    // Single timeout for all card transition logic
     setTimeout(() => {
       setIsFlipped(false);
+      setDueCards(newDueCards);
+      setCurrentDueIndex(newDueIndex);
       
-      // Update due cards list
-      const now = new Date();
-      const updatedDueDate = new Date(updatedSrsData.nextReviewDate);
-      const stillDueToday = (updatedDueDate - now) < (24 * 60 * 60 * 1000);
-      
-      if (stillDueToday && updatedSrsData.status !== 'review') {
-        // Move card to end of queue
-        const newDueCards = [...dueCards];
-        newDueCards.splice(currentDueIndex, 1);
-        newDueCards.push(updatedCard);
-        setDueCards(newDueCards);
-        
-        if (currentDueIndex >= newDueCards.length) {
-          setCurrentDueIndex(0);
-        }
-        
-        // Trigger entry animation for next card
+      // Trigger entry animation for next card if there is one
+      if (newDueCards.length > 0) {
         setCardEntryAnimation('card-enter');
         setTimeout(() => setCardEntryAnimation(''), 400);
-      } else {
-        // Remove card from today's queue
-        const newDueCards = dueCards.filter((_, index) => index !== currentDueIndex);
-        setDueCards(newDueCards);
-        
-        if (currentDueIndex >= newDueCards.length && newDueCards.length > 0) {
-          setCurrentDueIndex(newDueCards.length - 1);
-        }
-        
-        // Trigger entry animation for next card if there is one
-        if (newDueCards.length > 0) {
-          setCardEntryAnimation('card-enter');
-          setTimeout(() => setCardEntryAnimation(''), 400);
-        }
       }
       
-      // Refresh due cards if queue is empty
-      if (dueCards.length <= 1) {
+      // Handle queue refresh if needed (less frequent operation)
+      if (newDueCards.length === 0) {
         setTimeout(() => {
           const updatedAvailableCards = [];
           Object.entries(wordDefinitions).forEach(([key, value]) => {
@@ -642,14 +643,11 @@ const MobileFlashcardMode = ({
           setDueCards(refreshedDueCards);
           setCurrentDueIndex(0);
           
-          // Trigger entry animation for refreshed cards
           if (refreshedDueCards.length > 0) {
             setCardEntryAnimation('card-enter');
             setTimeout(() => setCardEntryAnimation(''), 400);
           }
-          
-          // Processing complete
-        }, 500);
+        }, 100);
       }
       
       // Processing complete for non-refresh path
@@ -826,12 +824,12 @@ const MobileFlashcardMode = ({
         <div style={{color: 'red', fontSize: '10px'}}>V2.0-HC</div>
         <div className="mobile-header-stats">
           <div className="mobile-header-progress">
-            <span style={{color: '#5f72ff'}}>New: {cardCounts.newCards}</span> • 
-            <span style={{color: '#ef4444', marginLeft: '4px'}}>Learning: {cardCounts.learningCards}</span> • 
-            <span style={{color: '#10b981', marginLeft: '4px'}}>Review: {cardCounts.reviewCards}</span>
+            <span style={{color: '#5f72ff'}}>New: {headerStats.newCards}</span> • 
+            <span style={{color: '#ef4444', marginLeft: '4px'}}>Learning: {headerStats.learningCards}</span> • 
+            <span style={{color: '#10b981', marginLeft: '4px'}}>Review: {headerStats.reviewCards}</span>
           </div>
           <div className="mobile-header-accuracy">
-            {accuracy}% • {stats.cardsReviewed} done
+            {headerStats.accuracy}% • {headerStats.cardsReviewed} done
           </div>
         </div>
       </div>
@@ -841,7 +839,7 @@ const MobileFlashcardMode = ({
         <div 
           className="mobile-progress-bar"
           style={{ 
-            width: `${totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0}%` 
+            width: `${progressPercentage}%` 
           }}
         />
       </div>
@@ -1028,9 +1026,7 @@ const MobileFlashcardMode = ({
         >
           <div className="mobile-btn-emoji">✓</div>
           <div className="mobile-btn-label">Correct</div>
-          <div className="mobile-btn-time">
-            {isFlipped ? formatNextReviewTime(calculateNextReview(currentCard, 'correct').nextReviewDate) : '—'}
-          </div>
+          <div className="mobile-btn-time">10 min</div>
         </button>
         
         <button 
@@ -1040,9 +1036,7 @@ const MobileFlashcardMode = ({
         >
           <div className="mobile-btn-emoji">⭐</div>
           <div className="mobile-btn-label">Easy</div>
-          <div className="mobile-btn-time">
-            {isFlipped ? formatNextReviewTime(calculateNextReview(currentCard, 'easy').nextReviewDate) : '—'}
-          </div>
+          <div className="mobile-btn-time">4 days</div>
         </button>
       </div>
 
