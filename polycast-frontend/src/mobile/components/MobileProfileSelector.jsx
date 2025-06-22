@@ -11,6 +11,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
   const [error, setError] = useState('');
   const [showNewCards, setShowNewCards] = useState(false);
   const [showDueCards, setShowDueCards] = useState(false);
+  const [showDebugOutput, setShowDebugOutput] = useState(false);
 
   // Available profiles (same as desktop)
   const profiles = [
@@ -187,6 +188,34 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
     return introDate.toLocaleDateString('en-US', options);
   };
 
+  // Generate debug output for copying
+  const generateDebugOutput = () => {
+    if (selectedProfile !== 'non-saving') return 'Debug output only available for non-saving mode';
+    
+    const newCards = getNewCards();
+    const reviewCards = getReviewCards();
+    
+    let output = '=== FLASHCARD ARRAYS DEBUG OUTPUT ===\n\n';
+    
+    output += `NEW CARDS ARRAY (${newCards.length} cards):\n`;
+    output += '```json\n';
+    output += JSON.stringify(newCards, null, 2);
+    output += '\n```\n\n';
+    
+    output += `REVIEW CARDS ARRAY (${reviewCards.length} cards):\n`;
+    output += '```json\n';
+    output += JSON.stringify(reviewCards, null, 2);
+    output += '\n```\n\n';
+    
+    output += 'SUMMARY:\n';
+    output += `- Total cards: ${newCards.length + reviewCards.length}\n`;
+    output += `- New cards: ${newCards.length}\n`;
+    output += `- Review cards: ${reviewCards.length}\n`;
+    output += `- Cards per session limit: 5 new + all due review\n`;
+    
+    return output;
+  };
+
   // Card list component
   const CardList = ({ cards, title, type }) => (
     <div style={{
@@ -282,6 +311,82 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
               </div>
             ))
           )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Debug output modal
+  const DebugOutputModal = () => (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.8)',
+      zIndex: 1000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        maxWidth: '95vw',
+        maxHeight: '90vh',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <div style={{
+          padding: '15px 20px',
+          borderBottom: '1px solid #eee',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          backgroundColor: '#f8f9fa'
+        }}>
+          <h3 style={{ margin: 0, fontSize: '18px', color: '#333' }}>Debug Arrays Output</h3>
+          <button 
+            onClick={() => setShowDebugOutput(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '24px',
+              cursor: 'pointer',
+              color: '#666'
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{
+          overflow: 'auto',
+          padding: '15px',
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          lineHeight: '1.4'
+        }}>
+          <textarea
+            readOnly
+            value={generateDebugOutput()}
+            style={{
+              width: '100%',
+              height: '60vh',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              padding: '10px',
+              fontFamily: 'monospace',
+              fontSize: '11px',
+              resize: 'none'
+            }}
+            onClick={(e) => e.target.select()}
+          />
+          <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+            Click in the textarea to select all text for copying
+          </div>
         </div>
       </div>
     </div>
@@ -443,6 +548,33 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
                   <span>Review Cards Order</span>
                 </button>
               </div>
+              
+              {/* Debug Button - Only for non-saving mode */}
+              {selectedProfile === 'non-saving' && (
+                <div style={{ marginTop: '10px' }}>
+                  <button 
+                    onClick={() => setShowDebugOutput(true)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      backgroundColor: '#f5f5f5',
+                      border: '1px solid #666',
+                      borderRadius: '8px',
+                      color: '#666',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>🔍</span>
+                    <span>Export Arrays (Debug)</span>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="mobile-empty-state">
@@ -486,6 +618,9 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
           />
         );
       })()}
+      
+      {/* Debug Output Modal */}
+      {showDebugOutput && <DebugOutputModal />}
     </div>
   );
 };
