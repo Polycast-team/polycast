@@ -481,14 +481,14 @@ const MobileFlashcardMode = ({
           }
         }
         
-        // Check for auto-swipe with more intentional thresholds
-        const distanceThreshold = 80; // Increased - need more deliberate drag
-        const velocityThreshold = 500; // Increased - need faster flick
+        // Check for auto-swipe with balanced thresholds
+        const distanceThreshold = 60; // Slightly easier - reduced from 80
+        const velocityThreshold = 400; // Slightly easier - reduced from 500
         const hasSignificantDistance = Math.abs(dragState.deltaX) > distanceThreshold;
         const hasSignificantMomentum = velocity > velocityThreshold;
         
         // Require BOTH significant distance AND some velocity, OR very high velocity
-        const shouldTriggerSwipe = (hasSignificantDistance && velocity > 100) || velocity > 800;
+        const shouldTriggerSwipe = (hasSignificantDistance && velocity > 80) || velocity > 600;
         
         console.log('[DIRECT AUTO-SWIPE] Distance:', Math.abs(dragState.deltaX), 'Velocity:', velocity, 'hasDistance:', hasSignificantDistance, 'hasMomentum:', hasSignificantMomentum, 'shouldTrigger:', shouldTriggerSwipe);
         
@@ -674,9 +674,12 @@ const MobileFlashcardMode = ({
                       {clozeSentence}
                     </div>
                     {nativeTranslation && (
-                      <div className="mobile-card-translation">
-                        {nativeTranslation.replace(/~([^~]+)~/g, (match, word) => word)}
-                      </div>
+                      <div 
+                        className="mobile-card-translation"
+                        dangerouslySetInnerHTML={{ 
+                          __html: nativeTranslation.replace(/~([^~]+)~/g, '<span class="mobile-highlighted-word">$1</span>') 
+                        }}
+                      />
                     )}
                     <div className="mobile-card-hint">
                       Tap to reveal answer
