@@ -841,8 +841,8 @@ const MobileFlashcardMode = ({
     return () => {};
   }, []);
 
-  // Calculate future due dates for calendar - now uses current session data
-  const getCalendarData = () => {
+  // Calculate future due dates for calendar - using useMemo for proper reactivity
+  const calendarData = React.useMemo(() => {
     const today = new Date();
     const nextWeekDays = [];
     
@@ -904,11 +904,18 @@ const MobileFlashcardMode = ({
     }
     
     return nextWeekDays;
-  };
+  }, [dueCards, wordDefinitions, availableCards, selectedProfile]);
 
   // Calendar Modal Component
   const CalendarModal = () => {
-    const calendarData = getCalendarData();
+    // Debug: Log when calendar data changes
+    React.useEffect(() => {
+      console.log('[CALENDAR DEBUG] Calendar data updated:', calendarData.map(day => ({
+        day: day.dayName,
+        cardCount: day.cards.length,
+        cards: day.cards.map(c => `${c.word} (due: ${new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()})`)
+      })));
+    }, [calendarData]);
     
     return (
       <div style={{
