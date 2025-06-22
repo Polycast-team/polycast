@@ -217,7 +217,11 @@ const MobileFlashcardMode = ({
   // Calculate button times based on current card
   const buttonTimes = React.useMemo(() => {
     if (!dueCards.length || !dueCards[currentDueIndex]) {
-      return { incorrect: '1 min', correct: '10 min', easy: '4 days' };
+      return { 
+        incorrect: { time: '1 min', debugDate: 'N/A' }, 
+        correct: { time: '10 min', debugDate: 'N/A' }, 
+        easy: { time: '4 days', debugDate: 'N/A' } 
+      };
     }
     
     const currentCard = dueCards[currentDueIndex];
@@ -253,10 +257,30 @@ const MobileFlashcardMode = ({
       }
     });
     
+    // Helper function to format date for debugging
+    const formatDebugDate = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        hour: date.getHours() === 0 && date.getMinutes() === 0 ? undefined : 'numeric',
+        minute: date.getHours() === 0 && date.getMinutes() === 0 ? undefined : '2-digit'
+      });
+    };
+
     return {
-      incorrect: formatNextReviewTime(incorrectResult.nextReviewDate),
-      correct: formatNextReviewTime(correctResult.nextReviewDate),
-      easy: formatNextReviewTime(easyResult.nextReviewDate)
+      incorrect: {
+        time: formatNextReviewTime(incorrectResult.nextReviewDate),
+        debugDate: formatDebugDate(incorrectResult.nextReviewDate)
+      },
+      correct: {
+        time: formatNextReviewTime(correctResult.nextReviewDate),
+        debugDate: formatDebugDate(correctResult.nextReviewDate)
+      },
+      easy: {
+        time: formatNextReviewTime(easyResult.nextReviewDate),
+        debugDate: formatDebugDate(easyResult.nextReviewDate)
+      }
     };
   }, [dueCards, currentDueIndex]);
 
@@ -1030,7 +1054,12 @@ const MobileFlashcardMode = ({
         >
           <div className="mobile-btn-emoji">❌</div>
           <div className="mobile-btn-label">Incorrect</div>
-          <div className="mobile-btn-time">{buttonTimes.incorrect}</div>
+          <div className="mobile-btn-time">
+            {buttonTimes.incorrect.time}
+            <div style={{fontSize: '0.7rem', fontStyle: 'italic', opacity: 0.7, marginTop: '2px'}}>
+              {buttonTimes.incorrect.debugDate}
+            </div>
+          </div>
         </button>
         
         <button 
@@ -1040,7 +1069,12 @@ const MobileFlashcardMode = ({
         >
           <div className="mobile-btn-emoji">✓</div>
           <div className="mobile-btn-label">Correct</div>
-          <div className="mobile-btn-time">{buttonTimes.correct}</div>
+          <div className="mobile-btn-time">
+            {buttonTimes.correct.time}
+            <div style={{fontSize: '0.7rem', fontStyle: 'italic', opacity: 0.7, marginTop: '2px'}}>
+              {buttonTimes.correct.debugDate}
+            </div>
+          </div>
         </button>
         
         <button 
@@ -1050,7 +1084,12 @@ const MobileFlashcardMode = ({
         >
           <div className="mobile-btn-emoji">⭐</div>
           <div className="mobile-btn-label">Easy</div>
-          <div className="mobile-btn-time">{buttonTimes.easy}</div>
+          <div className="mobile-btn-time">
+            {buttonTimes.easy.time}
+            <div style={{fontSize: '0.7rem', fontStyle: 'italic', opacity: 0.7, marginTop: '2px'}}>
+              {buttonTimes.easy.debugDate}
+            </div>
+          </div>
         </button>
       </div>
 
