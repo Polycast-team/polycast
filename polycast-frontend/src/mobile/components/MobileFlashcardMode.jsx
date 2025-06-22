@@ -814,6 +814,40 @@ const MobileFlashcardMode = ({
   // Calculate session stats
   const sessionDuration = Math.floor((new Date() - stats.sessionStartTime) / 1000 / 60);
 
+  // Get current card before any conditional returns
+  const currentCard = dueCards[currentDueIndex] || null;
+  
+  // Memoize card data to prevent recalculation on every render
+  const cardData = React.useMemo(() => {
+    if (!currentCard) return null;
+    
+    const baseWord = currentCard.word || currentCard.wordSenseId?.replace(/\d+$/, '');
+    const defNumber = currentCard.definitionNumber || currentCard.wordSenseId?.match(/\d+$/)?.[0] || '';
+    const interval = currentCard?.srsData?.interval || 1;
+    
+    // Parse example sentences once
+    let parsedExample = null;
+    if (currentCard.exampleSentencesGenerated) {
+      const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+      const sentenceIndex = ((interval - 1) % 5) * 2;
+      const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+      const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
+      const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
+      const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, '<span class="mobile-highlighted-word">$1</span>');
+      const exampleNumber = ((interval - 1) % 5) + 1;
+      
+      parsedExample = {
+        englishSentence,
+        nativeTranslation,
+        clozeSentence,
+        highlightedSentence,
+        exampleNumber
+      };
+    }
+    
+    return { baseWord, defNumber, interval, parsedExample };
+  }, [currentCard]);
+
   // Only show completion if no cards AND enough time has passed since last processing
   const timeSinceLastProcess = Date.now() - lastCardProcessedTime;
   if (dueCards.length === 0 && timeSinceLastProcess > 1000) {
@@ -854,37 +888,7 @@ const MobileFlashcardMode = ({
     );
   }
 
-  const currentCard = dueCards[currentDueIndex];
-  if (!currentCard) return null;
-
-  // Memoize card data to prevent recalculation on every render
-  const cardData = React.useMemo(() => {
-    const baseWord = currentCard.word || currentCard.wordSenseId?.replace(/\d+$/, '');
-    const defNumber = currentCard.definitionNumber || currentCard.wordSenseId?.match(/\d+$/)?.[0] || '';
-    const interval = currentCard?.srsData?.interval || 1;
-    
-    // Parse example sentences once
-    let parsedExample = null;
-    if (currentCard.exampleSentencesGenerated) {
-      const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-      const sentenceIndex = ((interval - 1) % 5) * 2;
-      const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-      const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
-      const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
-      const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, '<span class="mobile-highlighted-word">$1</span>');
-      const exampleNumber = ((interval - 1) % 5) + 1;
-      
-      parsedExample = {
-        englishSentence,
-        nativeTranslation,
-        clozeSentence,
-        highlightedSentence,
-        exampleNumber
-      };
-    }
-    
-    return { baseWord, defNumber, interval, parsedExample };
-  }, [currentCard]);
+  if (!currentCard || !cardData) return null;
 
   return (
     <div className="mobile-flashcard-mode">
