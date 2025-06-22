@@ -256,10 +256,6 @@ const MobileFlashcardMode = ({
     // Use function form to ensure immediate update
     setIsFlipped(prev => {
       console.log(`[MOBILE DEBUG] Flip state changing from ${prev} to ${!prev}`);
-      // Reset auto-play flag when flipping to front
-      if (prev === true) {
-        setHasAutoPlayedThisFlip(false);
-      }
       return !prev;
     });
     lastTapTime.current = now;
@@ -421,10 +417,12 @@ const MobileFlashcardMode = ({
     }
   }, [dueCards, currentDueIndex, generateAndPlayAudio]);
 
-  // Reset auto-play flag when card changes
+  // Reset auto-play flag when card changes OR when flipped to front
   useEffect(() => {
-    setHasAutoPlayedThisFlip(false);
-  }, [currentDueIndex]);
+    if (!isFlipped) {
+      setHasAutoPlayedThisFlip(false);
+    }
+  }, [currentDueIndex, isFlipped]);
 
   // Auto-play audio when card is flipped (only once per flip)
   useEffect(() => {
