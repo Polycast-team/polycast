@@ -488,6 +488,14 @@ const MobileFlashcardMode = ({
     const currentCard = dueCards[currentDueIndex];
     if (!currentCard) return;
     
+    // Stop any currently playing audio when swiping away a card
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      setCurrentAudio(null);
+      setAudioState({ loading: false, error: null });
+    }
+    
     // Log user's response
     console.log(`[USER RESPONSE] User clicked "${answer}" for card "${currentCard.word}"`);
     
@@ -663,7 +671,7 @@ const MobileFlashcardMode = ({
         processingCardRef.current = false;
       }
     }, 200);
-  }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings, showAnswerFeedback]);
+  }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings, showAnswerFeedback, currentAudio]);
 
   // Direct touch end handler (works for both touch and mouse)
   const handleDirectTouchEnd = useCallback((e) => {
