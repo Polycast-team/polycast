@@ -66,6 +66,12 @@ const MobileFlashcardMode = ({
       if (value && value.wordSenseId && value.inFlashcards) {
         // Initialize SRS data if it doesn't exist
         const cardWithSRS = { ...value, key };
+        
+        // Ensure frequency field exists (use wordFrequency if available)
+        if (!cardWithSRS.frequency && cardWithSRS.wordFrequency) {
+          cardWithSRS.frequency = cardWithSRS.wordFrequency;
+        }
+        
         if (!cardWithSRS.srsData) {
           cardWithSRS.srsData = {
             isNew: true,
@@ -74,9 +80,24 @@ const MobileFlashcardMode = ({
             status: 'new',
             correctCount: 0,
             incorrectCount: 0,
+            dueDate: null,
+            lastSeen: null,
             lastReviewDate: null,
             nextReviewDate: nowDateRef.current // Due now
           };
+        } else {
+          // Migrate old SRS data format to new format
+          const srs = cardWithSRS.srsData;
+          if (srs.interval !== undefined && srs.SRS_interval === undefined) {
+            // Old format detected, migrate to new format
+            srs.SRS_interval = srs.interval === 0 ? 1 : Math.min(srs.interval, 9);
+            srs.isNew = srs.status === 'new';
+            srs.gotWrongThisSession = false;
+            srs.correctCount = srs.repetitions || 0;
+            srs.incorrectCount = srs.lapses || 0;
+            srs.dueDate = srs.dueDate || srs.nextReviewDate;
+            srs.lastSeen = srs.lastReviewDate;
+          }
         }
         cards.push(cardWithSRS);
       }
@@ -147,7 +168,7 @@ const MobileFlashcardMode = ({
     // Log card order with frequency values
     console.log('[CARD ORDER] Due cards:', due.map(card => ({
       word: card.word,
-      frequency: card.frequency || 5,
+      frequency: card.frequency || 3, // 1-5 scale, 5 = most common
       isNew: card.srsData?.isNew,
       dueDate: card.srsData?.dueDate || card.srsData?.nextReviewDate
     })));

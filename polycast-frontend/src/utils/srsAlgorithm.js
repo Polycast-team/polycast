@@ -124,9 +124,9 @@ export function getDueCards(allCards, overrides = {}, includeWaiting = false) {
   // Get new cards, sorted by frequency if available
   const newCards = cardsWithSRS.filter(card => card.srsData.status === 'new');
   newCards.sort((a, b) => {
-    const freqA = a.frequency || 5;
-    const freqB = b.frequency || 5;
-    return freqA - freqB; // Lower frequency value = more common = higher priority
+    const freqA = a.frequency || 3; // Default to neutral if no frequency
+    const freqB = b.frequency || 3;
+    return freqB - freqA; // Higher frequency value = more common = higher priority
   });
   
   // Sort due cards by due date (earliest first)

@@ -26,11 +26,11 @@ export function categorizeCards(allCards) {
     return dateA - dateB;
   });
   
-  // Sort new cards by frequency (most common first, i.e., lower numbers first)
+  // Sort new cards by frequency (most common first, i.e., higher numbers first)
   newCards.sort((a, b) => {
-    const freqA = a.frequency || 5; // Default to middle if no frequency
-    const freqB = b.frequency || 5;
-    return freqA - freqB;
+    const freqA = a.frequency || 3; // Default to neutral if no frequency
+    const freqB = b.frequency || 3;
+    return freqB - freqA;
   });
   
   return { seenCards, newCards };

@@ -855,19 +855,23 @@ const TranscriptionDisplay = ({
           exampleSentencesRaw: wordData.exampleSentencesRaw || wordData.example || contextSentence,
           example: wordData.example || contextSentence,
           
-          // Default frequency ratings
+          // Frequency ratings from Gemini (1-5 scale, 5 = most common)
           wordFrequency: wordData.wordFrequency || 3,
           definitionFrequency: wordData.definitionFrequency || 3,
+          frequency: wordData.wordFrequency || 3, // Use wordFrequency for SRS sorting
           
           // SRS (Spaced Repetition System) fields
           srsData: {
-            interval: 0,          // Days until next review (0 = new card)
-            repetitions: 0,       // Number of successful reviews
-            easeFactor: 2.5,      // Difficulty factor (default 2.5)
-            lastReviewDate: null, // ISO date of last review
-            nextReviewDate: new Date().toISOString(), // Due immediately for new cards
-            lapses: 0,            // Number of times marked incorrect
-            status: 'new'         // 'new', 'learning', 'review', 'relearning'
+            isNew: true,
+            gotWrongThisSession: false,
+            SRS_interval: 1,
+            status: 'new',
+            correctCount: 0,
+            incorrectCount: 0,
+            dueDate: null, // New cards don't have due dates yet
+            lastSeen: null, // Never reviewed yet
+            lastReviewDate: null, // Keep for backwards compatibility
+            nextReviewDate: new Date().toISOString() // Keep for backwards compatibility
           }
         };
         
