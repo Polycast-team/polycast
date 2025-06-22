@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { getHardcodedCards } from '../../utils/hardcodedCards';
 
 const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudying, onBack }) => {
   const [selectedProfile, setSelectedProfile] = useState(initialProfile || 'non-saving');
@@ -62,12 +63,19 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
     fetchProfileData();
   }, [selectedProfile]);
 
+  // Get available cards (same logic as MobileFlashcardMode)
+  const getAvailableCards = () => {
+    if (selectedProfile === 'non-saving') {
+      return getHardcodedCards();
+    }
+    return Object.values(wordDefinitions).filter(def => 
+      def && def.wordSenseId && def.inFlashcards
+    );
+  };
+
   // Count available flashcards
-  const flashcardCount = selectedProfile === 'non-saving' 
-    ? 5 // Hardcoded cards for non-saving mode
-    : Object.values(wordDefinitions).filter(def => 
-        def && def.wordSenseId && def.inFlashcards
-      ).length;
+  const availableCards = getAvailableCards();
+  const flashcardCount = availableCards.length;
 
   const selectedProfileData = profiles.find(p => p.value === selectedProfile);
 
@@ -158,24 +166,24 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
                 </div>
                 <div className="mobile-stat">
                   <div className="mobile-stat-number">
-                    {Object.values(wordDefinitions).filter(def => 
-                      def && def.srsData && def.srsData.isNew
+                    {availableCards.filter(card => 
+                      card && card.srsData && card.srsData.isNew
                     ).length}
                   </div>
                   <div className="mobile-stat-label">New</div>
                 </div>
                 <div className="mobile-stat">
                   <div className="mobile-stat-number">
-                    {Object.values(wordDefinitions).filter(def => 
-                      def && def.srsData && !def.srsData.isNew && def.srsData.gotWrongThisSession
+                    {availableCards.filter(card => 
+                      card && card.srsData && !card.srsData.isNew && card.srsData.gotWrongThisSession
                     ).length}
                   </div>
                   <div className="mobile-stat-label">Learning</div>
                 </div>
                 <div className="mobile-stat">
                   <div className="mobile-stat-number">
-                    {Object.values(wordDefinitions).filter(def => 
-                      def && def.srsData && !def.srsData.isNew && !def.srsData.gotWrongThisSession
+                    {availableCards.filter(card => 
+                      card && card.srsData && !card.srsData.isNew && !card.srsData.gotWrongThisSession
                     ).length}
                   </div>
                   <div className="mobile-stat-label">Review</div>
