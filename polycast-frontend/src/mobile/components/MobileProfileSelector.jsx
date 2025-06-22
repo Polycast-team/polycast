@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { getHardcodedCards } from '../../utils/hardcodedCards';
+import { getHardcodedCards, getNewCards, getReviewCards } from '../../utils/hardcodedCards';
 import { categorizeCards, getDueSeenCards } from '../../utils/cardSorting';
 import { getSRSSettings } from '../../utils/srsSettings';
 
@@ -105,16 +105,34 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
     return cards;
   };
 
-  // Get categorized cards for display
+  // Get categorized cards for display using separate arrays
   const getCategorizedCards = () => {
-    const allCards = getAvailableCards();
-    const { seenCards, newCards } = categorizeCards(allCards);
-    
-    // For preview, show ALL seen cards (both due and future), not just currently due ones
-    // This lets users see the full order they'll encounter
-    const allSeenCardsSorted = seenCards; // Already sorted by due date in categorizeCards
-    
-    return { newCards, dueCards: allSeenCardsSorted, seenCards };
+    if (selectedProfile === 'non-saving') {
+      // For non-saving mode, use the dedicated arrays
+      const newCards = getNewCards();
+      const reviewCards = getReviewCards();
+      
+      // Sort new cards by frequency (highest first) 
+      newCards.sort((a, b) => (b.frequency || 5) - (a.frequency || 5));
+      
+      // Sort review cards by due date (earliest first)
+      reviewCards.sort((a, b) => {
+        const dateA = new Date(a.srsData.dueDate || a.srsData.nextReviewDate);
+        const dateB = new Date(b.srsData.dueDate || b.srsData.nextReviewDate);
+        return dateA - dateB;
+      });
+      
+      return { newCards, dueCards: reviewCards, seenCards: reviewCards };
+    } else {
+      // For other profiles, use the existing logic
+      const allCards = getAvailableCards();
+      const { seenCards, newCards } = categorizeCards(allCards);
+      
+      // For preview, show ALL seen cards (both due and future), not just currently due ones
+      const allSeenCardsSorted = seenCards; // Already sorted by due date in categorizeCards
+      
+      return { newCards, dueCards: allSeenCardsSorted, seenCards };
+    }
   };
 
   // Count available flashcards
