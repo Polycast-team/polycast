@@ -245,22 +245,21 @@ const MobileFlashcardMode = ({
     setDueCards(due);
     setCurrentDueIndex(0);
     setCompletedSteps(0); // Reset progress when cards change
-    
-    // Initialize card counts from the due cards
-    const newCards = due.filter(card => card.srsData?.status === 'new').length;
-    const learningCards = due.filter(card => 
-      card.srsData?.status === 'learning' || card.srsData?.status === 'relearning'
-    ).length;
-    const reviewCards = due.filter(card => card.srsData?.status === 'review').length;
-    
-    setCardCounts({ newCards, learningCards, reviewCards });
   }, [availableCards, todaysNewCards]);
 
   // Get SRS statistics
   const srsStats = React.useMemo(() => getReviewStats(availableCards), [availableCards]);
 
-  // Track card counts directly as state variables (no recalculation needed)
-  const [cardCounts, setCardCounts] = useState({ newCards: 0, learningCards: 0, reviewCards: 0 });
+  // Calculate card counts for Anki-style progress (memoized for toolbar stability)
+  const cardCounts = React.useMemo(() => {
+    const newCards = dueCards.filter(card => card.srsData?.status === 'new').length;
+    const learningCards = dueCards.filter(card => 
+      card.srsData?.status === 'learning' || card.srsData?.status === 'relearning'
+    ).length;
+    const reviewCards = dueCards.filter(card => card.srsData?.status === 'review').length;
+    
+    return { newCards, learningCards, reviewCards };
+  }, [dueCards]);
 
   // Calculate accuracy inline for headerStats
   const headerStats = React.useMemo(() => {
@@ -583,28 +582,6 @@ const MobileFlashcardMode = ({
       newDueIndex = currentDueIndex >= newDueCards.length && newDueCards.length > 0 ? newDueCards.length - 1 : currentDueIndex;
     }
     
-    // Update card counts based on status transitions
-    const oldStatus = currentCard.srsData.status;
-    const newStatus = updatedSrsData.status;
-    
-    setCardCounts(prev => {
-      const updated = { ...prev };
-      
-      // Subtract from old status
-      if (oldStatus === 'new') updated.newCards--;
-      else if (oldStatus === 'learning' || oldStatus === 'relearning') updated.learningCards--;
-      else if (oldStatus === 'review') updated.reviewCards--;
-      
-      // Add to new status (only if card stays in today's queue)
-      if (stillDueToday && newStatus !== 'review') {
-        if (newStatus === 'new') updated.newCards++;
-        else if (newStatus === 'learning' || newStatus === 'relearning') updated.learningCards++;
-        else if (newStatus === 'review') updated.reviewCards++;
-      }
-      
-      return updated;
-    });
-
     // Batch all state updates together to prevent UI flashing
     setWordDefinitions(prev => ({
       ...prev,
@@ -668,15 +645,6 @@ const MobileFlashcardMode = ({
           
           setDueCards(refreshedDueCards);
           setCurrentDueIndex(0);
-          
-          // Update card counts from refreshed cards
-          const newCards = refreshedDueCards.filter(card => card.srsData?.status === 'new').length;
-          const learningCards = refreshedDueCards.filter(card => 
-            card.srsData?.status === 'learning' || card.srsData?.status === 'relearning'
-          ).length;
-          const reviewCards = refreshedDueCards.filter(card => card.srsData?.status === 'review').length;
-          
-          setCardCounts({ newCards, learningCards, reviewCards });
           
           if (refreshedDueCards.length > 0) {
             setCardEntryAnimation('card-enter');
