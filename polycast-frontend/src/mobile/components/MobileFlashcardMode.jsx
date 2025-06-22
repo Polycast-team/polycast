@@ -34,6 +34,7 @@ const MobileFlashcardMode = ({
   const [hasAutoPlayedThisFlip, setHasAutoPlayedThisFlip] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [processedCards, setProcessedCards] = useState([]); // Track cards processed in current session
+  const [calendarUpdateTrigger, setCalendarUpdateTrigger] = useState(0); // Force calendar re-render
   const { error: popupError, showError, clearError } = useErrorHandler();
   
   // Refs for gesture handling
@@ -660,6 +661,7 @@ const MobileFlashcardMode = ({
       
       // Add the updated card to processedCards so it appears in calendar with new due date
       setProcessedCards(prev => [...prev, updatedCard]);
+      setCalendarUpdateTrigger(prev => prev + 1); // Force calendar re-render
     }
     
     // Batch all state updates together to prevent UI flashing
@@ -919,7 +921,7 @@ const MobileFlashcardMode = ({
     }
     
     return nextWeekDays;
-  }, [dueCards, wordDefinitions, availableCards, selectedProfile, processedCards]);
+  }, [dueCards, wordDefinitions, availableCards, selectedProfile, processedCards, calendarUpdateTrigger]);
 
   // Calendar Modal Component
   const CalendarModal = () => {
@@ -930,7 +932,19 @@ const MobileFlashcardMode = ({
         cardCount: day.cards.length,
         cards: day.cards.map(c => `${c.word} (due: ${new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()})`)
       })));
-    }, [calendarData]);
+      
+      console.log('[CALENDAR DEBUG] Current processedCards:', processedCards.map(c => ({
+        word: c.word,
+        dueDate: new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()
+      })));
+      
+      console.log('[CALENDAR DEBUG] Current dueCards:', dueCards.map(c => ({
+        word: c.word,
+        dueDate: new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()
+      })));
+      
+      console.log('[CALENDAR DEBUG] Update trigger:', calendarUpdateTrigger);
+    }, [calendarData, processedCards, dueCards, calendarUpdateTrigger]);
     
     return (
       <div style={{
