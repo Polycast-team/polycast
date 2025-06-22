@@ -227,8 +227,17 @@ const MobileFlashcardMode = ({
     initializeDailyLimits();
   }, [selectedProfile]);
 
+  // Flag to prevent useEffect from running during card processing
+  const processingCardRef = useRef(false);
+
   // Update due cards when dependencies change
   useEffect(() => {
+    // Skip if we're in the middle of processing a card
+    if (processingCardRef.current) {
+      console.log(`[MOBILE DEBUG] Skipping due cards update - processing card`);
+      return;
+    }
+    
     console.log(`[MOBILE DEBUG] Available cards:`, availableCards.length, availableCards);
     const currentSettings = getSRSSettings();
     const maxNewToday = Math.max(0, currentSettings.newCardsPerDay - todaysNewCards);
@@ -546,6 +555,9 @@ const MobileFlashcardMode = ({
     const currentCard = dueCards[currentDueIndex];
     if (!currentCard) return;
     
+    // Set processing flag to prevent useEffect from running
+    processingCardRef.current = true;
+    
     // Mark when we processed this card
     setLastCardProcessedTime(Date.now());
     
@@ -628,6 +640,9 @@ const MobileFlashcardMode = ({
       // Handle queue refresh if needed (less frequent operation)
       if (newDueCards.length === 0) {
         setTimeout(() => {
+          // Clear processing flag before refresh
+          processingCardRef.current = false;
+          
           const updatedAvailableCards = [];
           Object.entries(wordDefinitions).forEach(([key, value]) => {
             if (value && value.wordSenseId && value.inFlashcards) {
@@ -651,9 +666,10 @@ const MobileFlashcardMode = ({
             setTimeout(() => setCardEntryAnimation(''), 400);
           }
         }, 100);
+      } else {
+        // Clear processing flag after card state is updated
+        processingCardRef.current = false;
       }
-      
-      // Processing complete for non-refresh path
     }, 200);
   }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings, showAnswerFeedback]);
 
