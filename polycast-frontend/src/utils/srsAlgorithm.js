@@ -18,14 +18,15 @@ export function calculateNextReview(card, answer) {
   
   // Time intervals mapping: SRS_interval → actual time
   const timeIntervals = {
-    1: { minutes: 10 },      // 10 minutes
-    2: { days: 1 },          // 1 day
-    3: { days: 3 },          // 3 days
-    4: { days: 7 },          // 7 days
-    5: { days: 14 },         // 14 days
-    6: { days: 30 },         // 30 days
-    7: { days: 60 },         // 60 days
-    8: { days: 120 }         // 120 days
+    1: { minutes: 1 },       // 1 minute
+    2: { minutes: 10 },      // 10 minutes
+    3: { days: 1 },          // 1 day
+    4: { days: 3 },          // 3 days
+    5: { days: 7 },          // 1 week
+    6: { days: 14 },         // 2 weeks
+    7: { days: 30 },         // 1 month
+    8: { days: 60 },         // 2 months
+    9: { days: 120 }         // 4 months
   };
   
   const updated = { ...srsData };
@@ -61,7 +62,7 @@ export function calculateNextReview(card, answer) {
   }
   
   // Cap the interval at maximum
-  updated.SRS_interval = Math.min(updated.SRS_interval, 8);
+  updated.SRS_interval = Math.min(updated.SRS_interval, 9);
   
   // Calculate next review date
   const interval = timeIntervals[updated.SRS_interval];
@@ -205,14 +206,16 @@ export function formatNextReviewTime(nextReviewDate) {
   const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
   
   // Show clean intervals that match SRS_interval mapping
+  if (diffMins === 1) return '1 min';
+  if (diffMins === 10) return '10 min';
   if (diffMins < 60) return `${diffMins} min`;
   if (diffDays === 1) return '1 day';
   if (diffDays === 3) return '3 days';
-  if (diffDays === 7) return '7 days';
-  if (diffDays === 14) return '14 days';
-  if (diffDays === 30) return '30 days';
-  if (diffDays === 60) return '60 days';
-  if (diffDays === 120) return '120 days';
+  if (diffDays === 7) return '1 week';
+  if (diffDays === 14) return '2 weeks';
+  if (diffDays === 30) return '1 month';
+  if (diffDays === 60) return '2 months';
+  if (diffDays === 120) return '4 months';
   
   // Fallback for other intervals
   if (diffHours < 24) return `${diffHours} hours`;
