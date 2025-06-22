@@ -10,7 +10,7 @@ export const DEFAULT_SRS_SETTINGS = {
   maxReviewsPerDay: 100,
   
   // Learning steps (in minutes)
-  learningSteps: [10], // 10 min, then graduate to 1 day
+  learningSteps: [1, 10], // 1 min, then 10 min, then graduate to 1 day
   relearningSteps: [10], // 10 min, then back to review
   
   // Graduation settings

@@ -287,6 +287,9 @@ const MobileFlashcardMode = ({
 
   // Track completed steps for progress bar
   const [completedSteps, setCompletedSteps] = useState(0);
+  
+  // Track when we're in the middle of processing a card to prevent premature completion
+  const [isProcessingCard, setIsProcessingCard] = useState(false);
 
   // Handle card flipping
   const flipCard = useCallback(() => {
@@ -526,6 +529,9 @@ const MobileFlashcardMode = ({
     const currentCard = dueCards[currentDueIndex];
     if (!currentCard) return;
     
+    // Mark that we're processing a card
+    setIsProcessingCard(true);
+    
     // Show visual feedback
     showAnswerFeedback(answer, currentCard);
     
@@ -641,8 +647,14 @@ const MobileFlashcardMode = ({
             setCardEntryAnimation('card-enter');
             setTimeout(() => setCardEntryAnimation(''), 400);
           }
+          
+          // Clear processing flag
+          setIsProcessingCard(false);
         }, 500);
       }
+      
+      // Also clear processing flag for non-refresh path
+      setTimeout(() => setIsProcessingCard(false), 300);
     }, 200);
   }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings, showAnswerFeedback]);
 
@@ -759,7 +771,7 @@ const MobileFlashcardMode = ({
   const sessionDuration = Math.floor((new Date() - stats.sessionStartTime) / 1000 / 60);
   const accuracy = stats.cardsReviewed > 0 ? Math.round((stats.correctAnswers / stats.cardsReviewed) * 100) : 0;
 
-  if (dueCards.length === 0) {
+  if (dueCards.length === 0 && !isProcessingCard) {
     return (
       <div className="mobile-flashcard-mode">
         <div className="mobile-flashcard-header">
