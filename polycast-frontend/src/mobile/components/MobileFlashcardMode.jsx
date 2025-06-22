@@ -26,6 +26,8 @@ const MobileFlashcardMode = ({
   const [dragState, setDragState] = useState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
   const [cardEntryAnimation, setCardEntryAnimation] = useState('');
   const [answerFeedback, setAnswerFeedback] = useState({ show: false, type: '', text: '' });
+  const [audioState, setAudioState] = useState({ loading: false, error: null });
+  const [currentAudio, setCurrentAudio] = useState(null);
   
   // Refs for gesture handling
   const cardContainerRef = useRef(null);
@@ -306,6 +308,102 @@ const MobileFlashcardMode = ({
     }
   }, [isFlipped]);
 
+  // Generate and play audio for the current sentence
+  const generateAndPlayAudio = useCallback(async (text, cardKey) => {
+    if (!text || audioState.loading) return;
+    
+    setAudioState({ loading: true, error: null });
+    
+    try {
+      // First, check if audio already exists in backend
+      const checkResponse = await fetch(`https://polycast-server.onrender.com/api/audio/${encodeURIComponent(cardKey)}`);
+      
+      let audioUrl;
+      if (checkResponse.ok) {
+        // Audio already exists
+        const audioData = await checkResponse.json();
+        audioUrl = audioData.audioUrl;
+      } else {
+        // Generate new audio
+        const generateResponse = await fetch('https://polycast-server.onrender.com/api/generate-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            text: text.replace(/<[^>]*>/g, ''), // Strip HTML tags
+            cardKey: cardKey,
+            profile: selectedProfile
+          })
+        });
+        
+        if (!generateResponse.ok) {
+          throw new Error('Failed to generate audio');
+        }
+        
+        const audioData = await generateResponse.json();
+        audioUrl = audioData.audioUrl;
+      }
+      
+      // Play the audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+      
+      const audio = new Audio(audioUrl);
+      setCurrentAudio(audio);
+      
+      audio.onended = () => {
+        setAudioState({ loading: false, error: null });
+      };
+      
+      audio.onerror = () => {
+        setAudioState({ loading: false, error: 'Failed to play audio' });
+      };
+      
+      await audio.play();
+      setAudioState({ loading: false, error: null });
+      
+    } catch (error) {
+      console.error('Audio generation error:', error);
+      setAudioState({ loading: false, error: 'Failed to generate audio' });
+    }
+  }, [audioState.loading, currentAudio, selectedProfile]);
+
+  // Play audio button handler
+  const handlePlayAudio = useCallback(() => {
+    const currentCard = dueCards[currentDueIndex];
+    if (!currentCard || !currentCard.exampleSentencesGenerated) return;
+    
+    const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+    const interval = currentCard?.srsData?.interval || 1;
+    const sentenceIndex = ((interval - 1) % 5) * 2;
+    const englishSentence = parts[sentenceIndex] || parts[0] || '';
+    
+    if (englishSentence) {
+      generateAndPlayAudio(englishSentence, currentCard.key);
+    }
+  }, [dueCards, currentDueIndex, generateAndPlayAudio]);
+
+  // Auto-play audio when card is flipped
+  useEffect(() => {
+    if (isFlipped && dueCards.length > 0) {
+      const currentCard = dueCards[currentDueIndex];
+      if (currentCard && currentCard.exampleSentencesGenerated) {
+        const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+        const interval = currentCard?.srsData?.interval || 1;
+        const sentenceIndex = ((interval - 1) % 5) * 2;
+        const englishSentence = parts[sentenceIndex] || parts[0] || '';
+        
+        if (englishSentence) {
+          // Small delay to let the flip animation finish
+          setTimeout(() => {
+            generateAndPlayAudio(englishSentence, currentCard.key);
+          }, 300);
+        }
+      }
+    }
+  }, [isFlipped, dueCards, currentDueIndex, generateAndPlayAudio]);
+
   // Show answer feedback
   const showAnswerFeedback = useCallback((answer) => {
     const feedbackData = {
@@ -482,13 +580,13 @@ const MobileFlashcardMode = ({
         }
         
         // Check for auto-swipe with balanced thresholds
-        const distanceThreshold = 60; // Slightly easier - reduced from 80
-        const velocityThreshold = 400; // Slightly easier - reduced from 500
+        const distanceThreshold = 60; // Distance threshold unchanged
+        const velocityThreshold = 300; // Easier - reduced from 400
         const hasSignificantDistance = Math.abs(dragState.deltaX) > distanceThreshold;
         const hasSignificantMomentum = velocity > velocityThreshold;
         
         // Require BOTH significant distance AND some velocity, OR very high velocity
-        const shouldTriggerSwipe = (hasSignificantDistance && velocity > 80) || velocity > 600;
+        const shouldTriggerSwipe = (hasSignificantDistance && velocity > 60) || velocity > 450;
         
         console.log('[DIRECT AUTO-SWIPE] Distance:', Math.abs(dragState.deltaX), 'Velocity:', velocity, 'hasDistance:', hasSignificantDistance, 'hasMomentum:', hasSignificantMomentum, 'shouldTrigger:', shouldTriggerSwipe);
         
@@ -638,7 +736,7 @@ const MobileFlashcardMode = ({
               const dragTransform = dragState.isDragging 
                 ? `translateX(${dragState.deltaX}px) rotateZ(${dragState.rotation || 0}deg)` 
                 : '';
-              const finalTransform = dragState.isDragging ? `${dragTransform} ${baseTransform}` : baseTransform;
+              const finalTransform = dragState.isDragging ? `${baseTransform} ${dragTransform}` : baseTransform;
               console.log('[TRANSFORM DEBUG]', { dragState, isFlipped, finalTransform });
               return finalTransform;
             })(),
@@ -728,6 +826,13 @@ const MobileFlashcardMode = ({
                           {currentCard.disambiguatedDefinition.definition}
                         </div>
                       )}
+                      <button 
+                        className="mobile-audio-btn"
+                        onClick={handlePlayAudio}
+                        disabled={audioState.loading}
+                      >
+                        {audioState.loading ? '🔄' : '🔊'} Play Audio
+                      </button>
                     </div>
                   );
                 })()
@@ -741,6 +846,13 @@ const MobileFlashcardMode = ({
                       {currentCard.disambiguatedDefinition.definition}
                     </div>
                   )}
+                  <button 
+                    className="mobile-audio-btn"
+                    onClick={handlePlayAudio}
+                    disabled={audioState.loading}
+                  >
+                    {audioState.loading ? '🔄' : '🔊'} Play Audio
+                  </button>
                 </div>
               )}
             </div>
@@ -810,6 +922,19 @@ const MobileFlashcardMode = ({
       {answerFeedback.show && (
         <div className={`mobile-answer-feedback mobile-answer-feedback-${answerFeedback.type}`}>
           {answerFeedback.text}
+        </div>
+      )}
+
+      {/* Audio Error Overlay */}
+      {audioState.error && (
+        <div className="mobile-audio-error">
+          ❌ {audioState.error}
+          <button 
+            className="mobile-audio-error-close"
+            onClick={() => setAudioState({ loading: false, error: null })}
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>

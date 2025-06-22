@@ -25,6 +25,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   const [generatedSentences, setGeneratedSentences] = useState({});
   const [viewedCards, setViewedCards] = useState({});
   const [cardAnimation, setCardAnimation] = useState('');
+  const [audioState, setAudioState] = useState({ loading: false, error: null });
+  const [currentAudio, setCurrentAudio] = useState(null);
   
   // Reference to track which cards have been processed to avoid infinite re-renders
   const processedCardsRef = useRef('');
@@ -186,6 +188,10 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         // Flip card on spacebar
         e.preventDefault();
         setIsFlipped(prev => !prev);
+      } else if (e.code === 'KeyA') {
+        // Play audio on 'A' key
+        e.preventDefault();
+        handlePlayAudio();
       } else if (e.code === 'ArrowRight' || e.code === 'ArrowDown') {
         // Next card
         e.preventDefault();
@@ -414,6 +420,84 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       setTimeout(() => setCardAnimation(''), 300);
     }, 300);
   };
+
+  // Generate and play audio for the current sentence
+  const generateAndPlayAudio = async (text, cardKey) => {
+    if (!text || audioState.loading) return;
+    
+    setAudioState({ loading: true, error: null });
+    
+    try {
+      // First, check if audio already exists in backend
+      const checkResponse = await fetch(`https://polycast-server.onrender.com/api/audio/${encodeURIComponent(cardKey)}`);
+      
+      let audioUrl;
+      if (checkResponse.ok) {
+        // Audio already exists
+        const audioData = await checkResponse.json();
+        audioUrl = audioData.audioUrl;
+      } else {
+        // Generate new audio
+        const generateResponse = await fetch('https://polycast-server.onrender.com/api/generate-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            text: text.replace(/<[^>]*>/g, ''), // Strip HTML tags
+            cardKey: cardKey,
+            profile: selectedProfile
+          })
+        });
+        
+        if (!generateResponse.ok) {
+          throw new Error('Failed to generate audio');
+        }
+        
+        const audioData = await generateResponse.json();
+        audioUrl = audioData.audioUrl;
+      }
+      
+      // Play the audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+      
+      const audio = new Audio(audioUrl);
+      setCurrentAudio(audio);
+      
+      audio.onended = () => {
+        setAudioState({ loading: false, error: null });
+      };
+      
+      audio.onerror = () => {
+        setAudioState({ loading: false, error: 'Failed to play audio' });
+      };
+      
+      await audio.play();
+      setAudioState({ loading: false, error: null });
+      
+    } catch (error) {
+      console.error('Audio generation error:', error);
+      setAudioState({ loading: false, error: 'Failed to generate audio' });
+    }
+  };
+
+  // Play audio button handler
+  const handlePlayAudio = () => {
+    const currentSenseId = availableCards[currentIndex];
+    const wordDef = wordDefinitions[currentSenseId];
+    
+    if (!wordDef || !wordDef.exampleSentencesGenerated) return;
+    
+    const parts = wordDef.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+    const interval = wordDef?.srsData?.interval || 1;
+    const sentenceIndex = ((interval - 1) % 5) * 2;
+    const englishSentence = parts[sentenceIndex] || parts[0] || '';
+    
+    if (englishSentence) {
+      generateAndPlayAudio(englishSentence, currentSenseId);
+    }
+  };
   
   // Load images for all cards once when the component mounts or availableCards changes significantly
   useEffect(() => {
@@ -431,6 +515,28 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     setWordImages(newImageMap);
     
   }, [availableCards.length]); // Only re-run if the number of available cards changes
+
+  // Auto-play audio when card is flipped (if enabled in settings)
+  useEffect(() => {
+    if (isFlipped && srsSettings.autoPlayAudio && availableCards.length > 0) {
+      const currentSenseId = availableCards[currentIndex];
+      const wordDef = wordDefinitions[currentSenseId];
+      
+      if (wordDef && wordDef.exampleSentencesGenerated) {
+        const parts = wordDef.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+        const interval = wordDef?.srsData?.interval || 1;
+        const sentenceIndex = ((interval - 1) % 5) * 2;
+        const englishSentence = parts[sentenceIndex] || parts[0] || '';
+        
+        if (englishSentence) {
+          // Small delay to let the flip animation finish
+          setTimeout(() => {
+            generateAndPlayAudio(englishSentence, currentSenseId);
+          }, 300);
+        }
+      }
+    }
+  }, [isFlipped, currentIndex, srsSettings.autoPlayAudio, availableCards, wordDefinitions]);
   
   // Calculate stats for the visualization
   const calculatedStats = {
@@ -812,6 +918,30 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                         )}
                       </div>
                       
+                      {/* Audio Button */}
+                      <button
+                        className="audio-btn"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent card flip
+                          handlePlayAudio();
+                        }}
+                        disabled={audioState.loading || !currentCardData.exampleSentencesGenerated}
+                        style={{
+                          background: 'rgba(95, 114, 255, 0.2)',
+                          border: '2px solid rgba(95, 114, 255, 0.5)',
+                          color: '#ffffff',
+                          padding: '8px 16px',
+                          borderRadius: '12px',
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          cursor: audioState.loading ? 'wait' : 'pointer',
+                          transition: 'all 0.2s ease',
+                          marginBottom: '16px'
+                        }}
+                      >
+                        {audioState.loading ? '🔄 Loading...' : '🔊 Play Audio'}
+                      </button>
+                      
                        {/* SRS Answer buttons */}
                        <div className="answer-feedback-buttons">
                          <button 
@@ -855,6 +985,43 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                </div>
              );
            })()}
+          
+           {/* Audio Error Display */}
+           {audioState.error && (
+             <div style={{
+               position: 'fixed',
+               top: '20px',
+               left: '50%',
+               transform: 'translateX(-50%)',
+               background: 'rgba(239, 68, 68, 0.9)',
+               color: 'white',
+               padding: '12px 20px',
+               borderRadius: '8px',
+               fontSize: '0.9rem',
+               fontWeight: '600',
+               zIndex: 1001,
+               display: 'flex',
+               alignItems: 'center',
+               gap: '10px',
+               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+             }}>
+               ⚠️ {audioState.error}
+               <button
+                 onClick={() => setAudioState({ ...audioState, error: null })}
+                 style={{
+                   background: 'none',
+                   border: 'none',
+                   color: 'white',
+                   fontSize: '1.2rem',
+                   cursor: 'pointer',
+                   padding: '0',
+                   marginLeft: '10px'
+                 }}
+               >
+                 ×
+               </button>
+             </div>
+           )}
           
            <div className="flashcard-controls bottom-controls">
              <button className="nav-btn prev-btn" onClick={prevCard}>
