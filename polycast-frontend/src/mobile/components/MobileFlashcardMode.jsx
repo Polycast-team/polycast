@@ -388,24 +388,25 @@ const MobileFlashcardMode = ({
     }
   }, [dueCards, currentDueIndex, generateAndPlayAudio]);
 
-  // Auto-play audio when card is flipped
+  // Auto-play audio when card is flipped (disabled until backend endpoints are ready)
   useEffect(() => {
-    if (isFlipped && dueCards.length > 0) {
-      const currentCard = dueCards[currentDueIndex];
-      if (currentCard && currentCard.exampleSentencesGenerated) {
-        const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-        const interval = currentCard?.srsData?.interval || 1;
-        const sentenceIndex = ((interval - 1) % 5) * 2;
-        const englishSentence = parts[sentenceIndex] || parts[0] || '';
-        
-        if (englishSentence) {
-          // Small delay to let the flip animation finish
-          setTimeout(() => {
-            generateAndPlayAudio(englishSentence, currentCard.key);
-          }, 300);
-        }
-      }
-    }
+    // TODO: Re-enable when backend audio endpoints are implemented
+    // if (isFlipped && dueCards.length > 0) {
+    //   const currentCard = dueCards[currentDueIndex];
+    //   if (currentCard && currentCard.exampleSentencesGenerated) {
+    //     const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+    //     const interval = currentCard?.srsData?.interval || 1;
+    //     const sentenceIndex = ((interval - 1) % 5) * 2;
+    //     const englishSentence = parts[sentenceIndex] || parts[0] || '';
+    //     
+    //     if (englishSentence) {
+    //       // Small delay to let the flip animation finish
+    //       setTimeout(() => {
+    //         generateAndPlayAudio(englishSentence, currentCard.key);
+    //       }, 300);
+    //     }
+    //   }
+    // }
   }, [isFlipped, dueCards, currentDueIndex, generateAndPlayAudio]);
 
   // Simple click handler for flipping (fallback for mouse clicks)
@@ -848,9 +849,10 @@ const MobileFlashcardMode = ({
                       <button 
                         className="mobile-audio-btn"
                         onClick={handlePlayAudio}
-                        disabled={audioState.loading}
+                        disabled={true}
+                        style={{ opacity: 0.5, cursor: 'not-allowed' }}
                       >
-                        {audioState.loading ? '🔄' : '🔊'} Play Audio
+                        🔊 Audio (Backend Required)
                       </button>
                     </div>
                   );
@@ -868,9 +870,10 @@ const MobileFlashcardMode = ({
                   <button 
                     className="mobile-audio-btn"
                     onClick={handlePlayAudio}
-                    disabled={audioState.loading}
+                    disabled={true}
+                    style={{ opacity: 0.5, cursor: 'not-allowed' }}
                   >
-                    {audioState.loading ? '🔄' : '🔊'} Play Audio
+                    🔊 Audio (Backend Required)
                   </button>
                 </div>
               )}
