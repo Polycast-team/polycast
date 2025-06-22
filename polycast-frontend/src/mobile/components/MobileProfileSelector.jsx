@@ -108,9 +108,12 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
   const getCategorizedCards = () => {
     const allCards = getAvailableCards();
     const { seenCards, newCards } = categorizeCards(allCards);
-    const dueCards = getDueSeenCards(seenCards);
     
-    return { newCards, dueCards, seenCards };
+    // For preview, show ALL seen cards (both due and future), not just currently due ones
+    // This lets users see the full order they'll encounter
+    const allSeenCardsSorted = seenCards; // Already sorted by due date in categorizeCards
+    
+    return { newCards, dueCards: allSeenCardsSorted, seenCards };
   };
 
   // Count available flashcards
@@ -398,7 +401,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
                   }}
                 >
                   <span>⏰</span>
-                  <span>Due Cards Order</span>
+                  <span>Review Cards Order</span>
                 </button>
               </div>
             </div>
@@ -439,7 +442,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
         return (
           <CardList 
             cards={dueCards} 
-            title={`Due Cards (${dueCards.length}) - Sorted by Due Date`}
+            title={`Review Cards (${dueCards.length}) - Sorted by Due Date`}
             type="due"
           />
         );
