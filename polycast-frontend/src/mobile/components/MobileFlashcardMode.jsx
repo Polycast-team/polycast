@@ -12,7 +12,6 @@ const MobileFlashcardMode = ({
   setWordDefinitions, 
   onBack 
 }) => {
-  console.log(`[MOBILE DEBUG] MobileFlashcardMode loaded - version with hardcoded cards - ${new Date().toISOString()}`);
   const [currentDueIndex, setCurrentDueIndex] = useState(0);
   const [dueCards, setDueCards] = useState([]);
   const [todaysNewCards, setTodaysNewCards] = useState(0);
@@ -172,12 +171,9 @@ const MobileFlashcardMode = ({
 
   // Process the wordDefinitions to extract all word senses and initialize SRS data
   const availableCards = React.useMemo(() => {
-    console.log(`[MOBILE DEBUG] Selected profile is: "${selectedProfile}"`);
     // For non-saving mode, use hardcoded cards
     if (selectedProfile === 'non-saving') {
       const hardcodedCards = getHardcodedCards();
-      console.log(`[MOBILE DEBUG] Using hardcoded cards for non-saving mode:`, hardcodedCards);
-      console.log(`[MOBILE DEBUG] First card example:`, hardcodedCards[0]?.exampleSentencesGenerated);
       return hardcodedCards;
     }
 
@@ -202,7 +198,6 @@ const MobileFlashcardMode = ({
         cards.push(cardWithSRS);
       }
     });
-    console.log(`[MOBILE DEBUG] Processed cards with SRS data:`, cards);
     return cards;
   }, [wordDefinitions, selectedProfile]);
 
@@ -254,21 +249,16 @@ const MobileFlashcardMode = ({
   useEffect(() => {
     // Skip if we're in the middle of processing a card
     if (processingCardRef.current) {
-      console.log(`[MOBILE DEBUG] Skipping due cards update - processing card`);
       return;
     }
     
-    console.log(`[MOBILE DEBUG] Available cards:`, availableCards.length, availableCards);
     const currentSettings = getSRSSettings();
     const maxNewToday = Math.max(0, currentSettings.newCardsPerDay - todaysNewCards);
-    console.log(`[MOBILE DEBUG] Max new cards today:`, maxNewToday, `(total: ${currentSettings.newCardsPerDay}, used: ${todaysNewCards})`);
     
     let due = getDueCards(availableCards, { newPerDay: maxNewToday }, false);
-    console.log(`[MOBILE DEBUG] Due cards (strict):`, due.length, due);
     
     if (due.length === 0) {
       due = getDueCards(availableCards, { newPerDay: maxNewToday }, true);
-      console.log(`[MOBILE DEBUG] Due cards (fallback):`, due.length, due);
     }
     
     setDueCards(due);
@@ -344,22 +334,49 @@ const MobileFlashcardMode = ({
     }
     
     const currentCard = dueCards[currentDueIndex];
+    const incorrectResult = calculateNextReview(currentCard, 'incorrect');
+    const correctResult = calculateNextReview(currentCard, 'correct');
+    const easyResult = calculateNextReview(currentCard, 'easy');
+    
+    // Log SRS states for debugging
+    console.log(`[SRS] Card "${currentCard.word}" (${currentCard.srsData.status}):`, {
+      current: {
+        status: currentCard.srsData.status,
+        interval: currentCard.srsData.interval,
+        currentStep: currentCard.srsData.currentStep,
+        easeFactor: currentCard.srsData.easeFactor
+      },
+      ifIncorrect: {
+        status: incorrectResult.status,
+        interval: incorrectResult.interval,
+        nextReview: formatNextReviewTime(incorrectResult.nextReviewDate),
+        currentStep: incorrectResult.currentStep
+      },
+      ifCorrect: {
+        status: correctResult.status,
+        interval: correctResult.interval,
+        nextReview: formatNextReviewTime(correctResult.nextReviewDate),
+        currentStep: correctResult.currentStep
+      },
+      ifEasy: {
+        status: easyResult.status,
+        interval: easyResult.interval,
+        nextReview: formatNextReviewTime(easyResult.nextReviewDate),
+        currentStep: easyResult.currentStep
+      }
+    });
+    
     return {
-      incorrect: formatNextReviewTime(calculateNextReview(currentCard, 'incorrect').nextReviewDate),
-      correct: formatNextReviewTime(calculateNextReview(currentCard, 'correct').nextReviewDate),
-      easy: formatNextReviewTime(calculateNextReview(currentCard, 'easy').nextReviewDate)
+      incorrect: formatNextReviewTime(incorrectResult.nextReviewDate),
+      correct: formatNextReviewTime(correctResult.nextReviewDate),
+      easy: formatNextReviewTime(easyResult.nextReviewDate)
     };
   }, [dueCards, currentDueIndex]);
 
   // Handle card flipping
   const flipCard = useCallback(() => {
     const now = Date.now();
-    console.log(`[MOBILE DEBUG] Flipping card from ${isFlipped} to ${!isFlipped}`);
-    // Use function form to ensure immediate update
-    setIsFlipped(prev => {
-      console.log(`[MOBILE DEBUG] Flip state changing from ${prev} to ${!prev}`);
-      return !prev;
-    });
+    setIsFlipped(prev => !prev);
     lastTapTime.current = now;
   }, [isFlipped]);
 
@@ -374,14 +391,12 @@ const MobileFlashcardMode = ({
       // Front side - handle tap for flipping
       touchStartPos.current = { x: clientX, y: clientY };
       touchStartTime.current = now;
-      console.log('[DIRECT TOUCH] Touch/click start recorded for flip');
     } else {
       // Back side - handle drag for swiping
       dragStartPos.current = { x: clientX, y: clientY };
       lastTouchPos.current = { x: clientX, y: clientY };
       lastTouchTime.current = now;
       isDragging.current = false; // Will become true in touchmove/mousemove
-      console.log('[DIRECT DRAG] Touch/click start recorded for drag at:', clientX, clientY);
     }
   }, [isFlipped]);
 
@@ -406,8 +421,6 @@ const MobileFlashcardMode = ({
       const rotation = deltaX * 0.1;
       const opacity = Math.max(0.3, 1 - (Math.abs(deltaX) / 200));
       const colorIntensity = Math.min(1, Math.abs(deltaX) / 200); // Adjusted for new threshold
-      
-      console.log('[DIRECT DRAG] Moving - deltaX:', deltaX, 'rotation:', rotation);
       
       setDragState({
         isDragging: true,
@@ -552,7 +565,6 @@ const MobileFlashcardMode = ({
   // Simple click handler for flipping (fallback for mouse clicks)
   const handleCardClick = useCallback((e) => {
     if (!isFlipped && !isDragging.current) {
-      console.log('[CARD CLICK] Simple click detected - flipping card');
       e.preventDefault();
       e.stopPropagation();
       flipCard();
@@ -589,6 +601,9 @@ const MobileFlashcardMode = ({
     const currentCard = dueCards[currentDueIndex];
     if (!currentCard) return;
     
+    // Log user's response
+    console.log(`[USER RESPONSE] User clicked "${answer}" for card "${currentCard.word}"`);
+    
     // Set processing flag to prevent useEffect from running
     processingCardRef.current = true;
     
@@ -600,6 +615,21 @@ const MobileFlashcardMode = ({
     
     // Calculate next review using SRS algorithm
     const updatedSrsData = calculateNextReview(currentCard, answer);
+    
+    // Log the result of the SRS calculation
+    console.log(`[SRS RESULT] Card "${currentCard.word}" updated:`, {
+      from: {
+        status: currentCard.srsData.status,
+        interval: currentCard.srsData.interval,
+        currentStep: currentCard.srsData.currentStep
+      },
+      to: {
+        status: updatedSrsData.status,
+        interval: updatedSrsData.interval,
+        currentStep: updatedSrsData.currentStep,
+        nextReview: formatNextReviewTime(updatedSrsData.nextReviewDate)
+      }
+    });
     
     // Update the card in wordDefinitions with new SRS data
     const updatedCard = {
@@ -720,10 +750,7 @@ const MobileFlashcardMode = ({
       const touchDuration = now - touchStartTime.current;
       
       if (touchDuration < 500) { // Increased timeout for mouse clicks
-        if (now - lastTapTime.current < 100) {
-          console.log('[DIRECT TOUCH] Ignored - too soon after last tap');
-        } else {
-          console.log('[DIRECT TOUCH] Quick tap/click detected - executing flip');
+        if (now - lastTapTime.current >= 100) {
           e.preventDefault();
           e.stopPropagation();
           flipCard();
@@ -733,8 +760,6 @@ const MobileFlashcardMode = ({
       touchStartPos.current = null;
     } else if (isFlipped && dragStartPos.current) {
       // Back side - handle swipe completion
-      console.log('[DIRECT DRAG] Touch end - isDragging:', isDragging.current, 'dragState:', dragState);
-      
       if (isDragging.current) {
         // Calculate velocity based on recent movement
         let velocity = 0;
@@ -748,7 +773,6 @@ const MobileFlashcardMode = ({
             const totalDistanceX = Math.abs(dragState.deltaX);
             const totalTime = now - (lastTouchTime.current - timeDiff);
             velocity = totalDistanceX / (totalTime / 1000);
-            console.log('[DIRECT MOMENTUM] Velocity:', velocity, 'px/s', 'totalDistance:', totalDistanceX, 'totalTime:', totalTime);
           }
         }
         
@@ -763,17 +787,11 @@ const MobileFlashcardMode = ({
         // Trigger if: (distance + velocity) OR large distance alone OR very high velocity
         const shouldTriggerSwipe = (hasSignificantDistance && velocity > 60) || hasLargeDistance || velocity > 450;
         
-        console.log('[DIRECT AUTO-SWIPE] Distance:', Math.abs(dragState.deltaX), 'Velocity:', velocity, 'hasDistance:', hasSignificantDistance, 'hasMomentum:', hasSignificantMomentum, 'shouldTrigger:', shouldTriggerSwipe);
-        
         if (shouldTriggerSwipe) {
-          console.log('[DIRECT AUTO-SWIPE] Triggering swipe!');
-          
           // Determine answer: negative deltaX = left swipe = incorrect, positive deltaX = right swipe = correct
           if (dragState.deltaX < 0) {
-            console.log('[DIRECT AUTO-SWIPE] Left swipe (deltaX < 0) = Incorrect');
             markCard('incorrect');
           } else {
-            console.log('[DIRECT AUTO-SWIPE] Right swipe (deltaX > 0) = Correct');
             markCard('correct');
           }
           
@@ -792,7 +810,6 @@ const MobileFlashcardMode = ({
             setTimeout(() => setCardEntryAnimation(''), 400);
           }, 300);
         } else {
-          console.log('[DIRECT DRAG] Not enough distance/momentum - resetting');
           setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
         }
       }
