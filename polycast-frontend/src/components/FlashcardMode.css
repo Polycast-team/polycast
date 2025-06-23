@@ -482,10 +482,15 @@ kbd {
 .flashcard-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background-color: #1a1a2e;
   color: white;
-  padding: 5px;
+  padding: 0;
+  margin: 0;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -495,9 +500,9 @@ kbd {
   justify-content: space-between;
   align-items: center;
   margin: 0;
-  padding: 10px 20px;
+  padding: 5px 20px;
   flex-shrink: 0;
-  height: 60px;
+  height: 50px;
   background-color: transparent;
 }
 
