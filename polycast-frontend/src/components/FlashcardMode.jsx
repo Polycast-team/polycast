@@ -134,17 +134,6 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         <button 
           className="calendar-button" 
           onClick={() => setShowCalendar(true)}
-          style={{
-            background: 'none',
-            border: '1px solid #2196f3',
-            borderRadius: '6px',
-            padding: '8px 12px',
-            fontSize: '14px',
-            color: '#2196f3',
-            cursor: 'pointer',
-            marginLeft: 'auto',
-            marginRight: '20px'
-          }}
         >
           📅 Calendar
         </button>

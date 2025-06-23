@@ -494,25 +494,43 @@ kbd {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1vh;
-  padding: 0 1vw;
+  margin-bottom: 0.5vh;
+  padding: 0.5vh 1vw;
   flex-shrink: 0;
-  height: 8vh;
+  height: 5vh;
+  min-height: 40px;
 }
 
 .back-button {
   background-color: #3f3969;
   color: white;
   border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   transition: background-color 0.2s;
+  white-space: nowrap;
 }
 
 .back-button:hover {
   background-color: #5a4f94;
+}
+
+.calendar-button {
+  background: none;
+  border: 1px solid #2196f3;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #2196f3;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.calendar-button:hover {
+  background-color: rgba(33, 150, 243, 0.1);
 }
 
 .header-title {
@@ -525,17 +543,20 @@ kbd {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  gap: 1px;
+  line-height: 1.2;
 }
 
 .header-progress {
-  font-size: 12px;
+  font-size: 11px;
   color: #ccc;
+  white-space: nowrap;
 }
 
 .header-accuracy {
-  font-size: 11px;
+  font-size: 10px;
   color: #aaa;
+  white-space: nowrap;
 }
 
 .desktop-card-container {
@@ -543,17 +564,16 @@ kbd {
   justify-content: center;
   align-items: center;
   perspective: 1000px;
-  height: 50vh;
-  margin: 2vh 0;
+  flex: 1;
+  margin: 1vh 0;
+  min-height: 300px;
 }
 
 .desktop-flashcard {
-  width: 60vw;
-  height: 40vh;
-  max-width: 600px;
-  max-height: 400px;
+  width: min(60vw, 600px);
+  height: min(45vh, 350px);
   min-width: 400px;
-  min-height: 250px;
+  min-height: 200px;
   position: relative;
   transform-style: preserve-3d;
   cursor: pointer;
@@ -700,26 +720,28 @@ kbd {
   display: flex;
   justify-content: center;
   gap: 3vw;
-  margin-top: 2vh;
+  margin-top: 1vh;
   padding: 0 2vw;
   flex-shrink: 0;
-  height: 12vh;
+  height: 10vh;
   align-items: center;
+  min-height: 80px;
 }
 
 .desktop-answer-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5vh 2vw;
+  padding: 1vh 1.5vw;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: bold;
-  min-width: 10vw;
+  min-width: 120px;
   max-width: 15vw;
-  height: 10vh;
+  height: 8vh;
+  min-height: 65px;
   transition: all 0.2s ease;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
   justify-content: center;
