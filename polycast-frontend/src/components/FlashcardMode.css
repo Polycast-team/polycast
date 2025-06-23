@@ -488,7 +488,7 @@ kbd {
   padding: 0;
   margin-top: -100px;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .flashcard-header {
