@@ -564,9 +564,9 @@ kbd {
   justify-content: center;
   align-items: flex-start;
   perspective: 1000px;
-  flex: 1;
   margin: 0;
-  padding-top: 20px;
+  padding-top: 30px;
+  padding-bottom: 20px;
 }
 
 .desktop-flashcard {
