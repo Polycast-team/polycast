@@ -8,9 +8,6 @@
  * @returns {boolean} True if mobile device
  */
 export function isMobileDevice() {
-  // TEMPORARY: Force mobile mode for testing - easy to reverse
-  return true;
-  
   // Check user agent for mobile devices (primary indicator)
   const mobileUserAgent = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(
     navigator.userAgent
@@ -62,5 +59,17 @@ export function getDeviceType() {
  * @returns {boolean} True if should use mobile experience
  */
 export function shouldUseMobileApp() {
-  return isMobileDevice() || isTabletDevice();
+  const mobile = isMobileDevice();
+  const tablet = isTabletDevice();
+  const shouldUseMobile = mobile || tablet;
+  
+  console.log('[DEVICE DETECTION]', {
+    userAgent: navigator.userAgent,
+    screenWidth: window.innerWidth,
+    isMobile: mobile,
+    isTablet: tablet,
+    shouldUseMobileApp: shouldUseMobile
+  });
+  
+  return shouldUseMobile;
 }
