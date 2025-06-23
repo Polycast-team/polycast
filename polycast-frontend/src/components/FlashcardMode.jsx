@@ -1,55 +1,91 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import './FlashcardMode.css';
 import { calculateNextReview, getDueCards, getReviewStats, formatNextReviewTime } from '../utils/srsAlgorithm';
 import { getSRSSettings } from '../utils/srsSettings';
-import SRSSettings from './SRSSettings';
+import { getHardcodedCards } from '../utils/hardcodedCards';
 import ErrorPopup from './ErrorPopup';
 import { useErrorHandler } from '../hooks/useErrorHandler';
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  // SRS: Track today's review session
-  const [todaysNewCards, setTodaysNewCards] = useState(0);
-  const [dueCards, setDueCards] = useState([]);
   const [currentDueIndex, setCurrentDueIndex] = useState(0);
-  const [showSettings, setShowSettings] = useState(false);
-  const [srsSettings, setSrsSettings] = useState(getSRSSettings());
+  const [dueCards, setDueCards] = useState([]);
+  const [todaysNewCards, setTodaysNewCards] = useState(0);
+  const [sessionCounts, setSessionCounts] = useState({ newCount: 0, learningCount: 0, reviewCount: 0 });
   const [isFlipped, setIsFlipped] = useState(false);
-  const [showStats, setShowStats] = useState(false);
+  const [srsSettings] = useState(getSRSSettings());
   const [stats, setStats] = useState({
     cardsReviewed: 0,
     correctAnswers: 0,
-    history: []
+    sessionStartTime: new Date()
   });
-  const [wordImages, setWordImages] = useState({});
-  const [imageLoading, setImageLoading] = useState({});
-  const [generatedSentences, setGeneratedSentences] = useState({});
-  const [viewedCards, setViewedCards] = useState({});
-  const [cardAnimation, setCardAnimation] = useState('');
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [processedCards, setProcessedCards] = useState([]); // Track cards processed in current session
+  const [calendarUpdateTrigger, setCalendarUpdateTrigger] = useState(0); // Force calendar re-render
   const [audioState, setAudioState] = useState({ loading: false, error: null });
   const [currentAudio, setCurrentAudio] = useState(null);
   const { error: popupError, showError, clearError } = useErrorHandler();
   
-  // Reference to track which cards have been processed to avoid infinite re-renders
-  const processedCardsRef = useRef('');
+  // Refs for tracking
+  const processingCardRef = useRef(false);
+  const lastCardProcessedTime = useRef(Date.now());
   
-  // Track card views - a card can be in one of 4 spaced repetition stages
-  // 1: First time seen today
-  // 2: Second viewing today
-  // 3: Third viewing today
-  // 4: Will be shown tomorrow
-  
-  // Process the wordDefinitions to extract all word senses - use useMemo to avoid recalculation on every render
+  // Stable date for new cards - only calculate once
+  const nowDateRef = useRef(new Date().toISOString());
+
+  // Process the wordDefinitions to extract all word senses and initialize SRS data
   const availableCards = React.useMemo(() => {
+    // For non-saving mode, use hardcoded cards
+    if (selectedProfile === 'non-saving') {
+      const hardcodedCards = getHardcodedCards();
+      return hardcodedCards;
+    }
+
+    // For other profiles, process actual wordDefinitions
     const cards = [];
     Object.entries(wordDefinitions).forEach(([key, value]) => {
       if (value && value.wordSenseId && value.inFlashcards) {
-        cards.push({ ...value, key }); // Include the full card data
+        // Initialize SRS data if it doesn't exist
+        const cardWithSRS = { ...value, key };
+        
+        // Ensure frequency field exists (use wordFrequency if available)
+        if (!cardWithSRS.frequency && cardWithSRS.wordFrequency) {
+          cardWithSRS.frequency = cardWithSRS.wordFrequency;
+        }
+        
+        if (!cardWithSRS.srsData) {
+          cardWithSRS.srsData = {
+            isNew: true,
+            gotWrongThisSession: false,
+            SRS_interval: 1,
+            status: 'new',
+            correctCount: 0,
+            incorrectCount: 0,
+            dueDate: null,
+            lastSeen: null,
+            lastReviewDate: null,
+            nextReviewDate: nowDateRef.current // Due now
+          };
+        } else {
+          // Migrate old SRS data format to new format
+          const srs = cardWithSRS.srsData;
+          if (srs.interval !== undefined && srs.SRS_interval === undefined) {
+            // Old format detected, migrate to new format
+            srs.SRS_interval = srs.interval === 0 ? 1 : Math.min(srs.interval, 9);
+            srs.isNew = srs.status === 'new';
+            srs.gotWrongThisSession = false;
+            srs.correctCount = srs.repetitions || 0;
+            srs.incorrectCount = srs.lapses || 0;
+            srs.dueDate = srs.dueDate || srs.nextReviewDate;
+            srs.lastSeen = srs.lastReviewDate;
+          }
+        }
+        
+        cards.push(cardWithSRS);
       }
     });
     return cards;
-  }, [wordDefinitions]);
+  }, [wordDefinitions, selectedProfile]);
 
   // Initialize SRS data and get due cards
   useEffect(() => {
@@ -100,6 +136,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   
   // Separate effect for due cards that depends on todaysNewCards
   useEffect(() => {
+    console.log(`[DESKTOP] Starting study session for ${selectedProfile} with ${availableCards.length} flashcards`);
+    
     // Get due cards using SRS algorithm with current settings
     const currentSettings = getSRSSettings();
     const maxNewToday = Math.max(0, currentSettings.newCardsPerDay - todaysNewCards);
@@ -110,140 +148,267 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       due = getDueCards(availableCards, { newPerDay: maxNewToday }, true);
     }
     
+    console.log(`[CARD ORDER] Due cards:`, due);
     setDueCards(due);
     setCurrentDueIndex(0);
+    setIsFlipped(false);
   }, [availableCards, wordDefinitions, todaysNewCards]); // Re-run when dependencies change
-  
-  const cardContainerRef = useRef(null);
-  
-  // Clean up duplicate flashcards when component mounts
-  useEffect(() => {
-    // Create a map to count occurrences of each word
-    const wordCounts = {};
-    const seenIds = new Set();
-    const duplicates = [];
+
+  // Calculate future due dates for calendar - using useMemo for proper reactivity
+  const calendarData = React.useMemo(() => {
+    const today = new Date();
+    const nextWeekDays = [];
     
-    console.log('[FLASHCARDS] Checking for duplicate flashcards on mount...');
+    console.log(`[CALENDAR DEBUG] Building calendar from ${today.toDateString()} for 8 days`);
     
-    // Find flashcards with the same word
-    Object.entries(wordDefinitions).forEach(([key, value]) => {
-      if (value && value.wordSenseId && value.inFlashcards) {
-        const id = value.wordSenseId;
-        
-        // If we've seen this ID before, it's a duplicate
-        if (seenIds.has(id)) {
-          console.log(`[FLASHCARDS] Found duplicate ID: ${id}`);
-          duplicates.push(id);
-        } else {
-          seenIds.add(id);
-          
-          // Also track by word to detect potential word duplicates
-          const word = value.word;
-          if (!wordCounts[word]) {
-            wordCounts[word] = [];
-          }
-          wordCounts[word].push({
-            id: key,
-            data: value,
-            createdAt: value.cardCreatedAt ? new Date(value.cardCreatedAt).getTime() : Date.now()
-          });
-        }
-      }
+    // Get all cards with current session updates
+    const currentCards = [];
+    
+    // Add cards from current session (dueCards) with their updated state
+    dueCards.forEach(card => {
+      currentCards.push(card);
     });
     
-    // Log our findings
-    if (duplicates.length > 0) {
-      console.log(`[FLASHCARDS] Found ${duplicates.length} duplicate IDs that need cleanup`);
+    // Add processed cards (cards that were answered and removed from session)
+    processedCards.forEach(card => {
+      currentCards.push(card);
+    });
+    
+    // Add cards from wordDefinitions (for non-saving mode) or availableCards
+    if (selectedProfile === 'non-saving') {
+      // For non-saving mode, use availableCards but exclude those already in dueCards or processedCards
+      availableCards.forEach(card => {
+        const alreadyInSession = dueCards.some(sessionCard => 
+          sessionCard.key === card.key || sessionCard.wordSenseId === card.wordSenseId
+        );
+        const alreadyProcessed = processedCards.some(processedCard => 
+          processedCard.key === card.key || processedCard.wordSenseId === card.wordSenseId
+        );
+        if (!alreadyInSession && !alreadyProcessed) {
+          currentCards.push(card);
+        }
+      });
     } else {
-      console.log('[FLASHCARDS] No duplicate IDs found');
+      // For other profiles, use updated wordDefinitions data
+      Object.entries(wordDefinitions).forEach(([key, value]) => {
+        if (value && value.wordSenseId && value.inFlashcards) {
+          const alreadyInSession = dueCards.some(sessionCard => 
+            sessionCard.key === key || sessionCard.wordSenseId === value.wordSenseId
+          );
+          const alreadyProcessed = processedCards.some(processedCard => 
+            processedCard.key === key || processedCard.wordSenseId === value.wordSenseId
+          );
+          if (!alreadyInSession && !alreadyProcessed) {
+            currentCards.push({ ...value, key });
+          }
+        }
+      });
     }
     
-    // Only log words with multiple instances for debugging
-    Object.entries(wordCounts).forEach(([word, instances]) => {
-      if (instances.length > 1) {
-        console.log(`[FLASHCARDS] Word '${word}' has ${instances.length} different senses:`);
-        instances.forEach(instance => {
-          console.log(`  - ${instance.id}: ${instance.data.disambiguatedDefinition?.definition || 'No definition'} (${instance.data.partOfSpeech || 'unknown'})`); 
-        });
-      }
-    });
-  }, [wordDefinitions]);
-  
-  // Handle key presses for navigation and flipping
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (showStats) return; // Disable keyboard navigation when viewing stats
-      if (availableCards.length === 0) return; // No cards to navigate
+    for (let i = 0; i < 8; i++) { // Extended to 8 days to catch more future cards
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      date.setHours(0, 0, 0, 0);
       
-      if (e.code === 'Space') {
-        // Flip card on spacebar
-        e.preventDefault();
-        setIsFlipped(prev => !prev);
-      } else if (e.code === 'KeyA') {
-        // Play audio on 'A' key
-        e.preventDefault();
-        handlePlayAudio();
-      } else if (e.code === 'ArrowRight' || e.code === 'ArrowDown') {
-        // Next card
-        e.preventDefault();
-        if (isFlipped) {
-          // Get the current sense ID
-          const currentSenseId = availableCards[currentIndex];
-          const currentCardData = wordDefinitions[currentSenseId];
-          
-          // The basic word without the definition number
-          const baseWord = currentCardData?.word || currentSenseId.replace(/\d+$/, '');
-          
-          // Track this card as reviewed before moving to next
-          setStats(prev => ({
-            ...prev,
-            cardsReviewed: prev.cardsReviewed + 1,
-            history: [...prev.history, {
-              wordSenseId: currentSenseId,
-              word: baseWord, // Store the base word for better readability in stats
-              date: new Date().toISOString()
-            }]
-          }));
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      // Find cards due on this day using current session data
+      const cardsForDay = currentCards.filter(card => {
+        if (!card.srsData) return false;
+        
+        const dueDate = new Date(card.srsData.dueDate || card.srsData.nextReviewDate);
+        
+        // Compare just the date parts, ignoring time
+        const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+        const dayDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const isInRange = dueDateOnly.getTime() === dayDateOnly.getTime();
+        
+        // Debug logging for date filtering
+        if (card.word === 'eat' || i >= 6) { // Log for eat card or last few days
+          console.log(`[DATE DEBUG] Day ${i} (${dayDateOnly.toDateString()}): Card "${card.word}" due ${dueDateOnly.toDateString()}, match: ${isInRange}`);
         }
-        setIsFlipped(false);
-        setCurrentIndex(prev => (prev + 1) % availableCards.length);
-      } else if (e.code === 'ArrowLeft' || e.code === 'ArrowUp') {
-        // Previous card
-        e.preventDefault();
-        setIsFlipped(false);
-        setCurrentIndex(prev => 
-          prev === 0 ? availableCards.length - 1 : prev - 1
-        );
-      } else if (e.key === '1') {
-        // Mark as incorrect
-        if (isFlipped) {
-          markCard('incorrect');
-        }
-      } else if (e.key === '2') {
-        // Mark as correct
-        if (isFlipped) {
-          markCard('correct');
-        }
-      } else if (e.key === '3') {
-        // Mark as easy
-        if (isFlipped) {
-          markCard('easy');
-        }
-      }
-    };
+        
+        return isInRange;
+      });
+      
+      nextWeekDays.push({
+        date,
+        cards: cardsForDay,
+        dayName: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short' }),
+        dateStr: date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
+      });
+    }
     
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, isFlipped, availableCards, showStats, wordDefinitions]);
-  
-  const markCard = (answer) => {
-    if (dueCards.length === 0) return;
+    return nextWeekDays;
+  }, [dueCards, wordDefinitions, availableCards, selectedProfile, processedCards, calendarUpdateTrigger]);
+
+  // Calculate button times for SRS preview
+  const buttonTimes = React.useMemo(() => {
+    if (!dueCards[currentDueIndex]) return { incorrect: { time: '', debugDate: '' }, correct: { time: '', debugDate: '' }, easy: { time: '', debugDate: '' } };
     
     const currentCard = dueCards[currentDueIndex];
+    const incorrectResult = calculateNextReview(currentCard, 'incorrect');
+    const correctResult = calculateNextReview(currentCard, 'correct');
+    const easyResult = calculateNextReview(currentCard, 'easy');
+    
+    return {
+      incorrect: {
+        time: formatNextReviewTime(incorrectResult.nextReviewDate),
+        debugDate: new Date(incorrectResult.nextReviewDate).toLocaleString()
+      },
+      correct: {
+        time: formatNextReviewTime(correctResult.nextReviewDate),
+        debugDate: new Date(correctResult.nextReviewDate).toLocaleString()
+      },
+      easy: {
+        time: formatNextReviewTime(easyResult.nextReviewDate),
+        debugDate: new Date(easyResult.nextReviewDate).toLocaleString()
+      }
+    };
+  }, [dueCards, currentDueIndex]);
+
+  // Calculate header stats
+  const headerStats = React.useMemo(() => {
+    const newCards = dueCards.filter(card => card.srsData.isNew).length;
+    const learningCards = dueCards.filter(card => card.srsData.gotWrongThisSession && !card.srsData.isNew).length;
+    const reviewCards = dueCards.filter(card => !card.srsData.isNew && !card.srsData.gotWrongThisSession).length;
+    const accuracy = stats.cardsReviewed > 0 ? Math.round((stats.correctAnswers / stats.cardsReviewed) * 100) : 100;
+    
+    return {
+      newCards,
+      learningCards,
+      reviewCards,
+      cardsReviewed: stats.cardsReviewed,
+      accuracy
+    };
+  }, [dueCards, stats]);
+
+  // Audio playback handler
+  const handlePlayAudio = async () => {
+    const currentCard = dueCards[currentDueIndex];
     if (!currentCard) return;
+
+    const word = currentCard.word;
+    setAudioState({ loading: true, error: null });
+
+    try {
+      // Stop any currently playing audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+
+      const response = await fetch('https://polycast-server.onrender.com/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: word })
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS request failed: ${response.statusText}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      audio.onplay = () => setAudioState({ loading: false, error: null });
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setCurrentAudio(null);
+      };
+      audio.onerror = () => {
+        setAudioState({ loading: false, error: 'Audio playback failed' });
+        URL.revokeObjectURL(audioUrl);
+        setCurrentAudio(null);
+      };
+
+      setCurrentAudio(audio);
+      await audio.play();
+    } catch (error) {
+      console.error('TTS Error:', error);
+      setAudioState({ loading: false, error: 'Failed to generate audio' });
+    }
+  };
+
+  // Card marking function (reused from mobile)
+  const markCard = useCallback((answer) => {
+    if (!dueCards[currentDueIndex]) return;
+    if (processingCardRef.current) return;
+    
+    const currentCard = dueCards[currentDueIndex];
+    
+    // Stop any currently playing audio when marking a card
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      setCurrentAudio(null);
+      setAudioState({ loading: false, error: null });
+    }
+    
+    // Log user's response
+    console.log(`[USER RESPONSE] User clicked "${answer}" for card "${currentCard.word}"`);
+    
+    // Set processing flag to prevent useEffect from running
+    processingCardRef.current = true;
+    
+    // Mark when we processed this card
+    lastCardProcessedTime.current = Date.now();
     
     // Calculate next review using SRS algorithm
     const updatedSrsData = calculateNextReview(currentCard, answer);
+    
+    // Log the result of the SRS calculation
+    console.log(`[SRS RESULT] Card "${currentCard.word}" updated:`, {
+      from: {
+        status: currentCard.srsData.status,
+        isNew: currentCard.srsData.isNew,
+        gotWrongThisSession: currentCard.srsData.gotWrongThisSession,
+        SRS_interval: currentCard.srsData.SRS_interval
+      },
+      to: {
+        status: updatedSrsData.status,
+        isNew: updatedSrsData.isNew,
+        gotWrongThisSession: updatedSrsData.gotWrongThisSession,
+        SRS_interval: updatedSrsData.SRS_interval,
+        nextReview: formatNextReviewTime(updatedSrsData.nextReviewDate)
+      }
+    });
+    
+    // Update session counts based on card transitions
+    setSessionCounts(prevCounts => {
+      const newCounts = { ...prevCounts };
+      
+      // Current card state
+      const wasNew = currentCard.srsData.isNew;
+      const wasLearning = currentCard.srsData.gotWrongThisSession && !wasNew;
+      const wasReview = !wasNew && !currentCard.srsData.gotWrongThisSession;
+      
+      // New card state after answer
+      const isNowNew = updatedSrsData.isNew;
+      const isNowLearning = updatedSrsData.gotWrongThisSession && !isNowNew;
+      const isNowReview = !isNowNew && !updatedSrsData.gotWrongThisSession;
+      
+      // Decrement the old category
+      if (wasNew) newCounts.newCount = Math.max(0, newCounts.newCount - 1);
+      else if (wasLearning) newCounts.learningCount = Math.max(0, newCounts.learningCount - 1);
+      else if (wasReview) newCounts.reviewCount = Math.max(0, newCounts.reviewCount - 1);
+      
+      // Only increment if the card is still due today (not graduated to tomorrow or later)
+      const now = new Date();
+      const updatedDueDate = new Date(updatedSrsData.nextReviewDate);
+      const stillDueToday = (updatedDueDate - now) < (24 * 60 * 60 * 1000);
+      
+      if (stillDueToday) {
+        // Increment the new category
+        if (isNowNew) newCounts.newCount += 1; // This should never happen
+        else if (isNowLearning) newCounts.learningCount += 1;
+        else if (isNowReview) newCounts.reviewCount += 1;
+      }
+      
+      return newCounts;
+    });
     
     // Update the card in wordDefinitions with new SRS data
     const updatedCard = {
@@ -251,31 +416,59 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       srsData: updatedSrsData
     };
     
+    // Prepare all state updates to happen together
+    const now = new Date();
+    const updatedDueDate = new Date(updatedSrsData.dueDate || updatedSrsData.nextReviewDate);
+    
+    // Check if card is still due today (within next few hours, not full 24 hours)
+    // Cards with intervals like "1 day", "3 days" should be removed from today's session
+    const todayMidnight = new Date(now);
+    todayMidnight.setHours(23, 59, 59, 999); // End of today
+    const stillDueToday = updatedDueDate <= todayMidnight;
+    
+    // Debug logging to see what's happening
+    console.log(`[SESSION DEBUG] Card "${currentCard.word}" - Due: ${updatedDueDate.toLocaleString()}, Today ends: ${todayMidnight.toLocaleString()}, Still due today: ${stillDueToday}, SRS_interval: ${updatedSrsData.SRS_interval}`);
+    
+    // Calculate new due cards array
+    let newDueCards;
+    let newDueIndex;
+    
+    if (stillDueToday && (updatedSrsData.SRS_interval <= 2)) {
+      // Only keep in queue if due today AND still in minute-based intervals (1-2)
+      // Move card to end of queue for re-review later today
+      console.log(`[SESSION DEBUG] Keeping card "${currentCard.word}" in today's session`);
+      newDueCards = [...dueCards];
+      newDueCards.splice(currentDueIndex, 1);
+      newDueCards.push(updatedCard);
+      newDueIndex = currentDueIndex >= newDueCards.length ? 0 : currentDueIndex;
+    } else {
+      // Remove card from today's queue (graduated to tomorrow or later)
+      console.log(`[SESSION DEBUG] Removing card "${currentCard.word}" from today's session`);
+      newDueCards = dueCards.filter((_, index) => index !== currentDueIndex);
+      newDueIndex = currentDueIndex >= newDueCards.length && newDueCards.length > 0 ? newDueCards.length - 1 : currentDueIndex;
+      
+      // Add the updated card to processedCards so it appears in calendar with new due date
+      setProcessedCards(prev => [...prev, updatedCard]);
+      setCalendarUpdateTrigger(prev => prev + 1); // Force calendar re-render
+    }
+    
+    // Batch all state updates together to prevent UI flashing
     setWordDefinitions(prev => ({
       ...prev,
       [currentCard.key]: updatedCard
     }));
     
-    // Update stats
     setStats(prev => ({
       ...prev,
       cardsReviewed: prev.cardsReviewed + 1,
-      correctAnswers: answer !== 'incorrect' ? prev.correctAnswers + 1 : prev.correctAnswers,
-      history: [...prev.history, {
-        wordSenseId: currentCard.wordSenseId,
-        word: currentCard.word,
-        date: new Date().toISOString(),
-        correct: answer !== 'incorrect',
-        answer: answer
-      }]
+      correctAnswers: answer !== 'incorrect' ? prev.correctAnswers + 1 : prev.correctAnswers
     }));
     
-    // If this was a new card, increment today's count
+    // Update new cards count if necessary
     if (currentCard.srsData.status === 'new') {
       const newCount = todaysNewCards + 1;
       setTodaysNewCards(newCount);
       
-      // Save to database for profiles, skip for non-saving mode
       if (selectedProfile !== 'non-saving') {
         const today = new Date().toDateString();
         fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`, {
@@ -284,788 +477,401 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           body: JSON.stringify({ date: today, newCardsToday: newCount })
         }).catch(error => {
           console.error('Error saving daily SRS count:', error);
-          // Show warning popup
-          alert(`Warning: Failed to save daily SRS count to database for profile "${selectedProfile}". Using local storage as fallback.`);
-          // Fallback to localStorage for this session
-          localStorage.setItem('srsNewCardsToday', newCount.toString());
         });
       }
     }
     
-    // Move to next card
-    setCardAnimation('slide-out-left');
+    // Single timeout for all card transition logic
     setTimeout(() => {
+      // Reset flip state first, then update cards
       setIsFlipped(false);
       
-      // Update the due cards list
-      const now = new Date();
-      const updatedDueDate = new Date(updatedSrsData.nextReviewDate);
-      
-      // If the card is still due today (within next 24 hours), keep it in rotation
-      const stillDueToday = (updatedDueDate - now) < (24 * 60 * 60 * 1000);
-      
-      if (stillDueToday && updatedSrsData.status !== 'review') {
-        // Move card to end of queue
-        const newDueCards = [...dueCards];
-        newDueCards.splice(currentDueIndex, 1);
-        newDueCards.push(updatedCard);
+      // Small delay to ensure flip completes before changing cards
+      setTimeout(() => {
         setDueCards(newDueCards);
+        setCurrentDueIndex(newDueIndex);
         
-        // Stay at same index (which now shows next card)
-        if (currentDueIndex >= newDueCards.length) {
-          setCurrentDueIndex(0);
-        }
-      } else {
-        // Remove card from today's queue
-        const newDueCards = dueCards.filter((_, index) => index !== currentDueIndex);
-        setDueCards(newDueCards);
-        
-        // Adjust index if needed
-        if (currentDueIndex >= newDueCards.length && newDueCards.length > 0) {
-          setCurrentDueIndex(newDueCards.length - 1);
-        }
-      }
-      
-      // If no more cards in current queue, wait a bit for state updates then refresh
-      if (dueCards.length <= 1) {
-        setTimeout(() => {
-          // Re-fetch all cards with updated SRS data
-          const updatedAvailableCards = [];
-          Object.entries(wordDefinitions).forEach(([key, value]) => {
-            if (value && value.wordSenseId && value.inFlashcards) {
-              // Include the card with potentially updated SRS data
-              const cardToCheck = key === currentCard.key ? updatedCard : value;
-              updatedAvailableCards.push({ ...cardToCheck, key });
-            }
-          });
-          
-          // First try to get strictly due cards
-          const currentSettings = getSRSSettings();
-          const maxNewForRefresh = Math.max(0, currentSettings.newCardsPerDay - todaysNewCards);
-          let refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: maxNewForRefresh }, false);
-          
-          // If no cards are strictly due, include waiting learning cards (Anki behavior)
-          if (refreshedDueCards.length === 0) {
-            refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: maxNewForRefresh }, true);
-          }
-          
-          setDueCards(refreshedDueCards);
-          setCurrentDueIndex(0);
-        }, 500);
-      }
-      
-      setCardAnimation('slide-in-right');
-      setTimeout(() => setCardAnimation(''), 300);
-    }, 300);
-  };
-
-  // Get SRS statistics
-  const srsStats = React.useMemo(() => getReviewStats(availableCards), [availableCards]);
-  
-  const flipCard = () => {
-    setIsFlipped(prev => !prev);
-  };
-  
-  const nextCard = () => {
-    if (availableCards.length === 0) return;
-    
-    if (isFlipped) {
-      // Get the current sense ID and data
-      const currentSenseId = availableCards[currentIndex];
-      const currentCardData = wordDefinitions[currentSenseId];
-      
-      // The basic word without the definition number
-      const baseWord = currentCardData?.word || currentSenseId.replace(/\d+$/, '');
-      
-      // Track this card as reviewed before moving to next
-      setStats(prev => ({
-        ...prev,
-        cardsReviewed: prev.cardsReviewed + 1,
-        history: [...prev.history, {
-          wordSenseId: currentSenseId,
-          word: baseWord, // Store base word for readability
-          date: new Date().toISOString()
-        }]
-      }));
-    }
-    
-    // Trigger slide animation for manual navigation
-    setCardAnimation('slide-out-left');
-    setTimeout(() => {
-      setIsFlipped(false);
-      setCurrentIndex(prev => (prev + 1) % availableCards.length);
-      setCardAnimation('slide-in-right');
-      setTimeout(() => setCardAnimation(''), 300);
-    }, 300);
-  };
-  
-  const prevCard = () => {
-    // Trigger slide animation for previous navigation (reverse direction)
-    setCardAnimation('slide-out-right');
-    setTimeout(() => {
-      setIsFlipped(false);
-      setCurrentIndex(prev => 
-        prev === 0 ? availableCards.length - 1 : prev - 1
-      );
-      setCardAnimation('slide-in-left');
-      setTimeout(() => setCardAnimation(''), 300);
-    }, 300);
-  };
-
-  // Generate and play audio for the current sentence
-  const generateAndPlayAudio = useCallback(async (text, cardKey) => {
-    if (!text) return;
-    
-    setAudioState(prev => {
-      if (prev.loading) return prev; // Already loading, skip
-      return { loading: true, error: null };
-    });
-    
-    try {
-      // First, check if audio already exists in backend
-      const checkResponse = await fetch(`https://polycast-server.onrender.com/api/audio/${encodeURIComponent(cardKey)}`);
-      
-      let audioUrl;
-      if (checkResponse.ok) {
-        // Audio already exists
-        const audioData = await checkResponse.json();
-        if (!audioData || !audioData.audioUrl) {
-          throw new Error('Invalid audio data received from server');
-        }
-        audioUrl = audioData.audioUrl;
-      } else {
-        // Generate new audio
-        const generateResponse = await fetch('https://polycast-server.onrender.com/api/generate-audio', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            text: text.replace(/<[^>]*>/g, ''), // Strip HTML tags
-            cardKey: cardKey,
-            profile: selectedProfile
-          })
-        });
-        
-        if (!generateResponse.ok) {
-          throw new Error('Failed to generate audio');
-        }
-        
-        const audioData = await generateResponse.json();
-        if (!audioData || !audioData.audioUrl) {
-          throw new Error('Invalid audio data generated by server');
-        }
-        audioUrl = audioData.audioUrl;
-      }
-      
-      // Play the audio
-      setCurrentAudio(prevAudio => {
-        if (prevAudio) {
-          prevAudio.pause();
-          prevAudio.currentTime = 0;
-        }
-        
-        const audio = new Audio(audioUrl);
-        
-        audio.onended = () => {
-          setAudioState({ loading: false, error: null });
-        };
-        
-        audio.onerror = () => {
-          setAudioState({ loading: false, error: null });
-          showError('Failed to play audio');
-        };
-        
-        audio.play().then(() => {
-          setAudioState({ loading: false, error: null });
-        }).catch(err => {
-          console.error('Audio play error:', err);
-          setAudioState({ loading: false, error: null });
-          showError(`Failed to play audio: ${err.message}`);
-        });
-        
-        return audio;
-      });
-      
-    } catch (error) {
-      console.error('Audio generation error:', error);
-      setAudioState({ loading: false, error: null });
-      showError(`Failed to generate audio: ${error.message}`);
-    }
-  }, [selectedProfile, showError]);
-
-  // Play audio button handler
-  const handlePlayAudio = () => {
-    const currentSenseId = availableCards[currentIndex];
-    const wordDef = wordDefinitions[currentSenseId];
-    
-    if (!wordDef || !wordDef.exampleSentencesGenerated) return;
-    
-    const parts = wordDef.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-    const interval = wordDef?.srsData?.interval || 1;
-    const sentenceIndex = ((interval - 1) % 5) * 2;
-    const englishSentence = parts[sentenceIndex] || parts[0] || '';
-    
-    if (englishSentence) {
-      generateAndPlayAudio(englishSentence, currentSenseId);
-    }
-  };
-  
-  // Load images for all cards once when the component mounts or availableCards changes significantly
-  useEffect(() => {
-    if (availableCards.length === 0) return;
-    
-    // Create image map (no default images)
-    const newImageMap = {};
-    
-    // Cards start without images
-    availableCards.forEach(senseId => {
-      newImageMap[senseId] = null;
-    });
-    
-    // Set all images at once
-    setWordImages(newImageMap);
-    
-  }, [availableCards.length]); // Only re-run if the number of available cards changes
-
-  // Auto-play audio when card is flipped (if enabled in settings)
-  useEffect(() => {
-    if (isFlipped && srsSettings.autoPlayAudio && availableCards.length > 0) {
-      const currentSenseId = availableCards[currentIndex];
-      const wordDef = wordDefinitions[currentSenseId];
-      
-      if (wordDef && wordDef.exampleSentencesGenerated) {
-        const parts = wordDef.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-        const interval = wordDef?.srsData?.interval || 1;
-        const sentenceIndex = ((interval - 1) % 5) * 2;
-        const englishSentence = parts[sentenceIndex] || parts[0] || '';
-        
-        if (englishSentence) {
-          // Small delay to let the flip animation finish
+        // Auto-refresh queue if no cards left but there might be more due
+        if (newDueCards.length === 0) {
           setTimeout(() => {
-            generateAndPlayAudio(englishSentence, currentSenseId);
-          }, 300);
+            const updatedAvailableCards = [];
+            Object.entries(wordDefinitions).forEach(([key, value]) => {
+              const cardToCheck = updatedCard.key === key ? updatedCard : value;
+              if (cardToCheck && cardToCheck.wordSenseId && cardToCheck.inFlashcards) {
+                updatedAvailableCards.push({ ...cardToCheck, key });
+              }
+            });
+            
+            const maxNewForRefresh = Math.max(0, srsSettings.newCardsPerDay - todaysNewCards);
+            let refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: maxNewForRefresh }, false);
+            
+            if (refreshedDueCards.length === 0) {
+              refreshedDueCards = getDueCards(updatedAvailableCards, { newPerDay: maxNewForRefresh }, true);
+            }
+            
+            console.log(`[SESSION DEBUG] Auto-refreshing queue: found ${refreshedDueCards.length} cards`);
+            setDueCards(refreshedDueCards);
+            setCurrentDueIndex(0);
+          }, 100);
+        } else {
+          // Clear processing flag after card state is updated
+          processingCardRef.current = false;
         }
-      }
-    }
-  }, [isFlipped, currentIndex, srsSettings.autoPlayAudio, availableCards, wordDefinitions]);
-  
-  // Calculate stats for the visualization
-  const calculatedStats = {
-    totalCards: availableCards.length,
-    reviewedPercentage: stats.cardsReviewed > 0 
-      ? Math.round((stats.cardsReviewed / availableCards.length) * 100) 
-      : 0,
-    correctPercentage: stats.cardsReviewed > 0 
-      ? Math.round((stats.correctAnswers / stats.cardsReviewed) * 100) 
-      : 0,
-    dayStats: calculateDayStats(stats.history)
-  };
-  
-  // Helper to calculate daily stats for the chart
-  function calculateDayStats(history) {
-    if (!history.length) return [];
-    
-    const days = {};
-    const now = new Date();
-    
-    // Initialize last 7 days
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      const dateKey = date.toISOString().split('T')[0];
-      days[dateKey] = { date: dateKey, count: 0, correct: 0 };
-    }
-    
-    // Fill with actual data
-    history.forEach(item => {
-      const dateKey = item.date.split('T')[0];
-      if (days[dateKey]) {
-        days[dateKey].count++;
-        if (item.correct) {
-          days[dateKey].correct++;
-        }
-      }
-    });
-    
-    return Object.values(days);
-  }
-  
-  // Helper to get frequency label based on rating
-  const getFrequencyLabel = (rating) => {
-    const ratings = {
-      '1': 'Extremely Common',
-      '2': 'Very Common',
-      '3': 'Moderately Common',
-      '4': 'Somewhat Uncommon',
-      '5': 'Rare/Specialized'
-    };
-    return ratings[rating] || 'Unknown';
-  };
-  
-  const handleSettingsChange = (newSettings) => {
-    setSrsSettings(newSettings);
-    
-    // Refresh due cards with new settings
-    const maxNewToday = Math.max(0, newSettings.newCardsPerDay - todaysNewCards);
-    let refreshedDueCards = getDueCards(availableCards, { newPerDay: maxNewToday }, false);
-    
-    // If no cards are strictly due, include waiting learning cards
-    if (refreshedDueCards.length === 0) {
-      refreshedDueCards = getDueCards(availableCards, { newPerDay: maxNewToday }, true);
-    }
-    
-    setDueCards(refreshedDueCards);
-    setCurrentDueIndex(0);
-  };
+      }, 200);
+    }, 200);
+  }, [dueCards, currentDueIndex, setWordDefinitions, todaysNewCards, selectedProfile, srsSettings, currentAudio]);
 
-  return (
-    <div className="flashcard-mode">
-      {showSettings && (
-        <SRSSettings 
-          onClose={() => setShowSettings(false)}
-          onSettingsChange={handleSettingsChange}
-        />
-      )}
+  // Calendar Modal Component
+  const CalendarModal = () => {
+    // Debug: Log when calendar data changes
+    React.useEffect(() => {
+      console.log('[CALENDAR DEBUG] Calendar data updated:', calendarData.map(day => ({
+        day: day.dayName,
+        cardCount: day.cards.length,
+        cards: day.cards.map(c => `${c.word} (due: ${new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()})`)
+      })));
       
-      {availableCards.length === 0 ? (
-        <div className="flashcard-empty-state">
-          <div className="empty-state-icon">📚</div>
-          <h2>No Flashcards Yet</h2>
-          <p>Click on words in the transcript and select "Add to Flashcards" to create flashcards for study.</p>
-        </div>
-      ) : showStats ? (
-        <div className="stats-container">
-          <div className="stats-header">
-            <h2>Flashcard Statistics</h2>
+      console.log('[CALENDAR DEBUG] Current processedCards:', processedCards.map(c => ({
+        word: c.word,
+        dueDate: new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()
+      })));
+      
+      console.log('[CALENDAR DEBUG] Current dueCards:', dueCards.map(c => ({
+        word: c.word,
+        dueDate: new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()
+      })));
+      
+      console.log('[CALENDAR DEBUG] Update trigger:', calendarUpdateTrigger);
+    }, [calendarData, processedCards, dueCards, calendarUpdateTrigger]);
+    
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          maxWidth: '95vw',
+          maxHeight: '80vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <div style={{
+            padding: '15px 20px',
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#f8f9fa'
+          }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: '#333' }}>📅 Next 8 Days</h3>
             <button 
-              className="close-stats-button"
-              onClick={() => setShowStats(false)}
+              onClick={() => setShowCalendar(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#666'
+              }}
             >
-              Back to Flashcards
+              ×
             </button>
           </div>
+          <div style={{
+            overflow: 'auto',
+            padding: '10px'
+          }}>
+            {calendarData.map((day, index) => (
+              <div key={index} style={{
+                padding: '12px 15px',
+                margin: '5px 0',
+                backgroundColor: day.cards.length > 0 ? '#f0f9ff' : '#f8f9fa',
+                borderRadius: '8px',
+                borderLeft: `4px solid ${day.cards.length > 0 ? '#2196f3' : '#e5e7eb'}`
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: day.cards.length > 0 ? '8px' : '0'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#333' }}>
+                      {day.dayName}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>
+                      {day.dateStr}
+                    </div>
+                  </div>
+                  <div style={{
+                    backgroundColor: day.cards.length > 0 ? '#2196f3' : '#9ca3af',
+                    color: 'white',
+                    borderRadius: '12px',
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}>
+                    {day.cards.length} cards
+                  </div>
+                </div>
+                {day.cards.length > 0 && (
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    {day.cards.slice(0, 3).map(card => card.word).join(', ')}
+                    {day.cards.length > 3 && ` +${day.cards.length - 3} more`}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Calculate session stats
+  const sessionDuration = Math.floor((new Date() - stats.sessionStartTime) / 1000 / 60);
+
+  // Only show completion if no cards AND enough time has passed since last processing
+  const timeSinceLastProcess = Date.now() - lastCardProcessedTime.current;
+  if (dueCards.length === 0 && timeSinceLastProcess > 1000) {
+    return (
+      <div className="flashcard-container">
+        <div className="flashcard-header">
+          <button className="back-button" onClick={() => window.location.reload()}>
+            ← Back to Main
+          </button>
+          <div className="header-title">Study Complete</div>
+        </div>
+        
+        <div className="completion-state">
+          <div className="completion-icon">🎉</div>
+          <h2>Great work!</h2>
+          <p>You've completed all cards for today.</p>
           
-          <div className="stats-summary">
-            <div className="stat-card">
-              <div className="stat-value">{calculatedStats.totalCards}</div>
-              <div className="stat-label">Total Cards</div>
+          <div className="session-summary">
+            <div className="summary-stat">
+              <div className="summary-number">{stats.cardsReviewed}</div>
+              <div className="summary-label">Cards Reviewed</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-value">{stats.cardsReviewed}</div>
-              <div className="stat-label">Cards Reviewed</div>
+            <div className="summary-stat">
+              <div className="summary-number">{headerStats.accuracy}%</div>
+              <div className="summary-label">Accuracy</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-value">{calculatedStats.correctPercentage}%</div>
-              <div className="stat-label">Accuracy</div>
+            <div className="summary-stat">
+              <div className="summary-number">{sessionDuration}</div>
+              <div className="summary-label">Minutes</div>
             </div>
           </div>
           
-          <div className="stats-chart">
-            <h3>Daily Activity</h3>
-            <div className="chart-container">
-              {calculatedStats.dayStats.map((day, index) => (
-                <div key={index} className="chart-bar-container">
-                  <div className="chart-date-label">{formatShortDate(day.date)}</div>
-                  <div className="chart-bar-wrapper">
-                    <div 
-                      className="chart-bar" 
-                      style={{ height: `${(day.count / Math.max(...calculatedStats.dayStats.map(d => d.count || 1))) * 100}%` }}
-                    >
-                      <div 
-                        className="chart-bar-correct" 
-                        style={{ height: `${day.count > 0 ? (day.correct / day.count) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="chart-value-label">{day.count}</div>
-                </div>
-              ))}
+          <button className="done-button" onClick={() => window.location.reload()}>
+            Return to Main
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const currentCard = dueCards[currentDueIndex];
+  if (!currentCard) return null;
+
+  const baseWord = currentCard.word || currentCard.wordSenseId?.replace(/\d+$/, '');
+  const defNumber = currentCard.definitionNumber || currentCard.wordSenseId?.match(/\d+$/)?.[0] || '';
+  const interval = currentCard?.srsData?.interval || 1;
+
+  return (
+    <div className="flashcard-container">
+      {/* Header */}
+      <div className="flashcard-header">
+        <button className="back-button" onClick={() => window.location.reload()}>
+          ← Back to Main
+        </button>
+        <button 
+          className="calendar-button" 
+          onClick={() => setShowCalendar(true)}
+          style={{
+            background: 'none',
+            border: '1px solid #2196f3',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            fontSize: '14px',
+            color: '#2196f3',
+            cursor: 'pointer',
+            marginLeft: 'auto',
+            marginRight: '20px'
+          }}
+        >
+          📅 Calendar
+        </button>
+        <div style={{color: 'red', fontSize: '10px'}}>V2.0-HC</div>
+        <div className="header-stats">
+          <div className="header-progress">
+            <span style={{color: '#5f72ff'}}>New: {headerStats.newCards}</span> • 
+            <span style={{color: '#ef4444', marginLeft: '4px'}}>Learning: {headerStats.learningCards}</span> • 
+            <span style={{color: '#10b981', marginLeft: '4px'}}>Review: {headerStats.reviewCards}</span>
+          </div>
+          <div className="header-accuracy">
+            {headerStats.accuracy}% • {headerStats.cardsReviewed} done
+          </div>
+        </div>
+      </div>
+
+      {/* Card Container */}
+      <div className="desktop-card-container">
+        <div 
+          className="desktop-flashcard"
+          onClick={() => setIsFlipped(!isFlipped)}
+          style={{
+            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+            transition: 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            cursor: 'pointer'
+          }}
+        >
+          {/* Front of Card */}
+          <div className="desktop-card-front">
+            <div className="desktop-card-content">
+              <div className="desktop-card-word">
+                {baseWord}
+                {defNumber && <span className="def-number">#{defNumber}</span>}
+              </div>
+              <div className="desktop-card-prompt">
+                Click to see definition
+              </div>
             </div>
-            <div className="chart-legend">
-              <div className="legend-item">
-                <div className="legend-color legend-total"></div>
-                <div>Total Reviews</div>
-              </div>
-              <div className="legend-item">
-                <div className="legend-color legend-correct"></div>
-                <div>Correct</div>
-              </div>
+          </div>
+
+          {/* Back of Card */}
+          <div className="desktop-card-back">
+            <div className="desktop-card-content">
+              {currentCard.exampleSentencesGenerated ? (
+                (() => {
+                  const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+                  const sentenceIndex = ((interval - 1) % 5) * 2;
+                  const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+                  const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
+                    return `<span class="highlighted-word">${word}</span>`;
+                  });
+                  const exampleNumber = ((interval - 1) % 5) + 1;
+                  
+                  return (
+                    <div className="desktop-card-answer">
+                      <div className="desktop-example-label">
+                        Example {exampleNumber}:
+                      </div>
+                      <div 
+                        className="desktop-example-sentence"
+                        dangerouslySetInnerHTML={{ __html: highlightedSentence }}
+                      />
+                      {currentCard.disambiguatedDefinition && (
+                        <div className="desktop-card-definition">
+                          {currentCard.disambiguatedDefinition.definition}
+                        </div>
+                      )}
+                      <button 
+                        className="desktop-audio-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayAudio();
+                        }}
+                        disabled={audioState.loading}
+                      >
+                        {audioState.loading ? '🔄' : '🔊'} Play Audio
+                      </button>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="desktop-card-answer">
+                  <div className="desktop-card-word-large">
+                    {baseWord}
+                  </div>
+                  {currentCard.disambiguatedDefinition && (
+                    <div className="desktop-card-definition">
+                      {currentCard.disambiguatedDefinition.definition}
+                    </div>
+                  )}
+                  <button 
+                    className="desktop-audio-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePlayAudio();
+                    }}
+                    disabled={audioState.loading}
+                  >
+                    {audioState.loading ? '🔄' : '🔊'} Play Audio
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      ) : (
-        <>
-          <div className="flashcard-header">
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                className="flashcard-stats-button" 
-                onClick={() => setShowStats(true)}
-              >
-                View Stats ({stats.cardsReviewed} reviewed)
-              </button>
-              <button 
-                className="flashcard-stats-button" 
-                onClick={() => setShowSettings(true)}
-                style={{ background: '#4CAF50' }}
-              >
-                ⚙️ Settings
-              </button>
-            </div>
-            <div className="card-count">
-              <div>Card {currentDueIndex + 1} of {dueCards.length} due</div>
-              <div style={{ fontSize: '12px', color: '#999' }}>
-                New: {srsStats.new} | Learning: {srsStats.learning} | Review: {srsStats.review}
-              </div>
-              <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>
-                Daily limit: {todaysNewCards}/{srsSettings.newCardsPerDay} new cards
-              </div>
-            </div>
-          </div>
-          
-          {/* Get the current due card data */}
-          {(() => {
-            if (!dueCards.length) {
-              // Check if there are any waiting learning cards
-              const maxNewForWaiting = Math.max(0, srsSettings.newCardsPerDay - todaysNewCards);
-              const waitingCards = getDueCards(availableCards, { newPerDay: maxNewForWaiting }, true);
-              
-              if (waitingCards.length > 0) {
-                const nextCard = waitingCards[0];
-                const nextDueDate = new Date(nextCard.srsData.nextReviewDate);
-                const timeUntilNext = formatNextReviewTime(nextCard.srsData.nextReviewDate);
-                
-                return (
-                  <div className="flashcard-empty-state">
-                    <div className="empty-state-icon">⏰</div>
-                    <h2>Waiting for Learning Cards</h2>
-                    <p>You have {waitingCards.length} learning card{waitingCards.length > 1 ? 's' : ''} waiting.</p>
-                    <p>Next card available in: <strong>{timeUntilNext}</strong></p>
-                    <button 
-                      onClick={() => {
-                        setDueCards(waitingCards);
-                        setCurrentDueIndex(0);
-                      }}
-                      style={{
-                        marginTop: '15px',
-                        padding: '10px 20px',
-                        background: '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '16px'
-                      }}
-                    >
-                      Study Waiting Cards Now
-                    </button>
-                  </div>
-                );
-              }
-              
-              return (
-                <div className="flashcard-empty-state">
-                  <div className="empty-state-icon">🎉</div>
-                  <h2>All Done!</h2>
-                  <p>You've reviewed all cards due today. Come back tomorrow for more!</p>
-                  <div style={{ marginTop: '20px', fontSize: '14px', color: '#999' }}>
-                    Total cards: {availableCards.length} | Tomorrow: {srsStats.total - srsStats.dueToday} due
-                  </div>
-                </div>
-              );
-            }
-            
-            const currentCardData = dueCards[currentDueIndex];
-            const currentSenseId = currentCardData?.wordSenseId;
-            
-            if (!currentCardData) {
-              console.warn(`No data found for flashcard with ID: ${currentSenseId}`);
-              return null;
-            }
-            
-            // The basic word without the definition number
-            const baseWord = currentCardData.word || currentSenseId.replace(/\d+$/, '');
-            
-            // Get definition number for display
-            const defNumber = currentCardData.definitionNumber || 
-                             currentSenseId.match(/\d+$/)?.[0] || '';
-            // Get interval for display (for example sentences)
-            const interval = currentCardData?.srsData?.interval || 1;
-            return (
-              <div 
-                ref={cardContainerRef}
-                className={`flashcard-container ${cardAnimation}`}
-              >
-                <div 
-                  className={`flashcard ${isFlipped ? 'flipped' : ''}`}
-                  onClick={flipCard}
-                >
-                  <div className="flashcard-front">
-                    <div className="flashcard-content">
-                      {currentCardData.exampleSentencesGenerated ? (
-                        (() => {
-                          // Parse the sentences and translations (English1//NativeLanguage1//English2//NativeLanguage2//etc)
-                          const parts = currentCardData.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-                          
-                          // Calculate which sentence to show based on interval (looping after 5)
-                          const sentenceIndex = ((interval - 1) % 5) * 2; // *2 because each sentence has English + native language
-                          const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                          const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
-                          
-                          // Create cloze version by replacing ~word~ with _____
-                          const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
-                          
-                          return (
-                            <div style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              height: '100%',
-                              padding: '20px',
-                              textAlign: 'center'
-                            }}>
-                              <div style={{ 
-                                fontSize: '22px', 
-                                lineHeight: '1.4', 
-                                marginBottom: '30px',
-                                fontWeight: '500',
-                                color: '#fff',
-                                maxWidth: '90%'
-                              }}>
-                                {clozeSentence}
-                              </div>
-                              {nativeTranslation && (() => {
-                                // Create highlighted version of native translation by replacing ~word~ with bold yellow word
-                                const highlightedNativeTranslation = nativeTranslation.replace(/~([^~]+)~/g, (match, word) => {
-                                  return `<span style="font-weight: bold; color: #e3e36b;">${word}</span>`;
-                                });
-                                
-                                return (
-                                  <div 
-                                    style={{ 
-                                      fontSize: '18px', 
-                                      fontStyle: 'italic',
-                                      color: '#a0a0a0',
-                                      lineHeight: '1.3',
-                                      maxWidth: '85%'
-                                    }}
-                                    dangerouslySetInnerHTML={{ __html: highlightedNativeTranslation }}
-                                  />
-                                );
-                              })()}
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <>
-                          <div className="flashcard-word-container">
-                            <div className="flashcard-word">
-                              {baseWord}
-                              {defNumber && <span className="definition-number">({defNumber})</span>}
-                            </div>
-                          </div>
-                          <div className="flashcard-pos">{currentCardData.partOfSpeech || 'verb'}</div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flashcard-back">
-                    <div className="flashcard-content">
-                      
-                      {/* Display the full sentence with highlighted word */}
-                      <div className="flashcard-generated-examples">
-                        {currentCardData.exampleSentencesGenerated ? (
-                          (() => {
-                            // Parse the sentences and translations (English1//NativeLanguage1//English2//NativeLanguage2//etc)
-                            const parts = currentCardData.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-                            
-                            // Calculate which sentence to show based on interval (looping after 5)
-                            const sentenceIndex = ((interval - 1) % 5) * 2; // *2 because each sentence has English + native language
-                            const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                            
-                            // Create highlighted version by replacing ~word~ with bold yellow word
-                            const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
-                              return `<span style="font-weight: bold; color: #e3e36b;">${word}</span>`;
-                            });
-                            
-                            const exampleNumber = ((interval - 1) % 5) + 1;
-                            
-                            return (
-                              <div style={{ 
-                                backgroundColor: '#2a2a3e', 
-                                padding: '15px', 
-                                borderRadius: '8px', 
-                                marginBottom: '15px',
-                                fontSize: '16px',
-                                lineHeight: '1.6'
-                              }}>
-                                <div style={{ 
-                                  color: '#e3e36b', 
-                                  fontSize: '14px', 
-                                  marginBottom: '8px',
-                                  fontWeight: 'bold'
-                                }}>
-                                  Example {exampleNumber}:
-                                </div>
-                                <div 
-                                  dangerouslySetInnerHTML={{ __html: highlightedSentence }}
-                                  style={{
-                                    fontSize: '18px',
-                                    lineHeight: '1.6'
-                                  }}
-                                />
-                              </div>
-                            );
-                          })()
-                        ) : (
-                          <div style={{ 
-                            color: '#888', 
-                            fontStyle: 'italic',
-                            textAlign: 'center',
-                            marginBottom: '15px'
-                          }}>
-                            Generating examples...
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Audio Button */}
-                      <button
-                        className="audio-btn"
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevent card flip
-                          handlePlayAudio();
-                        }}
-                        disabled={audioState.loading || !currentCardData.exampleSentencesGenerated}
-                        style={{
-                          background: 'rgba(95, 114, 255, 0.2)',
-                          border: '2px solid rgba(95, 114, 255, 0.5)',
-                          color: '#ffffff',
-                          padding: '8px 16px',
-                          borderRadius: '12px',
-                          fontSize: '0.9rem',
-                          fontWeight: '600',
-                          cursor: audioState.loading ? 'wait' : 'pointer',
-                          transition: 'all 0.2s ease',
-                          marginBottom: '16px'
-                        }}
-                      >
-                        {audioState.loading ? '🔄 Loading...' : '🔊 Play Audio'}
-                      </button>
-                      
-                       {/* SRS Answer buttons */}
-                       <div className="answer-feedback-buttons">
-                         <button 
-                           className="feedback-btn incorrect-btn" 
-                           onClick={(e) => {
-                             e.stopPropagation(); // Prevent card flip
-                             markCard('incorrect');
-                           }}
-                         >
-                           <div>❌ Incorrect</div>
-                           <div className="next-review-time">{formatNextReviewTime(calculateNextReview(currentCardData, 'incorrect').nextReviewDate)}</div>
-                         </button>
-                         <button 
-                           className="feedback-btn correct-btn" 
-                           onClick={(e) => {
-                             e.stopPropagation(); // Prevent card flip
-                             markCard('correct');
-                           }}
-                         >
-                           <div>✓ Correct</div>
-                           <div className="next-review-time">{formatNextReviewTime(calculateNextReview(currentCardData, 'correct').nextReviewDate)}</div>
-                         </button>
-                         <button 
-                           className="feedback-btn easy-btn" 
-                           onClick={(e) => {
-                             e.stopPropagation(); // Prevent card flip
-                             markCard('easy');
-                           }}
-                           style={{
-                             background: 'linear-gradient(45deg, #4CAF50, #45a049)',
-                             marginLeft: '10px'
-                           }}
-                         >
-                           <div>⭐ Easy</div>
-                           <div className="next-review-time">{formatNextReviewTime(calculateNextReview(currentCardData, 'easy').nextReviewDate)}</div>
-                         </button>
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-               </div>
-             );
-           })()}
-          
-           {/* Audio Error Display */}
-           {audioState.error && (
-             <div style={{
-               position: 'fixed',
-               top: '20px',
-               left: '50%',
-               transform: 'translateX(-50%)',
-               background: 'rgba(239, 68, 68, 0.9)',
-               color: 'white',
-               padding: '12px 20px',
-               borderRadius: '8px',
-               fontSize: '0.9rem',
-               fontWeight: '600',
-               zIndex: 1001,
-               display: 'flex',
-               alignItems: 'center',
-               gap: '10px',
-               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-             }}>
-               ⚠️ {audioState.error}
-               <button
-                 onClick={() => setAudioState({ ...audioState, error: null })}
-                 style={{
-                   background: 'none',
-                   border: 'none',
-                   color: 'white',
-                   fontSize: '1.2rem',
-                   cursor: 'pointer',
-                   padding: '0',
-                   marginLeft: '10px'
-                 }}
-               >
-                 ×
-               </button>
-             </div>
-           )}
-          
-           <div className="flashcard-controls bottom-controls">
-             <button className="nav-btn prev-btn" onClick={prevCard}>
-               ← Previous
-             </button>
-             
-             <div className="spacer"></div>
-             
-             <button className="nav-btn next-btn" onClick={nextCard}>
-               Next →
-             </button>
-           </div>
-         </>
-       )}
+      </div>
 
-       {/* Error Popup */}
-       <ErrorPopup error={popupError} onClose={clearError} />
-     </div>
-   );
+      {/* Answer Buttons */}
+      <div className="desktop-answer-buttons">
+        <button 
+          className="desktop-answer-btn desktop-incorrect-btn"
+          onClick={() => markCard('incorrect')}
+          disabled={!isFlipped}
+        >
+          <div className="desktop-btn-emoji">❌</div>
+          <div className="desktop-btn-label">Incorrect</div>
+          <div className="desktop-btn-time">
+            {buttonTimes.incorrect.time}
+          </div>
+        </button>
+        
+        <button 
+          className="desktop-answer-btn desktop-correct-btn"
+          onClick={() => markCard('correct')}
+          disabled={!isFlipped}
+        >
+          <div className="desktop-btn-emoji">✓</div>
+          <div className="desktop-btn-label">Correct</div>
+          <div className="desktop-btn-time">
+            {buttonTimes.correct.time}
+          </div>
+        </button>
+        
+        <button 
+          className="desktop-answer-btn desktop-easy-btn"
+          onClick={() => markCard('easy')}
+          disabled={!isFlipped}
+        >
+          <div className="desktop-btn-emoji">⭐</div>
+          <div className="desktop-btn-label">Easy</div>
+          <div className="desktop-btn-time">
+            {buttonTimes.easy.time}
+          </div>
+        </button>
+      </div>
+
+      {/* Calendar Modal */}
+      {showCalendar && <CalendarModal />}
+
+      {/* Error Popup */}
+      <ErrorPopup error={popupError} onClose={clearError} />
+    </div>
+  );
 };
 
-// Helper to format date to short form (e.g., "Mon 5")
-function formatShortDate(dateStr) {
-  const date = new Date(dateStr);
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return `${days[date.getDay()]} ${date.getDate()}`;
-}
-
 FlashcardMode.propTypes = {
-  selectedWords: PropTypes.arrayOf(PropTypes.string).isRequired,
+  selectedWords: PropTypes.array,
   wordDefinitions: PropTypes.object.isRequired,
   setWordDefinitions: PropTypes.func.isRequired,
-  englishSegments: PropTypes.arrayOf(PropTypes.object),
-  targetLanguages: PropTypes.arrayOf(PropTypes.string),
+  englishSegments: PropTypes.array,
+  targetLanguages: PropTypes.array,
   selectedProfile: PropTypes.string.isRequired
 };
 
