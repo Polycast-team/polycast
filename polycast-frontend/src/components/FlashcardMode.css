@@ -485,7 +485,7 @@ kbd {
   height: 100vh;
   background-color: #1a1a2e;
   color: white;
-  padding: 1vh;
+  padding: 5px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -494,23 +494,24 @@ kbd {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5vh;
-  padding: 0.5vh 1vw;
+  margin: 0;
+  padding: 5px 10px;
   flex-shrink: 0;
-  height: 5vh;
-  min-height: 40px;
+  height: 35px;
+  background-color: transparent;
 }
 
 .back-button {
   background-color: #3f3969;
   color: white;
   border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: 3px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   transition: background-color 0.2s;
   white-space: nowrap;
+  height: 24px;
 }
 
 .back-button:hover {
@@ -520,13 +521,14 @@ kbd {
 .calendar-button {
   background: none;
   border: 1px solid #2196f3;
-  border-radius: 4px;
-  padding: 6px 10px;
-  font-size: 11px;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 10px;
   color: #2196f3;
   cursor: pointer;
   transition: background-color 0.2s;
   white-space: nowrap;
+  height: 24px;
 }
 
 .calendar-button:hover {
@@ -543,18 +545,20 @@ kbd {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 1px;
-  line-height: 1.2;
+  gap: 0px;
+  line-height: 1.1;
+  height: 24px;
+  justify-content: center;
 }
 
 .header-progress {
-  font-size: 11px;
+  font-size: 9px;
   color: #ccc;
   white-space: nowrap;
 }
 
 .header-accuracy {
-  font-size: 10px;
+  font-size: 8px;
   color: #aaa;
   white-space: nowrap;
 }
@@ -565,8 +569,7 @@ kbd {
   align-items: center;
   perspective: 1000px;
   flex: 1;
-  margin: 1vh 0;
-  min-height: 300px;
+  margin: 10px 0;
 }
 
 .desktop-flashcard {
@@ -719,29 +722,26 @@ kbd {
 .desktop-answer-buttons {
   display: flex;
   justify-content: center;
-  gap: 3vw;
-  margin-top: 1vh;
-  padding: 0 2vw;
+  gap: 20px;
+  margin: 10px 0;
+  padding: 0 20px;
   flex-shrink: 0;
-  height: 10vh;
+  height: 80px;
   align-items: center;
-  min-height: 80px;
 }
 
 .desktop-answer-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1vh 1.5vw;
+  padding: 8px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 13px;
   font-weight: bold;
-  min-width: 120px;
-  max-width: 15vw;
-  height: 8vh;
-  min-height: 65px;
+  min-width: 110px;
+  height: 65px;
   transition: all 0.2s ease;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
   justify-content: center;
@@ -759,17 +759,17 @@ kbd {
 }
 
 .desktop-btn-emoji {
-  font-size: 2vh;
-  margin-bottom: 0.5vh;
+  font-size: 18px;
+  margin-bottom: 2px;
 }
 
 .desktop-btn-label {
-  font-size: 0.8rem;
-  margin-bottom: 0.3vh;
+  font-size: 12px;
+  margin-bottom: 1px;
 }
 
 .desktop-btn-time {
-  font-size: 0.7rem;
+  font-size: 10px;
   opacity: 0.8;
   font-weight: normal;
 }
