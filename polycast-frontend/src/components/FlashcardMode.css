@@ -496,9 +496,9 @@ kbd {
   justify-content: space-between;
   align-items: center;
   margin: 0;
-  padding: 5px 20px;
+  padding: 2px 20px;
   flex-shrink: 0;
-  height: 50px;
+  height: 30px;
   background-color: transparent;
 }
 
