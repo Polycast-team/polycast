@@ -175,13 +175,48 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           {/* Front of Card */}
           <div className="desktop-card-front">
             <div className="desktop-card-content">
-              <div className="desktop-card-word">
-                {baseWord}
-                {defNumber && <span className="def-number">#{defNumber}</span>}
-              </div>
-              <div className="desktop-card-prompt">
-                Click to see definition
-              </div>
+              {currentCard.exampleSentencesGenerated ? (
+                (() => {
+                  const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+                  const sentenceIndex = ((interval - 1) % 5) * 2;
+                  const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+                  const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
+                  const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
+                  const exampleNumber = ((interval - 1) % 5) + 1;
+                  
+                  return (
+                    <div className="desktop-card-content">
+                      <div className="desktop-example-label">
+                        Example {exampleNumber}:
+                      </div>
+                      <div className="desktop-card-sentence">
+                        {clozeSentence}
+                      </div>
+                      {nativeTranslation && (
+                        <div 
+                          className="desktop-card-translation"
+                          dangerouslySetInnerHTML={{ 
+                            __html: nativeTranslation.replace(/~([^~]+)~/g, '<span class="highlighted-word">$1</span>') 
+                          }}
+                        />
+                      )}
+                      <div className="desktop-card-hint">
+                        Click to reveal answer
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="desktop-card-content">
+                  <div className="desktop-card-word">
+                    {baseWord}
+                    {defNumber && <span className="def-number">#{defNumber}</span>}
+                  </div>
+                  <div className="desktop-card-prompt">
+                    Click to see definition
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
