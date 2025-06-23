@@ -128,6 +128,39 @@ function Controls({
                   </label>
                 )}
             </div>
+            
+            {/* Flashcard controls - only show in flashcard mode */}
+            {appMode === 'flashcard' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 20 }}>
+                <button 
+                  onClick={() => window.location.reload()}
+                  style={{
+                    background: '#3f3969', color: 'white', border: 'none', padding: '6px 12px',
+                    borderRadius: '6px', cursor: 'pointer', fontSize: '13px'
+                  }}
+                >
+                  ← Back to Main
+                </button>
+                <button 
+                  onClick={() => {
+                    // We'll need to pass this function down from App.jsx
+                    window.dispatchEvent(new CustomEvent('showFlashcardCalendar'));
+                  }}
+                  style={{
+                    background: 'none', border: '1px solid #2196f3', borderRadius: '6px',
+                    padding: '6px 10px', fontSize: '13px', color: '#2196f3', cursor: 'pointer'
+                  }}
+                >
+                  📅 Calendar
+                </button>
+                <div style={{ color: '#ccc', fontSize: '12px' }}>
+                  <span style={{color: '#5f72ff'}}>New: 5</span> • 
+                  <span style={{color: '#ef4444', marginLeft: '4px'}}>Learning: 0</span> • 
+                  <span style={{color: '#10b981', marginLeft: '4px'}}>Review: 1</span>
+                </div>
+              </div>
+            )}
+            
             {/* Font size controls - available to both hosts and students */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 18 }}>
                 <button

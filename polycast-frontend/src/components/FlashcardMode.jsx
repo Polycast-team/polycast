@@ -79,6 +79,16 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     await playFlashcardAudio(currentCard.word, currentAudio, setCurrentAudio, setAudioState);
   };
   
+  // Listen for calendar event from toolbar
+  React.useEffect(() => {
+    const handleCalendarEvent = () => {
+      setShowCalendar(true);
+    };
+    
+    window.addEventListener('showFlashcardCalendar', handleCalendarEvent);
+    return () => window.removeEventListener('showFlashcardCalendar', handleCalendarEvent);
+  }, []);
+  
   // Show completion screen
   if (isSessionComplete) {
     return (
@@ -126,28 +136,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   
   return (
     <div className="flashcard-container">
-      {/* Header */}
-      <div className="flashcard-header">
-        <button className="back-button" onClick={() => window.location.reload()}>
-          ← Back to Main
-        </button>
-        <button 
-          className="calendar-button" 
-          onClick={() => setShowCalendar(true)}
-        >
-          📅 Calendar
-        </button>
-        <div style={{color: 'red', fontSize: '10px'}}>V2.0-HC</div>
-        <div className="header-stats">
-          <div className="header-progress">
-            <span style={{color: '#5f72ff'}}>New: {headerStats.newCards}</span> • 
-            <span style={{color: '#ef4444', marginLeft: '4px'}}>Learning: {headerStats.learningCards}</span> • 
-            <span style={{color: '#10b981', marginLeft: '4px'}}>Review: {headerStats.reviewCards}</span>
-          </div>
-          <div className="header-accuracy">
-            {headerStats.accuracy}% • {headerStats.cardsReviewed} done
-          </div>
-        </div>
+      {/* Header - now hidden since controls moved to main toolbar */}
+      <div className="flashcard-header" style={{ display: 'none' }}>
       </div>
 
       {/* Card Container */}
