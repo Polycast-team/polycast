@@ -483,7 +483,7 @@ kbd {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #1a1a2e;
+  background-color: transparent;
   color: white;
   padding: 0;
   margin-top: -100px;
