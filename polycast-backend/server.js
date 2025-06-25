@@ -942,11 +942,11 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
         // Insert into database
         await client.query('BEGIN');
         
-        // Insert flashcard
+        // Insert flashcard (using only existing columns)
         await client.query(`
             INSERT INTO flashcards 
-            (profile_name, word_sense_id, word, definition, translation, part_of_speech, definition_number, example, in_flashcards, exampleSentencesGenerated, wordFrequency, definitionFrequency)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            (profile_name, word_sense_id, word, definition, translation, part_of_speech, definition_number, example, in_flashcards)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         `, [
             profile,
             wordSenseId,
@@ -956,10 +956,7 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
             parsedResponse.partOfSpeech,
             parsedResponse.definitionNumber || 1,
             parsedResponse.example,
-            true, // in_flashcards
-            exampleSentencesRaw,
-            wordFrequency,
-            definitionFrequency
+            true // in_flashcards
         ]);
         
         // Update profile's selected_words
@@ -984,6 +981,10 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
             translation: parsedResponse.translation,
             partOfSpeech: parsedResponse.partOfSpeech,
             definition: parsedResponse.definition,
+            definitions: [{
+                text: parsedResponse.definition,
+                example: parsedResponse.example
+            }],
             example: parsedResponse.example,
             definitionNumber: parsedResponse.definitionNumber || 1,
             contextualExplanation: parsedResponse.contextualExplanation,
