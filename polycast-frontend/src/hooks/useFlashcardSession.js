@@ -38,13 +38,27 @@ export function useFlashcardSession(selectedProfile, wordDefinitions) {
     // For non-saving mode, use hardcoded cards
     if (selectedProfile === 'non-saving') {
       const hardcodedCards = getHardcodedCards();
+      console.log(`[DEBUG] Non-saving mode: ${hardcodedCards.length} hardcoded cards available`);
       return hardcodedCards;
     }
 
     // For other profiles, process actual wordDefinitions
     const cards = [];
+    const totalWords = Object.keys(wordDefinitions).length;
+    let wordsWithFlashcards = 0;
+    let wordsWithoutFlashcards = 0;
+    
     Object.entries(wordDefinitions).forEach(([key, value]) => {
-      if (value && value.wordSenseId && value.inFlashcards) {
+      if (value && value.wordSenseId) {
+        if (value.inFlashcards) {
+          wordsWithFlashcards++;
+        } else {
+          wordsWithoutFlashcards++;
+        }
+      }
+      
+      // TEMPORARY FIX: Include all words with definitions, not just those marked inFlashcards
+      if (value && value.wordSenseId) {
         // Initialize SRS data if it doesn't exist
         const cardWithSRS = { ...value, key };
         
@@ -84,6 +98,9 @@ export function useFlashcardSession(selectedProfile, wordDefinitions) {
         cards.push(cardWithSRS);
       }
     });
+    
+    console.log(`[DEBUG] Profile ${selectedProfile}: ${totalWords} total words, ${wordsWithFlashcards} with inFlashcards=true, ${wordsWithoutFlashcards} without inFlashcards, ${cards.length} final cards`);
+    
     return cards;
   }, [wordDefinitions, selectedProfile]);
   
@@ -113,14 +130,18 @@ export function useFlashcardSession(selectedProfile, wordDefinitions) {
     // Get due cards using SRS algorithm with current settings
     const currentSettings = getSRSSettings();
     const maxNewToday = Math.max(0, currentSettings.newCardsPerDay - todaysNewCards);
+    console.log(`[DEBUG] SRS settings: newCardsPerDay=${currentSettings.newCardsPerDay}, todaysNewCards=${todaysNewCards}, maxNewToday=${maxNewToday}`);
+    
     let due = getDueCards(availableCards, { newPerDay: maxNewToday }, false);
+    console.log(`[DEBUG] First pass: ${due.length} due cards found (strict mode)`);
     
     // If no cards are strictly due, include waiting learning cards
     if (due.length === 0) {
       due = getDueCards(availableCards, { newPerDay: maxNewToday }, true);
+      console.log(`[DEBUG] Second pass: ${due.length} due cards found (include waiting)`);
     }
     
-    console.log(`[CARD ORDER] Due cards:`, due);
+    console.log(`[CARD ORDER] Final due cards:`, due);
     setDueCards(due);
     setCurrentDueIndex(0);
     setIsFlipped(false);
