@@ -876,8 +876,8 @@ const TranscriptionDisplay = ({
         try {
           console.log(`[BACKGROUND GEMINI] Generating example sentences for "${word}"`);
           
-          // Get the native language (student's home language or first selected language)
-          const nativeLanguage = (isStudentMode && studentHomeLanguage) ? studentHomeLanguage : (targetLanguages[0] || 'Spanish');
+          // Get the native language (student's home language or profile language)
+          const nativeLanguage = (isStudentMode && studentHomeLanguage) ? studentHomeLanguage : getLanguageForProfile(selectedProfile);
           
           // Create the prompt for example sentences with translations
           const examplePrompt = `Rate "${word}" frequency (1-10) and create 5 example sentences in context: ${definition}
@@ -1299,9 +1299,10 @@ START NOW:`;
             const scheme = colorSchemes[(idx + 1) % colorSchemes.length];
             const layout = langBoxLayout[idx] || { x: 0, y: 0, w: 320, h: 250 };
             
-            // For student mode, always use Spanish translations if available regardless of language label
-            const segments = isStudentMode && lang === 'Spanish' 
-              ? (translations['Spanish'] || translations[Object.keys(translations)[0]] || []) 
+            // For student mode, use the profile's language translations
+            const profileLanguage = getLanguageForProfile(selectedProfile);
+            const segments = isStudentMode && lang === profileLanguage 
+              ? (translations[profileLanguage] || translations[Object.keys(translations)[0]] || []) 
               : (translations[lang] || []);
             return (
               <div
