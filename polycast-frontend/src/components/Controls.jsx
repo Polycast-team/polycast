@@ -60,25 +60,76 @@ function Controls({
                   </>
                 )}
                 <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Mode:</label>
-                <select 
-                    value={appMode}
-                    onChange={e => {
-                        console.log('Mode dropdown onChange fired:', e.target.value);
-                        console.log('setAppMode function exists:', !!setAppMode);
-                        console.log('Current appMode:', appMode);
-                        if (setAppMode) {
-                            setAppMode(e.target.value);
-                        } else {
-                            console.error('setAppMode is null or undefined!');
-                        }
-                    }}
-                    style={{ minWidth: 90, fontSize: 15, padding: '2px 6px', borderRadius: 6 }}
-                    disabled={isRecording} // Only disable while recording, allow students to change modes
-                >
-                    <option value="audio">{t.lectureMode}</option>
-                    <option value="dictionary">{t.dictionaryMode}</option>
-                    <option value="flashcard">{t.flashcardMode}</option>
-                </select>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {/* Show transcript button only when not in audio mode and when in a room */}
+                    {appMode !== 'audio' && userRole === 'student' && (
+                        <button
+                            onClick={() => setAppMode && setAppMode('audio')}
+                            disabled={isRecording}
+                            style={{
+                                background: '#3f3969',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '6px 12px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                            title="View Transcript"
+                        >
+                            📝 Transcript
+                        </button>
+                    )}
+                    
+                    {/* Show dictionary button only when not in dictionary mode */}
+                    {appMode !== 'dictionary' && (
+                        <button
+                            onClick={() => setAppMode && setAppMode('dictionary')}
+                            disabled={isRecording}
+                            style={{
+                                background: '#3f3969',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '6px 12px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                            title="Dictionary Mode"
+                        >
+                            📚 {t.dictionaryMode}
+                        </button>
+                    )}
+                    
+                    {/* Show flashcard button only when not in flashcard mode */}
+                    {appMode !== 'flashcard' && (
+                        <button
+                            onClick={() => setAppMode && setAppMode('flashcard')}
+                            disabled={isRecording}
+                            style={{
+                                background: '#3f3969',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '6px 12px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                            title="Flashcard Mode"
+                        >
+                            🔄 {t.flashcardMode}
+                        </button>
+                    )}
+                </div>
                 {/* Only show the live transcript and translation checkboxes in audio mode */}
                 {appMode === 'audio' && (
                   <>

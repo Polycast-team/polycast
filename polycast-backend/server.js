@@ -924,12 +924,28 @@ After the 5 sentence pairs, provide two frequency ratings (1-10 scale):
 - Word frequency: How common '${normalizedWord}' is in general vocabulary (1=extremely rare, 10=ubiquitous)  
 - Definition frequency: How common this specific meaning is for this word (1=very rare meaning, 10=primary meaning)
 
+DO NOT include any preamble, explanation, or phrases like "Here's the output:" - provide ONLY the requested format.
+
 Your output format: [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [word_freq] // [def_freq]`;
         
         const flashcardContent = await generateTextWithGemini(flashcardPrompt, 0.2);
         
+        // Clean up any preamble that Gemini might add (like "Here's the output:")
+        let cleanedContent = flashcardContent;
+        const preamblePatterns = [
+            /^Here's the output:\s*/i,
+            /^Here are the\s+.*?:\s*/i,
+            /^The output is:\s*/i,
+            /^Output:\s*/i,
+            /^Here's.*?:\s*/i
+        ];
+        
+        for (const pattern of preamblePatterns) {
+            cleanedContent = cleanedContent.replace(pattern, '');
+        }
+        
         // Parse flashcard content
-        const contentParts = flashcardContent.split('//').map(part => part.trim());
+        const contentParts = cleanedContent.split('//').map(part => part.trim());
         let exampleSentencesRaw = '';
         let wordFrequency = 3;
         let definitionFrequency = 3;
