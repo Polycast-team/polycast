@@ -848,6 +848,176 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
     }
 });
 
+// Add word to specific profile endpoint
+app.post('/api/profile/:profile/add-word', async (req, res) => {
+    const { profile } = req.params;
+    const { word } = req.body;
+    
+    if (!word || typeof word !== 'string') {
+        return res.status(400).json({ error: 'Word is required' });
+    }
+    
+    const normalizedWord = word.trim().toLowerCase();
+    console.log(`[Add Word API] Adding word "${normalizedWord}" to profile: ${profile}`);
+    
+    const client = await pool.connect();
+    try {
+        // Check if word already exists for this profile
+        const existingCheck = await client.query(
+            'SELECT word_sense_id FROM flashcards WHERE profile_name = $1 AND LOWER(word) = $2 LIMIT 1',
+            [profile, normalizedWord]
+        );
+        
+        if (existingCheck.rowCount > 0) {
+            console.log(`[Add Word API] Word "${normalizedWord}" already exists for profile ${profile}`);
+            return res.status(409).json({ 
+                error: 'duplicate',
+                message: `"${word}" is already in your dictionary!`,
+                wordSenseId: existingCheck.rows[0].word_sense_id
+            });
+        }
+        
+        // Get definition using existing dictionary logic
+        const targetLanguage = getDefaultLanguageForProfile(profile);
+        console.log(`[Add Word API] Fetching definition for "${normalizedWord}" in ${targetLanguage}`);
+        
+        // Use the same logic as the dictionary endpoint
+        const prompt = `You are an expert language teacher helping a student understand a word.
+
+The word "${normalizedWord}" needs a definition and translation.
+
+Output ONLY a JSON object with these fields:
+{
+  "translation": "${targetLanguage} translation of the word",
+  "partOfSpeech": "The part of speech (noun, verb, adjective, etc.)",
+  "definition": "A clear and concise definition",
+  "example": "A simple example sentence",
+  "definitionNumber": 1,
+  "contextualExplanation": "A short phrase IN ${targetLanguage} explaining what '${normalizedWord}' means."
+}
+
+Do NOT provide multiple definitions or explanations outside the JSON.`;
+        
+        const llmResponse = await generateTextWithGemini(prompt, 0.2);
+        
+        // Extract JSON from response
+        const jsonMatch = llmResponse.match(/\{[\s\S]*?\}/);
+        if (!jsonMatch) {
+            throw new Error('Could not extract JSON from LLM response');
+        }
+        
+        const parsedResponse = JSON.parse(jsonMatch[0]);
+        const wordSenseId = `${normalizedWord}_${parsedResponse.definitionNumber || 1}`;
+        
+        // Generate flashcard content with proper ~word~ markup
+        const flashcardPrompt = `Generate 5 pairs of example sentences for the word '${normalizedWord}' (definition: ${parsedResponse.definition}). Each pair should have:
+1. English sentence with the target word wrapped in ~tildes~
+2. Translation in ${targetLanguage} with the target word wrapped in ~tildes~
+
+Format each pair as: English sentence // Translation sentence
+
+CRITICAL: The target word '${normalizedWord}' MUST be wrapped in ~tildes~ in both English and translation.
+
+After the 5 sentence pairs, provide two frequency ratings (1-10 scale):
+- Word frequency: How common '${normalizedWord}' is in general vocabulary (1=extremely rare, 10=ubiquitous)  
+- Definition frequency: How common this specific meaning is for this word (1=very rare meaning, 10=primary meaning)
+
+Your output format: [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [word_freq] // [def_freq]`;
+        
+        const flashcardContent = await generateTextWithGemini(flashcardPrompt, 0.2);
+        
+        // Parse flashcard content
+        const contentParts = flashcardContent.split('//').map(part => part.trim());
+        let exampleSentencesRaw = '';
+        let wordFrequency = 3;
+        let definitionFrequency = 3;
+        
+        if (contentParts.length >= 12) {
+            const sentences = contentParts.slice(0, 10);
+            exampleSentencesRaw = sentences.join('//');
+            wordFrequency = parseInt(contentParts[10]) || 3;
+            definitionFrequency = parseInt(contentParts[11]) || 3;
+        }
+        
+        // Insert into database
+        await client.query('BEGIN');
+        
+        // Insert flashcard
+        await client.query(`
+            INSERT INTO flashcards 
+            (profile_name, word_sense_id, word, definition, translation, part_of_speech, definition_number, example, in_flashcards, exampleSentencesGenerated, wordFrequency, definitionFrequency)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `, [
+            profile,
+            wordSenseId,
+            normalizedWord,
+            parsedResponse.definition,
+            parsedResponse.translation,
+            parsedResponse.partOfSpeech,
+            parsedResponse.definitionNumber || 1,
+            parsedResponse.example,
+            true, // in_flashcards
+            exampleSentencesRaw,
+            wordFrequency,
+            definitionFrequency
+        ]);
+        
+        // Update profile's selected_words
+        await client.query(`
+            UPDATE profiles 
+            SET selected_words = array_append(
+                COALESCE(selected_words, ARRAY[]::text[]), 
+                $2
+            ),
+            last_updated = $3
+            WHERE profile_name = $1
+        `, [profile, normalizedWord, new Date()]);
+        
+        await client.query('COMMIT');
+        
+        console.log(`[Add Word API] Successfully added "${normalizedWord}" to profile ${profile}`);
+        
+        // Return the word data in the same format as the dictionary endpoint
+        const responseData = {
+            wordSenseId: wordSenseId,
+            word: normalizedWord,
+            translation: parsedResponse.translation,
+            partOfSpeech: parsedResponse.partOfSpeech,
+            definition: parsedResponse.definition,
+            example: parsedResponse.example,
+            definitionNumber: parsedResponse.definitionNumber || 1,
+            contextualExplanation: parsedResponse.contextualExplanation,
+            exampleSentencesRaw: exampleSentencesRaw,
+            wordFrequency: wordFrequency,
+            definitionFrequency: definitionFrequency,
+            inFlashcards: true,
+            isContextual: true
+        };
+        
+        res.status(201).json(responseData);
+        
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error(`[Add Word API] Error adding word "${normalizedWord}":`, error);
+        res.status(500).json({ error: 'Failed to add word', details: error.message });
+    } finally {
+        client.release();
+    }
+});
+
+// Helper function to get default language for a profile
+function getDefaultLanguageForProfile(profile) {
+    const languageMap = {
+        cat: 'Spanish',
+        dog: 'French', 
+        mouse: 'German',
+        horse: 'Italian',
+        lizard: 'Portuguese',
+        shirley: 'Chinese'
+    };
+    return languageMap[profile] || 'Spanish';
+}
+
 // === IMAGE GENERATION ENDPOINT ===
 app.get('/api/generate-image', async (req, res) => {
     const prompt = req.query.prompt || '';

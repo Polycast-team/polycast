@@ -336,17 +336,6 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
       return;
     }
 
-    // Check if word already exists in dictionary
-    const existingWord = Object.values(wordDefinitions).find(
-      entry => entry.word && entry.word.toLowerCase() === word.toLowerCase()
-    );
-    
-    if (existingWord) {
-      alert(`"${word}" is already in your dictionary!`);
-      setNewWordInput('');
-      return;
-    }
-
     setIsAddingWord(true);
     
     try {
@@ -356,7 +345,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
       }
     } catch (error) {
       console.error('Error adding word:', error);
-      alert(`Failed to add "${word}". Please try again.`);
+      alert(error.message || `Failed to add "${word}". Please try again.`);
     } finally {
       setIsAddingWord(false);
     }

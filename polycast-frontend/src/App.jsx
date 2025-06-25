@@ -823,41 +823,44 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             onAddWord={async (word) => {
               console.log(`Adding word to dictionary: ${word}`);
               try {
-                // Fetch the word definition using the same API as clicking words in transcript
-                const response = await fetch(`https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}`);
+                // Use the profile-specific add-word endpoint
+                const currentProfile = selectedProfile || internalSelectedProfile;
+                const response = await fetch(`https://polycast-server.onrender.com/api/profile/${currentProfile}/add-word`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ word: word })
+                });
+                
+                if (response.status === 409) {
+                  // Duplicate word
+                  const errorData = await response.json();
+                  throw new Error(errorData.message || `"${word}" is already in your dictionary!`);
+                }
                 
                 if (!response.ok) {
-                  throw new Error(`Failed to fetch definition for "${word}"`);
+                  const errorData = await response.json();
+                  throw new Error(errorData.details || `Failed to add "${word}"`);
                 }
                 
                 const data = await response.json();
-                console.log(`Received definition data for "${word}":`, data);
+                console.log(`Successfully added "${word}" to profile ${currentProfile}:`, data);
                 
-                if (data && data.wordSenseId) {
-                  // Add to wordDefinitions with inFlashcards: true
-                  const wordData = {
-                    ...data,
-                    inFlashcards: true,
-                    word: word
-                  };
-                  
-                  setWordDefinitions(prev => ({
-                    ...prev,
-                    [data.wordSenseId]: wordData
-                  }));
-                  
-                  // Add to selectedWords if not already there
-                  setSelectedWords(prev => {
-                    if (!prev.includes(word)) {
-                      return [...prev, word];
-                    }
-                    return prev;
-                  });
-                  
-                  console.log(`Successfully added "${word}" to dictionary`);
-                } else {
-                  throw new Error(`Invalid definition data received for "${word}"`);
-                }
+                // Add to wordDefinitions
+                setWordDefinitions(prev => ({
+                  ...prev,
+                  [data.wordSenseId]: data
+                }));
+                
+                // Add to selectedWords
+                setSelectedWords(prev => {
+                  if (!prev.includes(word)) {
+                    return [...prev, word];
+                  }
+                  return prev;
+                });
+                
               } catch (error) {
                 console.error(`Error adding word "${word}":`, error);
                 throw error; // Re-throw to let DictionaryTable handle the error display
