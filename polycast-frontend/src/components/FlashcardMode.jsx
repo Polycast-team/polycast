@@ -476,9 +476,6 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                   
                   return (
                     <div className="desktop-card-answer">
-                      <div className="desktop-example-label">
-                        Example {exampleNumber}:
-                      </div>
                       <div 
                         className="desktop-example-sentence"
                         dangerouslySetInnerHTML={{ __html: highlightedSentence }}

@@ -571,15 +571,15 @@ kbd {
 }
 
 .desktop-flashcard {
-  width: min(60vw, 600px);
-  height: min(45vh, 350px);
-  min-width: 400px;
-  min-height: 200px;
+  width: min(70vw, 700px);
+  height: min(50vh, 400px);
+  min-width: 500px;
+  min-height: 300px;
   position: relative;
   transform-style: preserve-3d;
   cursor: pointer;
-  border-radius: 12px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
   margin: 0;
 }
 
@@ -598,14 +598,16 @@ kbd {
 }
 
 .desktop-card-front {
-  background: linear-gradient(135deg, #262440 0%, #3f3969 100%);
-  border: 2px solid #5a4f94;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 50%, #3f3969 100%);
+  border: 2px solid rgba(95, 114, 255, 0.3);
+  backdrop-filter: blur(10px);
 }
 
 .desktop-card-back {
-  background: linear-gradient(135deg, #1a1a2e 0%, #262440 100%);
-  border: 2px solid #39e58c;
+  background: linear-gradient(135deg, #1a1a2e 0%, #262440 50%, #2d2d44 100%);
+  border: 2px solid rgba(57, 229, 140, 0.4);
   transform: rotateY(180deg);
+  backdrop-filter: blur(10px);
 }
 
 .desktop-card-content {
@@ -635,25 +637,29 @@ kbd {
 }
 
 .desktop-card-sentence {
-  font-size: 2vh;
+  font-size: 2.8vh;
   color: white;
-  line-height: 1.5;
-  margin-bottom: 1.5vh;
+  line-height: 1.6;
+  margin-bottom: 2vh;
   text-align: center;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .desktop-card-translation {
-  font-size: 1.5vh;
-  color: #aaa;
-  margin-bottom: 1.5vh;
+  font-size: 2.2vh;
+  color: #bbb;
+  margin-bottom: 2vh;
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.5;
+  font-weight: 400;
 }
 
 .desktop-card-hint {
-  font-size: 1.5vh;
+  font-size: 2vh;
   color: #ccc;
   font-style: italic;
+  opacity: 0.8;
 }
 
 .desktop-card-answer {
@@ -668,10 +674,13 @@ kbd {
 }
 
 .desktop-example-sentence {
-  font-size: 2vh;
+  font-size: 3.2vh;
   color: white;
-  line-height: 1.5;
-  margin-bottom: 1.5vh;
+  line-height: 1.6;
+  margin-bottom: 2.5vh;
+  text-align: center;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .highlighted-word {
@@ -683,10 +692,12 @@ kbd {
 }
 
 .desktop-card-definition {
-  font-size: 16px;
-  color: #ccc;
-  margin-bottom: 20px;
-  line-height: 1.5;
+  font-size: 2.2vh;
+  color: #ddd;
+  margin-bottom: 25px;
+  line-height: 1.6;
+  text-align: center;
+  font-weight: 400;
 }
 
 .desktop-card-word-large {
@@ -698,19 +709,23 @@ kbd {
 }
 
 .desktop-audio-btn {
-  background-color: #3f3969;
+  background: linear-gradient(135deg, #5f72ff 0%, #9a5cff 100%);
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
+  padding: 12px 24px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-  margin-top: 15px;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin-top: 20px;
+  box-shadow: 0 4px 12px rgba(95, 114, 255, 0.3);
 }
 
 .desktop-audio-btn:hover {
-  background-color: #5a4f94;
+  background: linear-gradient(135deg, #4c63ff 0%, #8a4fff 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(95, 114, 255, 0.4);
 }
 
 .desktop-audio-btn:disabled {
@@ -923,9 +938,10 @@ kbd {
 .desktop-highlighted-word {
   color: #39e58c;
   font-weight: bold;
-  background-color: rgba(57, 229, 140, 0.1);
-  padding: 2px 4px;
-  border-radius: 3px;
+  background-color: rgba(57, 229, 140, 0.15);
+  padding: 3px 6px;
+  border-radius: 4px;
+  box-shadow: 0 0 8px rgba(57, 229, 140, 0.3);
 }
 
 .desktop-definition-number {

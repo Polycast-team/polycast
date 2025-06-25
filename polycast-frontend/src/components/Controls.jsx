@@ -50,6 +50,7 @@ function Controls({
                   <option value="mouse">mouse</option>
                   <option value="horse">horse</option>
                   <option value="lizard">lizard</option>
+                  <option value="shirley">shirley</option>
                 </select>
                 <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Mode:</label>
                 <select 

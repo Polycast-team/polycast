@@ -12,14 +12,15 @@ import DictionaryTable from './components/DictionaryTable';
 import FlashcardMode from './components/FlashcardMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
+import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
 
 // App now receives an array of target languages and room setup as props
-function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange }) {
+function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange }) {
   // Debug logging
-  console.log('App component received props:', { targetLanguages, roomSetup, userRole, studentHomeLanguage });
+  console.log('App component received props:', { targetLanguages, selectedProfile, roomSetup, userRole, studentHomeLanguage });
   
-  // Step 1: Add selectedProfile state
-  const [selectedProfile, setSelectedProfile] = React.useState('non-saving');
+  // Step 1: Use selectedProfile from props, with fallback to non-saving
+  const [internalSelectedProfile, setSelectedProfile] = React.useState(selectedProfile || 'non-saving');
   
   // Join Room state for students
   const [showJoinRoomModal, setShowJoinRoomModal] = useState(false);
@@ -78,12 +79,11 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
   
   // Fetch profile data when selectedProfile changes
   useEffect(() => {
-    fetchProfileData(selectedProfile);
-  }, [selectedProfile, fetchProfileData]);
-  // For students, use their home language; for hosts, use their selected display languages
-  const effectiveLanguages = userRole === 'student' && studentHomeLanguage 
-    ? [studentHomeLanguage] 
-    : targetLanguages;
+    fetchProfileData(internalSelectedProfile);
+  }, [internalSelectedProfile, fetchProfileData]);
+  // Use the selected profile's language for all WebSocket communication
+  const profileLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
+  const effectiveLanguages = [profileLanguage];
   const languagesQueryParam = effectiveLanguages.map(encodeURIComponent).join(',');
   
   console.log('Effective languages for WebSocket:', effectiveLanguages);
@@ -586,7 +586,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
               setShowTranslation(checked);
               if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
             }}
-            selectedProfile={selectedProfile}
+            selectedProfile={selectedProfile || internalSelectedProfile}
             setSelectedProfile={profile => {
               setSelectedProfile(profile);
               console.log('Profile switched to:', profile);
@@ -801,7 +801,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             setWordDefinitions={setWordDefinitions}
             englishSegments={englishSegments}
             targetLanguages={effectiveLanguages}
-            selectedProfile={selectedProfile}
+            selectedProfile={selectedProfile || internalSelectedProfile}
           />
         ) : (
           <TranscriptionDisplay 

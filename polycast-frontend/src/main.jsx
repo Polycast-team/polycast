@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import AppRouter from './AppRouter.jsx'
-import LanguageSelectorScreen from './components/LanguageSelectorScreen.jsx';
-import StudentLanguageSelector from './components/StudentLanguageSelector.jsx';
+import ProfileSelectorScreen from './components/ProfileSelectorScreen.jsx';
 import MobileApp from './mobile/MobileApp.jsx';
 import { shouldUseMobileApp } from './utils/deviceDetection.js';
 import './components/RoomSelectionScreen.css'; // Import styles
@@ -12,6 +11,7 @@ import './index.css'
 function Main() {
   const [roomSetup, setRoomSetup] = useState(null);
   const [selectedLanguages, setSelectedLanguages] = useState(null);
+  const [selectedProfile, setSelectedProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isMobile, setIsMobile] = useState(false);
@@ -74,23 +74,25 @@ function Main() {
     );
   }
 
-  // Step 2: Language selection
+  // Step 2: Profile selection
   if (roomSetup && !selectedLanguages) {
-    if (roomSetup.isHost) {
-      // Host selects display languages (0-4)
-      return <LanguageSelectorScreen onLanguageSelected={setSelectedLanguages} />;
-    } else if (roomSetup.needsLanguageSelection) {
-      // Student selects home language (1 only)
-      return <StudentLanguageSelector onLanguageSelected={setSelectedLanguages} />;
-    }
+    return <ProfileSelectorScreen 
+      onProfileSelected={(languages, profile) => {
+        setSelectedLanguages(languages);
+        setSelectedProfile(profile);
+      }}
+      userRole={roomSetup.isHost ? 'host' : 'student'}
+    />;
   }
 
   // Step 3: Main app
   const propsToPass = {
     targetLanguages: selectedLanguages || ['English'], // Default fallback
+    selectedProfile: selectedProfile,
     onReset: () => {
       setRoomSetup(null);
       setSelectedLanguages(null);
+      setSelectedProfile(null);
       setForceFlashcardMobile(false); // Reset mobile mode when resetting
     },
     roomSetup: roomSetup?.roomCode ? roomSetup : null, // Only pass room setup when there's a valid room code

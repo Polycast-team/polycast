@@ -20,7 +20,8 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
     { value: 'dog', label: 'Dog Profile', icon: '🐶' },
     { value: 'mouse', label: 'Mouse Profile', icon: '🐭' },
     { value: 'horse', label: 'Horse Profile', icon: '🐴' },
-    { value: 'lizard', label: 'Lizard Profile', icon: '🦎' }
+    { value: 'lizard', label: 'Lizard Profile', icon: '🦎' },
+    { value: 'shirley', label: 'Shirley Profile', icon: '🐉' }
   ];
 
   // Fetch profile data when profile changes
