@@ -253,15 +253,29 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
 
   // Play audio button handler
   const handlePlayAudio = useCallback(() => {
-    if (!currentCard || !currentCard.exampleSentencesGenerated) return;
+    if (!currentCard) return;
     
-    const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-    const srsInterval = currentCard?.srsData?.SRS_interval || 1;
-    const sentenceIndex = ((srsInterval - 1) % 5) * 2;
-    const englishSentence = parts[sentenceIndex] || parts[0] || '';
+    let textToPlay = '';
     
-    if (englishSentence) {
-      generateAndPlayAudio(englishSentence, currentCard);
+    if (currentCard.exampleSentencesGenerated) {
+      // Use generated examples if available
+      const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+      const srsInterval = currentCard?.srsData?.SRS_interval || 1;
+      const sentenceIndex = ((srsInterval - 1) % 5) * 2;
+      textToPlay = parts[sentenceIndex] || parts[0] || '';
+    } else if (currentCard.contextSentence) {
+      // Fallback to context sentence
+      textToPlay = currentCard.contextSentence;
+    } else if (currentCard.example) {
+      // Fallback to example
+      textToPlay = currentCard.example;
+    } else {
+      // Last resort: just the word
+      textToPlay = currentCard.word;
+    }
+    
+    if (textToPlay) {
+      generateAndPlayAudio(textToPlay, currentCard);
     }
   }, [currentCard, generateAndPlayAudio]);
 
@@ -330,19 +344,31 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   // Auto-play audio when card is flipped (with correct sentence)
   useEffect(() => {
     if (isFlipped && currentCard && !hasAutoPlayedThisFlip) {
+      setHasAutoPlayedThisFlip(true);
+      
+      let textToPlay = '';
+      
       if (currentCard.exampleSentencesGenerated) {
-        setHasAutoPlayedThisFlip(true);
-        
+        // Use generated examples if available
         const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
         const srsInterval = currentCard?.srsData?.SRS_interval || 1;
         const sentenceIndex = ((srsInterval - 1) % 5) * 2;
-        const englishSentence = parts[sentenceIndex] || parts[0] || '';
-        
-        if (englishSentence) {
-          setTimeout(() => {
-            generateAndPlayAudio(englishSentence, currentCard);
-          }, 300);
-        }
+        textToPlay = parts[sentenceIndex] || parts[0] || '';
+      } else if (currentCard.contextSentence) {
+        // Fallback to context sentence
+        textToPlay = currentCard.contextSentence;
+      } else if (currentCard.example) {
+        // Fallback to example
+        textToPlay = currentCard.example;
+      } else {
+        // Last resort: just the word
+        textToPlay = currentCard.word;
+      }
+      
+      if (textToPlay) {
+        setTimeout(() => {
+          generateAndPlayAudio(textToPlay, currentCard);
+        }, 300);
       }
     }
   }, [isFlipped, currentCard, hasAutoPlayedThisFlip, generateAndPlayAudio]);
@@ -454,6 +480,11 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                   {baseWord}
                   {defNumber && <span className="desktop-definition-number">#{defNumber}</span>}
                 </div>
+                {currentCard.contextSentence && (
+                  <div className="desktop-card-sentence">
+                    {currentCard.contextSentence}
+                  </div>
+                )}
                 <div className="desktop-card-hint">
                   Click to see definition
                 </div>
@@ -503,9 +534,34 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                   <div className="desktop-card-word-large">
                     {baseWord}
                   </div>
-                  {currentCard.disambiguatedDefinition && (
+                  {/* Show definition from either source */}
+                  {(currentCard.disambiguatedDefinition?.definition || currentCard.definition) && (
                     <div className="desktop-card-definition">
-                      {currentCard.disambiguatedDefinition.definition}
+                      {currentCard.disambiguatedDefinition?.definition || currentCard.definition}
+                    </div>
+                  )}
+                  {/* Show context sentence if available */}
+                  {currentCard.contextSentence && (
+                    <div className="desktop-example-sentence">
+                      {currentCard.contextSentence}
+                    </div>
+                  )}
+                  {/* Show example if available */}
+                  {currentCard.example && currentCard.example !== currentCard.contextSentence && (
+                    <div className="desktop-example-sentence">
+                      {currentCard.example}
+                    </div>
+                  )}
+                  {/* Show indicator that better examples are generating in background */}
+                  {!currentCard.exampleSentencesGenerated && (
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#888',
+                      fontStyle: 'italic',
+                      marginTop: '10px',
+                      opacity: 0.7
+                    }}>
+                      ⚡ Enhanced examples generating...
                     </div>
                   )}
                   <button 
