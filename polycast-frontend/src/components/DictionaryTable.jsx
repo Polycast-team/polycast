@@ -526,13 +526,15 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
               {/* Expanded definitions */}
               {isExpanded && (
                 <div className="dictionary-definitions" style={{ paddingLeft: '20px', paddingRight: '10px' }}>
+                  {/* DEBUG: Log the entries for this word */}
+                  {console.log(`[DICTIONARY DEBUG] Showing ${entries.length} entries for word "${word}":`, entries)}
                   {entries.map(entry => {
                     // Get definition data
                     const partOfSpeech = entry.partOfSpeech || 
                                       (entry.disambiguatedDefinition?.partOfSpeech) || 
                                       '';
                     
-                    const definition = entry.disambiguatedDefinition?.spanish_equivalent || 
+                    const definition = entry.translation || 
                                       entry.disambiguatedDefinition?.translation || 
                                       entry.disambiguatedDefinition?.definition || 
                                       entry.definition ||
