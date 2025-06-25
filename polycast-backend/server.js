@@ -949,6 +949,16 @@ async function initializeDatabase() {
             )
         `);
         
+        // Create srs_daily table for tracking daily SRS statistics
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS srs_daily (
+                profile_name VARCHAR(255) REFERENCES profiles(profile_name) ON DELETE CASCADE,
+                date DATE NOT NULL,
+                new_cards_today INTEGER DEFAULT 0,
+                PRIMARY KEY (profile_name, date)
+            )
+        `);
+        
         // Insert sample data for the 'cat' profile if it doesn't exist
         const profileCheck = await client.query('SELECT * FROM profiles WHERE profile_name = $1', ['cat']);
         if (profileCheck.rowCount === 0) {
@@ -1398,6 +1408,86 @@ app.post('/api/profile/:profile/words', async (req, res) => {
         });
     } finally {
         client.release();
+    }
+});
+
+// === SRS Daily Tracking Endpoints ===
+
+// GET /api/profile/:profile/srs-daily - Get daily SRS data for a profile
+app.get('/api/profile/:profile/srs-daily', async (req, res) => {
+    const { profile } = req.params;
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    console.log(`[SRS Daily API] GET request for profile: ${profile}, date: ${today}`);
+    
+    try {
+        const client = await pool.connect();
+        try {
+            // Get today's SRS data for the profile
+            const result = await client.query(
+                'SELECT date, new_cards_today FROM srs_daily WHERE profile_name = $1 AND date = $2',
+                [profile, today]
+            );
+            
+            if (result.rowCount > 0) {
+                const dailyData = result.rows[0];
+                console.log(`[SRS Daily API] Found data for ${profile}: ${dailyData.new_cards_today} new cards today`);
+                res.json({
+                    date: dailyData.date,
+                    newCardsToday: dailyData.new_cards_today
+                });
+            } else {
+                // No data for today, return default
+                console.log(`[SRS Daily API] No data found for ${profile} today, returning default`);
+                res.json({
+                    date: today,
+                    newCardsToday: 0
+                });
+            }
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error(`[SRS Daily API] Error getting daily data for ${profile}:`, err);
+        res.status(500).json({
+            error: 'Failed to get daily SRS data',
+            message: err.message
+        });
+    }
+});
+
+// POST /api/profile/:profile/srs-daily - Save daily SRS data for a profile
+app.post('/api/profile/:profile/srs-daily', async (req, res) => {
+    const { profile } = req.params;
+    const { date, newCardsToday } = req.body;
+    
+    console.log(`[SRS Daily API] POST request for profile: ${profile}, date: ${date}, newCardsToday: ${newCardsToday}`);
+    
+    try {
+        const client = await pool.connect();
+        try {
+            // Upsert the daily SRS data
+            await client.query(`
+                INSERT INTO srs_daily (profile_name, date, new_cards_today)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (profile_name, date)
+                DO UPDATE SET new_cards_today = EXCLUDED.new_cards_today
+            `, [profile, date, newCardsToday]);
+            
+            console.log(`[SRS Daily API] Successfully saved daily data for ${profile}`);
+            res.json({
+                success: true,
+                message: `Daily SRS data saved for profile '${profile}'`
+            });
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error(`[SRS Daily API] Error saving daily data for ${profile}:`, err);
+        res.status(500).json({
+            error: 'Failed to save daily SRS data',
+            message: err.message
+        });
     }
 });
 
