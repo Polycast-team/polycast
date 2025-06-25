@@ -13,8 +13,10 @@ import FlashcardCalendarModal from './shared/FlashcardCalendarModal';
 import '../mobile/styles/mobile-flashcards.css';
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
-  // State for UI mode
-  const [currentMode, setCurrentMode] = useState('profile'); // 'profile' or 'flashcards'
+  // State for UI mode - desktop starts in flashcards, mobile starts in profile selection
+  const [currentMode, setCurrentMode] = useState(() => {
+    return shouldUseMobileApp() ? 'profile' : 'flashcards';
+  });
   const [showCalendar, setShowCalendar] = useState(false);
   const [dragState, setDragState] = useState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
   const [cardEntryAnimation, setCardEntryAnimation] = useState('');
@@ -74,7 +76,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   // Audio caching for current session only (no database storage)
   const audioCache = useRef(new Map());
 
-  // Handle starting study session
+  // Handle starting study session (only used on mobile)
   const handleStartStudying = useCallback((profile, flashcards) => {
     console.log(`[FLASHCARD] Starting study session for ${profile} with ${Object.keys(flashcards).length} flashcards`);
     setCurrentMode('flashcards');
@@ -384,7 +386,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     );
   }
 
-  // Profile selection mode
+  // Profile selection mode (only for actual mobile devices)
   if (currentMode === 'profile') {
     return (
       <div className="flashcard-profile-wrapper">
