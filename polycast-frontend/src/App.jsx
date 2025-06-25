@@ -507,7 +507,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             margin: 0,
             flex: '0 0 auto',
           }}
-          onClick={() => typeof onReset === 'function' && onReset()}
+          onClick={() => window.location.reload()}
           onMouseOver={e => (e.currentTarget.style.opacity = 0.85)}
           onMouseOut={e => (e.currentTarget.style.opacity = 1)}
         >
