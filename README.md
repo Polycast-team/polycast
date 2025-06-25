@@ -21,7 +21,9 @@ A comprehensive language learning application that combines real-time transcript
 - Target word highlighting in yellow on back, native language on front
 - **CRITICAL**: All flashcards MUST have `exampleSentencesGenerated` field with proper `~word~` markup - no fallback UI exists
 
-## 🚫 CRITICAL DEVELOPMENT RULE: NO FALLBACK UI
+## 🚫 CRITICAL DEVELOPMENT RULES
+
+### NO FALLBACK UI
 **NEVER create fallback UI to paper over missing data or broken functionality!**
 
 - **Always fix the root cause** instead of adding bandaid solutions
@@ -31,6 +33,37 @@ A comprehensive language learning application that combines real-time transcript
 - **Better to crash with a clear error** than to lie to the user with wrong functionality
 
 This prevents technical debt and ensures we actually solve problems instead of hiding them.
+
+### ALWAYS UPDATE README
+**EVERY TIME you make changes, update this README with important information for the next AI!**
+
+- **Document UI changes** - new components, button layouts, mode switches
+- **Document backend changes** - API endpoints, data formats, validation rules
+- **Document bug fixes** - what was broken and how it was fixed
+- **Document development patterns** - coding standards, architectural decisions
+- **Update system requirements** - new dependencies, environment variables
+
+This ensures continuity and prevents future AIs from repeating mistakes or missing context.
+
+## 📝 RECENT MAJOR CHANGES
+
+### UI Mode Switching (December 2024)
+- **Replaced mode dropdown with emoji buttons** in `/polycast-frontend/src/components/Controls.jsx`
+- **Button layout**: 📝 Transcript (students in rooms only), 📚 Dictionary, 🔄 Flashcard
+- **Smart visibility**: Only show buttons for modes you're NOT currently in
+- **Location**: Top controls bar, next to profile selector
+
+### Backend Flashcard Generation (December 2024)
+- **Fixed Gemini preamble issue**: Added cleanup patterns to strip "Here's the output:" from responses
+- **Enhanced validation**: Backend now validates proper `~word~` markup and throws clear errors
+- **Prompt improvements**: Explicitly forbids preambles in Gemini flashcard generation
+- **Location**: `/polycast-backend/server.js` lines 927-945
+
+### Flashcard Error Handling (December 2024)
+- **Removed all fallback UI** that showed basic word format instead of proper cloze deletion
+- **Clear error throwing**: Components now fail clearly when `exampleSentencesGenerated` is missing
+- **No compromise approach**: System must generate proper flashcards or fail visibly
+- **Affected files**: `FlashcardMode.jsx`, `MobileFlashcardMode.jsx`
 
 ## 🎯 Overview
 
