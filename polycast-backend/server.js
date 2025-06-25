@@ -731,7 +731,7 @@ Output ONLY a JSON object with these fields:
   "definition": "A clear and concise definition appropriate for how the word is used in this context only",
   "example": "A simple example sentence showing a similar usage to the context",
   "definitionNumber": A number representing this specific meaning (e.g., 1, 2, 3, etc.),
-  "contextualExplanation": "A very short phrase IN ${targetLanguage} (3-5 words max) explaining what '${word}' means here."
+  "contextualExplanation": "A short phrase IN ${targetLanguage} (10 words max) explaining what '${word}' means here."
 }
 
 Do NOT provide multiple definitions or explanations outside the JSON.`;
@@ -1732,7 +1732,7 @@ Your response must be in JSON format with these fields:
   "frequencyRating": "A number from 1 to 5 representing how common this word is in everyday English in this sense",
   "definition": "VERY SIMPLE and SHORT explanation in simple English for how the word is used in this context (1-2 short sentences max)",
   "example": "A simple example sentence in English that uses this word in a similar way to the context.",
-  "contextualExplanation": "A very short phrase IN ${targetLanguage} (3-5 words max) explaining what '${word}' means here."
+  "contextualExplanation": "A short phrase IN ${targetLanguage} (10 words max) explaining what '${word}' means here."
 }
 
 IMPORTANT: ONLY provide the definition of the word as it is used in the context sentence. DO NOT provide multiple definitions or alternative meanings.
