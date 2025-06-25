@@ -2,6 +2,24 @@
 
 A comprehensive language learning application that combines real-time transcription, translation, and spaced repetition flashcards with AI-powered content generation.
 
+## ⚠️ CRITICAL: Flashcard Format Reference
+**ALWAYS check this section when working on flashcards - the format is very specific!**
+
+**FRONT of Card:**
+1. English sentence with target word blanked out: "I will _____ into battle" 
+2. Full translation with target word highlighted: "我将**冲锋**进入战斗"
+3. "Click to reveal answer" hint
+
+**BACK of Card:**
+1. Full English sentence with target word highlighted: "I will **charge** into battle"
+2. 🔊 Play Audio button for text-to-speech
+
+**System Details:**
+- Each word gets 5 sample sentences from Gemini with `~word~` markup
+- SRS interval determines which sentence is shown (rotating through all 5)
+- Cloze deletion format for active recall learning
+- Target word highlighting in yellow on back, native language on front
+
 ## 🎯 Overview
 
 Polycast is a full-stack language learning platform designed for immersive learning experiences. It features real-time audio/video processing with AI transcription, intelligent flashcard generation using spaced repetition algorithms, and mobile-optimized study sessions.
@@ -49,10 +67,14 @@ Polycast is a full-stack language learning platform designed for immersive learn
 - **Due Date Management**: Automatic scheduling based on performance
 - **Session Limits**: Configurable daily new card limits
 
-### 4. Mobile Flashcard Interface
-- **Touch Gestures**: Swipe left (wrong), swipe right (correct), tap to flip
+### 4. Flashcard System (Cloze Deletion Format)
+- **Card Front**: English sentence with target word blanked out (e.g., "I will _____ into battle") + full translation with target word highlighted in native language
+- **Card Back**: Full English sentence with target word highlighted in yellow + text-to-speech audio
+- **Generated Content**: Each word gets 5 example sentences from Gemini API with ~word~ markup
+- **Rotation System**: SRS interval determines which of the 5 sentences is shown
+- **Touch Gestures** (Mobile): Swipe left (wrong), swipe right (correct), tap to flip
 - **Visual Feedback**: Color-coded responses, smooth animations
-- **Audio Integration**: Text-to-speech playback for pronunciation
+- **Audio Integration**: Text-to-speech playback for pronunciation practice
 - **Progress Tracking**: Session statistics and learning analytics
 
 ### 5. Profile Management
