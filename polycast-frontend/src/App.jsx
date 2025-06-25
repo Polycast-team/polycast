@@ -12,12 +12,15 @@ import DictionaryTable from './components/DictionaryTable';
 import FlashcardMode from './components/FlashcardMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
-import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
+import { getLanguageForProfile, getTranslationsForProfile } from './utils/profileLanguageMapping.js';
 
 // App now receives an array of target languages and room setup as props
 function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange, onProfileChange }) {
   // Debug logging
   console.log('App component received props:', { targetLanguages, selectedProfile, roomSetup, userRole, studentHomeLanguage });
+  
+  // Get translations for this profile's language
+  const t = getTranslationsForProfile(selectedProfile);
   
   // Step 1: Use selectedProfile from props, with fallback to non-saving
   const [internalSelectedProfile, setSelectedProfile] = React.useState(selectedProfile || 'non-saving');
@@ -208,7 +211,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     const cleanedRoomCode = joinRoomCode.replace(/[^0-9]/g, '').trim();
     
     if (cleanedRoomCode.length !== 5) {
-      setJoinRoomError('Room code must be 5 digits');
+      setJoinRoomError(t.enterRoomCode + ' (5 digits)');
       return;
     }
     
@@ -676,7 +679,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               cursor: 'pointer'
             }}
           >
-            Join Room
+            {t.joinRoom}
           </button>
         )}
         
@@ -867,16 +870,16 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             textAlign: 'center',
             boxShadow: '0 4px 18px 0 rgba(60, 60, 90, 0.2)'
           }}>
-            <h2 style={{ color: '#fff', marginBottom: 24 }}>Join Room</h2>
+            <h2 style={{ color: '#fff', marginBottom: 24 }}>{t.joinRoom}</h2>
             <p style={{ color: '#b3b3e7', marginBottom: 24, fontSize: 14 }}>
-              Enter a 5-digit room code to join a host's session
+              {t.enterRoomCode}
             </p>
             
             <input
               type="text"
               value={joinRoomCode}
               onChange={(e) => setJoinRoomCode(e.target.value)}
-              placeholder="5-digit room code"
+              placeholder={t.roomCode}
               maxLength={5}
               style={{
                 width: '100%',
@@ -931,7 +934,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                   cursor: 'pointer'
                 }}
               >
-                {isJoiningRoom ? 'Joining...' : 'Join Room'}
+                {isJoiningRoom ? t.joinButton + '...' : t.joinButton}
               </button>
             </div>
           </div>

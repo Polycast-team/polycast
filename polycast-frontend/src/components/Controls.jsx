@@ -75,9 +75,9 @@ function Controls({
                     style={{ minWidth: 90, fontSize: 15, padding: '2px 6px', borderRadius: 6 }}
                     disabled={isRecording} // Only disable while recording, allow students to change modes
                 >
-                    <option value="audio">lecture mode</option>
-                    <option value="dictionary">dictionary mode</option>
-                    <option value="flashcard">flashcard mode</option>
+                    <option value="audio">{t.lectureMode}</option>
+                    <option value="dictionary">{t.dictionaryMode}</option>
+                    <option value="flashcard">{t.flashcardMode}</option>
                 </select>
                 {/* Only show the live transcript and translation checkboxes in audio mode */}
                 {appMode === 'audio' && (
