@@ -4,7 +4,7 @@
  */
 
 /**
- * Check if the current device is mobile based on screen size and user agent
+ * Check if the current device is mobile based on user agent and touch capability
  * @returns {boolean} True if mobile device
  */
 export function isMobileDevice() {
@@ -16,12 +16,8 @@ export function isMobileDevice() {
   // Check for touch capability
   const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   
-  // Check screen width (secondary indicator, only for very small screens)
-  const screenWidth = window.innerWidth;
-  const isVerySmallScreen = screenWidth <= 480; // Much more restrictive
-  
-  // Mobile if (mobile user agent AND touch screen) OR very small screen
-  return (mobileUserAgent && hasTouchScreen) || isVerySmallScreen;
+  // Mobile only if mobile user agent AND touch screen (no window size dependency)
+  return mobileUserAgent && hasTouchScreen;
 }
 
 /**
@@ -35,13 +31,8 @@ export function isTabletDevice() {
   // Check for touch capability
   const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   
-  // Check screen width for larger touch devices
-  const screenWidth = window.innerWidth;
-  const isTabletSized = screenWidth > 480 && screenWidth <= 1024;
-  
-  // Tablet if tablet user agent OR (large touch screen AND not mobile user agent)
-  const mobileUserAgent = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  return tabletUserAgent || (isTabletSized && hasTouchScreen && !mobileUserAgent);
+  // Tablet only if tablet user agent AND touch screen (no window size dependency)
+  return tabletUserAgent && hasTouchScreen;
 }
 
 /**
@@ -65,7 +56,6 @@ export function shouldUseMobileApp() {
   
   console.log('[DEVICE DETECTION]', {
     userAgent: navigator.userAgent,
-    screenWidth: window.innerWidth,
     isMobile: mobile,
     isTablet: tablet,
     shouldUseMobileApp: shouldUseMobile

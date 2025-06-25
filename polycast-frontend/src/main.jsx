@@ -17,17 +17,9 @@ function Main() {
   const [isMobile, setIsMobile] = useState(false);
   const [forceFlashcardMobile, setForceFlashcardMobile] = useState(false);
 
-  // Check if device should use mobile app
+  // Check if device should use mobile app (only once, no resize listener)
   useEffect(() => {
-    const checkDevice = () => {
-      setIsMobile(shouldUseMobileApp());
-    };
-    
-    checkDevice();
-    
-    // Recheck on resize (for responsive behavior)
-    window.addEventListener('resize', checkDevice);
-    return () => window.removeEventListener('resize', checkDevice);
+    setIsMobile(shouldUseMobileApp());
   }, []);
 
   // If mobile device OR flashcard mode is forced, render mobile app instead
