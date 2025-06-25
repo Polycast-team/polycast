@@ -96,37 +96,10 @@ export function useFlashcardSession(selectedProfile, wordDefinitions) {
         // Non-saving mode: don't persist daily limits at all
         setTodaysNewCards(0);
       } else {
-        // Profile mode: use database for daily limits
-        try {
-          const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`);
-          if (response.ok) {
-            const dailyData = await response.json();
-            
-            // Reset count if it's a new day
-            if (dailyData.date !== today) {
-              setTodaysNewCards(0);
-              // Save reset to database
-              await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ date: today, newCardsToday: 0 })
-              });
-            } else {
-              setTodaysNewCards(dailyData.newCardsToday || 0);
-            }
-          } else {
-            // First time or error - initialize
-            setTodaysNewCards(0);
-            await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ date: today, newCardsToday: 0 })
-            });
-          }
-        } catch (error) {
-          console.error('Error loading daily SRS data:', error);
-          setTodaysNewCards(0);
-        }
+        // Profile mode: temporarily disable database calls until endpoints are deployed
+        // TODO: Re-enable when SRS daily endpoints are deployed to production
+        console.log('[SRS Daily] Database endpoints not deployed yet, using local storage fallback');
+        setTodaysNewCards(0);
       }
     };
     

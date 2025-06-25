@@ -169,16 +169,17 @@ export function useFlashcardSRS(
       const newCount = todaysNewCards + 1;
       setTodaysNewCards(newCount);
       
-      if (selectedProfile !== 'non-saving') {
-        const today = new Date().toDateString();
-        fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: today, newCardsToday: newCount })
-        }).catch(error => {
-          console.error('Error saving daily SRS count:', error);
-        });
-      }
+      // TODO: Re-enable when SRS daily endpoints are deployed to production
+      // if (selectedProfile !== 'non-saving') {
+      //   const today = new Date().toDateString();
+      //   fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/srs-daily`, {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({ date: today, newCardsToday: newCount })
+      //   }).catch(error => {
+      //     console.error('Error saving daily SRS count:', error);
+      //   });
+      // }
     }
     
     // Single timeout for all card transition logic
