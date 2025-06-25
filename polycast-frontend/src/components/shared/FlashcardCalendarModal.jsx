@@ -13,25 +13,9 @@ const FlashcardCalendarModal = ({
   dueCards,
   calendarUpdateTrigger 
 }) => {
-  // Debug: Log when calendar data changes
+  // Calendar data tracking for internal updates
   useEffect(() => {
-    console.log('[CALENDAR DEBUG] Calendar data updated:', calendarData.map(day => ({
-      day: day.dayName,
-      cardCount: day.cards.length,
-      cards: day.cards.map(c => `${c.word} (due: ${new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()})`)
-    })));
-    
-    console.log('[CALENDAR DEBUG] Current processedCards:', processedCards.map(c => ({
-      word: c.word,
-      dueDate: new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()
-    })));
-    
-    console.log('[CALENDAR DEBUG] Current dueCards:', dueCards.map(c => ({
-      word: c.word,
-      dueDate: new Date(c.srsData.dueDate || c.srsData.nextReviewDate).toLocaleString()
-    })));
-    
-    console.log('[CALENDAR DEBUG] Update trigger:', calendarUpdateTrigger);
+    // Calendar data updated - internal tracking only
   }, [calendarData, processedCards, dueCards, calendarUpdateTrigger]);
 
   if (!showCalendar) return null;

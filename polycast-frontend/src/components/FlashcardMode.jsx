@@ -144,9 +144,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           text: text.replace(/<[^>]*>/g, ''), // Strip HTML tags
-          // Don't send cardKey for caching - we want fresh audio
-          profile: selectedProfile,
-          noCache: true // Signal to backend not to cache
+          cardKey: cacheKey, // Use sentence-specific key but don't expect backend caching
+          profile: selectedProfile
         })
       });
       
@@ -222,7 +221,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   const preGenerateAudioForSession = useCallback(async (cards) => {
     if (!cards || cards.length === 0) return;
     
-    console.log(`[AUDIO] Pre-generating audio for ${Math.min(cards.length, 5)} upcoming cards`);
+    // Pre-generate audio for next few cards
     
     // Generate audio for next 5 cards concurrently
     const audioPromises = cards.slice(0, 5).map(async (card) => {
@@ -238,16 +237,16 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         if (cacheKey) {
           try {
             await generateAudioForSentence(englishSentence, cacheKey);
-            console.log(`[AUDIO] Pre-generated audio for ${card.word} (${cacheKey})`);
+            // Audio pre-generated successfully
           } catch (error) {
-            console.error(`[AUDIO] Failed to pre-generate audio for ${card.word}:`, error);
+            // Skip failed pre-generation (will generate on-demand)
           }
         }
       }
     });
     
     await Promise.allSettled(audioPromises);
-    console.log(`[AUDIO] Completed pre-generation for study session`);
+    // Pre-generation completed
   }, [getSentenceCacheKey, generateAudioForSentence]);
 
   // Play audio button handler

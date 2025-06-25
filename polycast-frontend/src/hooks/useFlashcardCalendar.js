@@ -17,7 +17,7 @@ export function useFlashcardCalendar(
     const today = new Date();
     const nextWeekDays = [];
     
-    console.log(`[CALENDAR DEBUG] Building calendar from ${today.toDateString()} for 8 days`);
+    // Building calendar for next 8 days
     
     // Get all cards with current session updates
     const currentCards = [];
@@ -82,10 +82,7 @@ export function useFlashcardCalendar(
         const dayDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         const isInRange = dueDateOnly.getTime() === dayDateOnly.getTime();
         
-        // Debug logging for date filtering
-        if (card.word === 'eat' || i >= 6) { // Log for eat card or last few days
-          console.log(`[DATE DEBUG] Day ${i} (${dayDateOnly.toDateString()}): Card "${card.word}" due ${dueDateOnly.toDateString()}, match: ${isInRange}`);
-        }
+        // Check if card is due on this specific day
         
         return isInRange;
       });
