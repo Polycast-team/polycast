@@ -259,7 +259,13 @@ const TranscriptionDisplay = ({
       const geminiFetch = fetch(apiUrl)
         .then(res => res.json())
         .then(data => {
-          console.log(`Received definition for "${word}":`, data);
+          console.log(`[API DEBUG] Received definition for "${word}":`, data);
+          console.log(`[API DEBUG] Profile Language used in API call: "${profileLanguage}"`);
+          console.log(`[API DEBUG] API Response structure:`, {
+            translation: data?.translation,
+            translations: data?.translations,
+            contextualExplanation: data?.contextualExplanation
+          });
           return data;
         })
         .catch(err => {
@@ -1261,21 +1267,28 @@ START NOW:`;
       }}
     >
       {/* Word Definition Popup */}
-      {popupInfo.visible && (
-        <WordDefinitionPopup 
-          word={popupInfo.word}
-          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
-          dictDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.dictionaryDefinition}
-          disambiguatedDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
-          position={popupInfo.position}
-          isInDictionary={wordDefinitions[popupInfo.word.toLowerCase()] ? doesWordSenseExist(popupInfo.word, wordDefinitions[popupInfo.word.toLowerCase()]?.contextSentence) : false}
-          onAddToDictionary={handleAddWordToDictionary}
-          onRemoveFromDictionary={handleRemoveWordFromDictionary}
-          loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
-          nativeLanguage={getLanguageForProfile(selectedProfile)}
-          onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
-        />
-      )}
+      {popupInfo.visible && (() => {
+        const profileLanguage = getLanguageForProfile(selectedProfile);
+        console.log(`[POPUP LANG DEBUG] Selected Profile: "${selectedProfile}", Mapped Language: "${profileLanguage}"`);
+        console.log(`[POPUP LANG DEBUG] Word being looked up: "${popupInfo.word}"`);
+        console.log(`[POPUP LANG DEBUG] Word definition data:`, wordDefinitions[popupInfo.word.toLowerCase()]);
+        
+        return (
+          <WordDefinitionPopup 
+            word={popupInfo.word}
+            definition={wordDefinitions[popupInfo.word.toLowerCase()]}
+            dictDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.dictionaryDefinition}
+            disambiguatedDefinition={wordDefinitions[popupInfo.word.toLowerCase()]?.disambiguatedDefinition}
+            position={popupInfo.position}
+            isInDictionary={wordDefinitions[popupInfo.word.toLowerCase()] ? doesWordSenseExist(popupInfo.word, wordDefinitions[popupInfo.word.toLowerCase()]?.contextSentence) : false}
+            onAddToDictionary={handleAddWordToDictionary}
+            onRemoveFromDictionary={handleRemoveWordFromDictionary}
+            loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
+            nativeLanguage={profileLanguage}
+            onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
+          />
+        );
+      })()}
       {/* Transcript/English box always renders and updates first */}
       {transcriptVisible && (
         <div style={{ width: translationVisible ? '100%' : '100%', flex: translationVisible ? '0 0 33.5%' : '1 1 100%', minHeight: 0, display: 'flex', flexDirection: 'column', transition: 'flex 0.3s, width 0.3s' }}>{renderEnglishBox()}</div>
