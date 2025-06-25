@@ -395,11 +395,13 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
   return (
     <div className="mobile-profile-selector">
       {/* Back Button */}
-      <div className="mobile-profile-back">
-        <button className="mobile-back-btn" onClick={onBack}>
-          ← Change Profile
-        </button>
-      </div>
+      {onBack && (
+        <div className="mobile-profile-back">
+          <button className="mobile-back-btn" onClick={onBack}>
+            ← Back
+          </button>
+        </div>
+      )}
 
       {/* Profile Selection */}
       <div className="mobile-profile-section">
@@ -628,7 +630,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
 MobileProfileSelector.propTypes = {
   selectedProfile: PropTypes.string,
   onStartStudying: PropTypes.func.isRequired,
-  onBack: PropTypes.func.isRequired
+  onBack: PropTypes.func
 };
 
 export default MobileProfileSelector;
