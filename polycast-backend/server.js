@@ -793,20 +793,30 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
                 flashcardContent = await generateTextWithGemini(flashcardPrompt, 0.2);
                 console.log(`[Dictionary API] Flashcard content for "${word}": ${flashcardContent}`);
                 
-                // Parse the flashcard content
+                // Parse the flashcard content - expecting 10 sentences + 2 frequencies = 12 parts
                 const contentParts = flashcardContent.split('//').map(part => part.trim());
                 
-                if (contentParts.length >= 5) {
-                    // Extract example sentences and frequency ratings
-                    const [sentence1, sentence2, sentence3, wordFrequency, definitionFrequency] = contentParts;
+                if (contentParts.length >= 12) {
+                    // Extract all 10 sentences and 2 frequency ratings
+                    const sentences = contentParts.slice(0, 10); // First 10 parts are sentences
+                    const wordFrequency = contentParts[10]; // 11th part is word frequency
+                    const definitionFrequency = contentParts[11]; // 12th part is definition frequency
                     
-                    // Add to the formatted response
+                    // Join all sentences for exampleSentencesRaw (used by frontend)
+                    formattedResponse.exampleSentencesRaw = sentences.join('//');
+                    formattedResponse.exampleSentences = sentences; // For backward compatibility
+                    formattedResponse.wordFrequency = parseInt(wordFrequency) || 3;
+                    formattedResponse.definitionFrequency = parseInt(definitionFrequency) || 3;
+                    
+                    console.log(`[Dictionary API] Generated ${sentences.length} sentences. Word frequency: ${formattedResponse.wordFrequency}, Definition frequency: ${formattedResponse.definitionFrequency}`);
+                } else if (contentParts.length >= 5) {
+                    // Fallback for old format (3 sentences + 2 frequencies)
+                    const [sentence1, sentence2, sentence3, wordFrequency, definitionFrequency] = contentParts;
                     formattedResponse.exampleSentences = [sentence1, sentence2, sentence3];
                     formattedResponse.exampleSentencesRaw = `${sentence1}//${sentence2}//${sentence3}`;
                     formattedResponse.wordFrequency = parseInt(wordFrequency) || 3;
                     formattedResponse.definitionFrequency = parseInt(definitionFrequency) || 3;
-                    
-                    console.log(`[Dictionary API] Word frequency: ${formattedResponse.wordFrequency}, Definition frequency: ${formattedResponse.definitionFrequency}`);
+                    console.log(`[Dictionary API] Using old format fallback. Word frequency: ${formattedResponse.wordFrequency}, Definition frequency: ${formattedResponse.definitionFrequency}`);
                 } else {
                     console.error('[Dictionary API] Unexpected flashcard content format:', flashcardContent);
                     // Fallback to default values
