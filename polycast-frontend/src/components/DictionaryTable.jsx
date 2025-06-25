@@ -369,6 +369,50 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
             className="dictionary-search-input"
           />
         </div>
+        
+        {/* Add Word Form - Always visible */}
+        <div className="add-word-form" style={{ 
+          padding: '10px 16px', 
+          borderBottom: '1px solid #39394d',
+          backgroundColor: '#1e1e2e'
+        }}>
+          <form onSubmit={handleAddWord} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Type English word to add to dictionary..."
+              value={newWordInput}
+              onChange={handleNewWordInputChange}
+              ref={addWordInputRef}
+              disabled={isAddingWord}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                backgroundColor: '#252533',
+                color: '#f5f5f5',
+                border: '1px solid #39394d',
+                borderRadius: '4px',
+                fontSize: '14px'
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!newWordInput.trim() || isAddingWord}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: newWordInput.trim() ? '#5f72ff' : '#39394d',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '14px',
+                cursor: newWordInput.trim() && !isAddingWord ? 'pointer' : 'not-allowed',
+                opacity: isAddingWord ? 0.7 : 1
+              }}
+            >
+              {isAddingWord ? '...' : '+ Add Word'}
+            </button>
+          </form>
+        </div>
+        
         <div className="empty-dictionary-message">
           {searchTerm ? 
             `No words matching "${searchTerm}" found in your dictionary.` : 
