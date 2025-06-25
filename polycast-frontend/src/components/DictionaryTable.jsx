@@ -143,7 +143,7 @@ const FrequencyLegend = () => {
   );
 };
 
-const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
+const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedWords, setExpandedWords] = useState({});
   const [groupedEntries, setGroupedEntries] = useState({});
@@ -152,7 +152,10 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
   const [frequencyFilter, setFrequencyFilter] = useState([1, 5]); // Min and max frequency to show
   const [selectedWordIndex, setSelectedWordIndex] = useState(-1); // For keyboard navigation
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [newWordInput, setNewWordInput] = useState('');
+  const [isAddingWord, setIsAddingWord] = useState(false);
   const searchInputRef = React.useRef(null);
+  const addWordInputRef = React.useRef(null);
 
   // Group entries by word
   useEffect(() => {
@@ -324,6 +327,46 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
     }
   };
 
+  // Function to handle manually adding a word
+  const handleAddWord = async (e) => {
+    e.preventDefault();
+    const word = newWordInput.trim();
+    
+    if (!word) {
+      return;
+    }
+
+    // Check if word already exists in dictionary
+    const existingWord = Object.values(wordDefinitions).find(
+      entry => entry.word && entry.word.toLowerCase() === word.toLowerCase()
+    );
+    
+    if (existingWord) {
+      alert(`"${word}" is already in your dictionary!`);
+      setNewWordInput('');
+      return;
+    }
+
+    setIsAddingWord(true);
+    
+    try {
+      if (onAddWord) {
+        await onAddWord(word);
+        setNewWordInput('');
+      }
+    } catch (error) {
+      console.error('Error adding word:', error);
+      alert(`Failed to add "${word}". Please try again.`);
+    } finally {
+      setIsAddingWord(false);
+    }
+  };
+
+  // Handle input change for new word
+  const handleNewWordInputChange = (e) => {
+    setNewWordInput(e.target.value);
+  };
+
   // Show a message if dictionary is empty
   if (filteredWords.length === 0) {
     return (
@@ -361,6 +404,49 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
         <div className="dictionary-count">
           {sortedWords.length} {sortedWords.length === 1 ? 'word' : 'words'}
         </div>
+      </div>
+      
+      {/* Add Word Form */}
+      <div className="add-word-form" style={{ 
+        padding: '10px 16px', 
+        borderBottom: '1px solid #39394d',
+        backgroundColor: '#1e1e2e'
+      }}>
+        <form onSubmit={handleAddWord} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="Type English word to add to dictionary..."
+            value={newWordInput}
+            onChange={handleNewWordInputChange}
+            ref={addWordInputRef}
+            disabled={isAddingWord}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              backgroundColor: '#252533',
+              color: '#f5f5f5',
+              border: '1px solid #39394d',
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!newWordInput.trim() || isAddingWord}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: newWordInput.trim() ? '#5f72ff' : '#39394d',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '14px',
+              cursor: newWordInput.trim() && !isAddingWord ? 'pointer' : 'not-allowed',
+              opacity: isAddingWord ? 0.7 : 1
+            }}
+          >
+            {isAddingWord ? '...' : '+ Add Word'}
+          </button>
+        </form>
       </div>
       
       {/* Controls */}
@@ -639,6 +725,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord }) => {
 DictionaryTable.propTypes = {
   wordDefinitions: PropTypes.object.isRequired,
   onRemoveWord: PropTypes.func, // optional – only needed if removal UI is desired
+  onAddWord: PropTypes.func, // optional – only needed if manual word addition is desired
 };
 
 export default DictionaryTable;

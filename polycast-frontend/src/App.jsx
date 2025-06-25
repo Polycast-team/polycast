@@ -820,6 +820,49 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                 showError(`Failed to delete "${word}" from dictionary. Please try again.`);
               }
             }}
+            onAddWord={async (word) => {
+              console.log(`Adding word to dictionary: ${word}`);
+              try {
+                // Fetch the word definition using the same API as clicking words in transcript
+                const response = await fetch(`https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}`);
+                
+                if (!response.ok) {
+                  throw new Error(`Failed to fetch definition for "${word}"`);
+                }
+                
+                const data = await response.json();
+                console.log(`Received definition data for "${word}":`, data);
+                
+                if (data && data.wordSenseId) {
+                  // Add to wordDefinitions with inFlashcards: true
+                  const wordData = {
+                    ...data,
+                    inFlashcards: true,
+                    word: word
+                  };
+                  
+                  setWordDefinitions(prev => ({
+                    ...prev,
+                    [data.wordSenseId]: wordData
+                  }));
+                  
+                  // Add to selectedWords if not already there
+                  setSelectedWords(prev => {
+                    if (!prev.includes(word)) {
+                      return [...prev, word];
+                    }
+                    return prev;
+                  });
+                  
+                  console.log(`Successfully added "${word}" to dictionary`);
+                } else {
+                  throw new Error(`Invalid definition data received for "${word}"`);
+                }
+              } catch (error) {
+                console.error(`Error adding word "${word}":`, error);
+                throw error; // Re-throw to let DictionaryTable handle the error display
+              }
+            }}
           />
         ) : appMode === 'flashcard' ? (
           <FlashcardMode 
