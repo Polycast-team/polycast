@@ -712,7 +712,8 @@ app.get('/api/dictionary/:word', async (req, res) => {
     try {
         const { word } = req.params;
         const context = req.query.context || '';
-        console.log(`[Dictionary API] Getting definition for: ${word}${context ? ' with context: "' + context + '"' : ''}`);
+        const targetLanguage = req.query.targetLanguage || 'Spanish'; // Default to Spanish for backward compatibility
+        console.log(`[Dictionary API] Getting definition for: ${word}${context ? ' with context: "' + context + '"' : ''} in ${targetLanguage}`);
         
         // Create a prompt that asks for a single contextual definition and definition number
         const prompt = `You are an expert language teacher helping a student understand a word in its specific context.
@@ -725,7 +726,7 @@ Your task is to:
 
 Output ONLY a JSON object with these fields:
 {
-  "translation": "Spanish translation of the word as used in this specific context",
+  "translation": "${targetLanguage} translation of the word as used in this specific context",
   "partOfSpeech": "The part of speech of the word in this context (noun, verb, adjective, etc.)",
   "definition": "A clear and concise definition appropriate for how the word is used in this context only",
   "example": "A simple example sentence showing a similar usage to the context",
@@ -1709,6 +1710,7 @@ process.on('SIGTERM', () => {
 app.get('/api/local-dictionary/:letter/:word', async (req, res) => {
     const { letter, word } = req.params;
     const contextSentence = req.query.context || '';
+    const targetLanguage = req.query.targetLanguage || 'Spanish'; // Default to Spanish for backward compatibility
     
     // Validate letter is a single character a-z
     if (!/^[a-z]$/.test(letter)) {
@@ -1723,7 +1725,7 @@ Your job is to explain the English word "${word}" in a simple, clear way that he
 The word appears in this context: "${contextSentence}". Your definition and example should be specific to how the word is used in this context ONLY.
 Your response must be in JSON format with these fields:
 {
-  "translation": "Spanish translation of the word as used in this specific context",
+  "translation": "${targetLanguage} translation of the word as used in this specific context",
   "partOfSpeech": "The part of speech (noun, verb, adjective, etc.) of the word in this context",
   "frequencyRating": "A number from 1 to 5 representing how common this word is in everyday English in this sense",
   "definition": "VERY SIMPLE and SHORT explanation in simple English for how the word is used in this context (1-2 short sentences max)",
