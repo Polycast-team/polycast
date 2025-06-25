@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { ReadyState } from 'react-use-websocket';
+import { getTranslationsForProfile } from '../utils/profileLanguageMapping';
 
 /**
  * Component for mode controls, language selection, font size, and recording indicator.
@@ -29,6 +30,7 @@ function Controls({
     // Check if we're in host mode (all control functions available) or student mode (view-only)
     const isHostMode = setIsTextMode !== null && onStartRecording !== null;
     const isConnected = readyState === ReadyState.OPEN;
+    const t = getTranslationsForProfile(selectedProfile);
 
     return (
         <div className="controls">
@@ -143,7 +145,7 @@ function Controls({
                     borderRadius: '6px', cursor: 'pointer', fontSize: '13px'
                   }}
                 >
-                  ← Back to Main
+                  {t.backToMain}
                 </button>
                 <button 
                   onClick={() => {
@@ -155,12 +157,12 @@ function Controls({
                     padding: '6px 10px', fontSize: '13px', color: '#2196f3', cursor: 'pointer'
                   }}
                 >
-                  📅 Calendar
+                  {t.calendar}
                 </button>
                 <div style={{ color: '#ccc', fontSize: '12px' }}>
-                  <span style={{color: '#5f72ff'}}>New: 5</span> • 
-                  <span style={{color: '#ef4444', marginLeft: '4px'}}>Learning: 0</span> • 
-                  <span style={{color: '#10b981', marginLeft: '4px'}}>Review: 1</span>
+                  <span style={{color: '#5f72ff'}}>{t.new}: 5</span> • 
+                  <span style={{color: '#ef4444', marginLeft: '4px'}}>{t.learning}: 0</span> • 
+                  <span style={{color: '#10b981', marginLeft: '4px'}}>{t.review}: 1</span>
                 </div>
               </div>
             )}

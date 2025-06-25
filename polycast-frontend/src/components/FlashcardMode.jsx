@@ -10,9 +10,13 @@ import { useFlashcardSession } from '../hooks/useFlashcardSession';
 import { useFlashcardSRS } from '../hooks/useFlashcardSRS';
 import { useFlashcardCalendar } from '../hooks/useFlashcardCalendar';
 import FlashcardCalendarModal from './shared/FlashcardCalendarModal';
+import { getTranslationsForProfile } from '../utils/profileLanguageMapping';
 import '../mobile/styles/mobile-flashcards.css';
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
+  // Get translations for this profile's language
+  const t = getTranslationsForProfile(selectedProfile);
+  
   // State for UI mode - desktop starts in flashcards, mobile starts in profile selection
   const [currentMode, setCurrentMode] = useState(() => {
     return shouldUseMobileApp() ? 'profile' : 'flashcards';
@@ -386,26 +390,26 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       <div className="flashcard-completion">
         <div className="completion-content">
           <div className="completion-icon">🎉</div>
-          <h2>Great work!</h2>
+          <h2>{t.sessionComplete}</h2>
           <p>You've completed all cards for today.</p>
           
           <div className="session-summary">
             <div className="summary-stat">
               <div className="summary-number">{sessionData.stats.cardsReviewed}</div>
-              <div className="summary-label">Cards Reviewed</div>
+              <div className="summary-label">{t.cardsReviewed}</div>
             </div>
             <div className="summary-stat">
               <div className="summary-number">{headerStats.accuracy}%</div>
-              <div className="summary-label">Accuracy</div>
+              <div className="summary-label">{t.accuracy}</div>
             </div>
             <div className="summary-stat">
               <div className="summary-number">{sessionDuration}</div>
-              <div className="summary-label">Minutes</div>
+              <div className="summary-label">{t.minutes}</div>
             </div>
           </div>
           
           <button className="completion-back-button" onClick={handleBackToProfile}>
-            Return to Profiles
+            {t.returnToProfiles}
           </button>
         </div>
       </div>
@@ -433,15 +437,15 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         <div className="desktop-card-container">
           <div className="no-flashcards-message">
             <div className="no-flashcards-icon">📚</div>
-            <h2>No Flashcards Available</h2>
-            <p>You don't have any flashcards to study yet.</p>
+            <h2>{t.noFlashcardsTitle}</h2>
+            <p>{t.noFlashcardsMessage}</p>
             <div className="no-flashcards-instructions">
-              <p><strong>To add flashcards:</strong></p>
+              <p><strong>{t.instructionsTitle}</strong></p>
               <ol>
-                <li>Switch to <strong>Audio Mode</strong></li>
-                <li>Listen to content or speak into the microphone</li>
-                <li>Click on words in the transcript to save them</li>
-                <li>Return to <strong>Flashcard Mode</strong> to study</li>
+                <li>{t.step1}</li>
+                <li>{t.step2}</li>
+                <li>{t.step3}</li>
+                <li>{t.step4}</li>
               </ol>
             </div>
           </div>
@@ -490,7 +494,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                       />
                     )}
                     <div className="desktop-card-hint">
-                      Click to reveal answer
+                      {t.clickToReveal}
                     </div>
                   </div>
                 );
@@ -507,7 +511,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                   </div>
                 )}
                 <div className="desktop-card-hint">
-                  Click to see definition
+                  {t.clickToReveal}
                 </div>
               </div>
             )}
@@ -594,7 +598,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           disabled={!isFlipped}
         >
           <div className="desktop-btn-emoji">❌</div>
-          <div className="desktop-btn-label">Incorrect</div>
+          <div className="desktop-btn-label">{t.again}</div>
           <div className="desktop-btn-time">
             {buttonTimes.incorrect.time}
           </div>
@@ -606,7 +610,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           disabled={!isFlipped}
         >
           <div className="desktop-btn-emoji">✓</div>
-          <div className="desktop-btn-label">Correct</div>
+          <div className="desktop-btn-label">{t.good}</div>
           <div className="desktop-btn-time">
             {buttonTimes.correct.time}
           </div>
@@ -618,7 +622,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           disabled={!isFlipped}
         >
           <div className="desktop-btn-emoji">⭐</div>
-          <div className="desktop-btn-label">Easy</div>
+          <div className="desktop-btn-label">{t.easy}</div>
           <div className="desktop-btn-time">
             {buttonTimes.easy.time}
           </div>
