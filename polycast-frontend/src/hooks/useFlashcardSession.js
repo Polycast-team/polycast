@@ -171,7 +171,8 @@ export function useFlashcardSession(selectedProfile, wordDefinitions) {
   
   // Check if session is complete
   const timeSinceLastProcess = Date.now() - lastCardProcessedTime.current;
-  const isSessionComplete = dueCards.length === 0 && timeSinceLastProcess > 1000;
+  // Only consider session complete if cards were actually reviewed (not just empty from start)
+  const isSessionComplete = dueCards.length === 0 && timeSinceLastProcess > 1000 && stats.cardsReviewed > 0;
   
   return {
     // State

@@ -64,8 +64,9 @@ This ensures continuity and prevents future AIs from repeating mistakes or missi
 ### Flashcard Error Handling (December 2024)
 - **Removed all fallback UI** that showed basic word format instead of proper cloze deletion
 - **Clear error throwing**: Components now fail clearly when `exampleSentencesGenerated` is missing
-- **No compromise approach**: System must generate proper flashcards or fail visibly
-- **Affected files**: `FlashcardMode.jsx`, `MobileFlashcardMode.jsx`
+- **Fixed session completion logic**: Only shows completion screen after reviewing cards, not when starting empty
+- **Improved no-cards message**: Clear numbered instructions on how to add words via Dictionary Mode
+- **Affected files**: `FlashcardMode.jsx`, `MobileFlashcardMode.jsx`, `useFlashcardSession.js`
 
 ## 🎯 Overview
 

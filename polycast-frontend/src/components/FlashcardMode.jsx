@@ -437,15 +437,15 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         <div className="desktop-card-container">
           <div className="no-flashcards-message">
             <div className="no-flashcards-icon">📚</div>
-            <h2>{t.noFlashcardsTitle}</h2>
-            <p>{t.noFlashcardsMessage}</p>
+            <h2>No Flashcards Available</h2>
+            <p>You haven't added any words to study yet.</p>
             <div className="no-flashcards-instructions">
-              <p><strong>{t.instructionsTitle}</strong></p>
+              <p><strong>How to add words:</strong></p>
               <ol>
-                <li>{t.step1}</li>
-                <li>{t.step2}</li>
-                <li>{t.step3}</li>
-                <li>{t.step4}</li>
+                <li>Go to 📚 <strong>Dictionary Mode</strong> (button above)</li>
+                <li>Type an English word in the input field</li>
+                <li>Click <strong>"+ Add Word"</strong> to create flashcards</li>
+                <li>Return here to start studying</li>
               </ol>
             </div>
           </div>
