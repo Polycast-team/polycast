@@ -495,28 +495,20 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           {/* Back of Card */}
           <div className="desktop-card-back">
             <div className="desktop-card-content">
-              {currentCard.exampleSentencesGenerated ? (
-                (() => {
-                  const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-                  const sentenceIndex = ((interval - 1) % 5) * 2;
-                  const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                  const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
-                    return `<span class="desktop-highlighted-word">${word}</span>`;
-                  });
-                  const exampleNumber = ((interval - 1) % 5) + 1;
-                  
-                  return (
-                    <div className="desktop-card-answer">
-                      <div 
-                        className="desktop-example-sentence"
-                        dangerouslySetInnerHTML={{ __html: highlightedSentence }}
-                      />
-                      {currentCard.disambiguatedDefinition && (
-                        <div className="desktop-card-definition">
-                          {currentCard.disambiguatedDefinition.definition}
-                        </div>
-                      )}
-                      <button 
+              <div className="desktop-card-answer">
+                {/* Translation */}
+                <div className="desktop-card-translation">
+                  {currentCard.translation || 'Translation not available'}
+                </div>
+                
+                {/* Contextual Explanation */}
+                {currentCard.contextualExplanation && (
+                  <div className="desktop-card-context-explanation">
+                    {currentCard.contextualExplanation}
+                  </div>
+                )}
+                
+                <button 
                         className="desktop-audio-btn"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -531,27 +523,18 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                 })()
               ) : (
                 <div className="desktop-card-answer">
-                  <div className="desktop-card-word-large">
-                    {baseWord}
+                  {/* Translation */}
+                  <div className="desktop-card-translation">
+                    {currentCard.translation || 'Translation not available'}
                   </div>
-                  {/* Show definition from either source */}
-                  {(currentCard.disambiguatedDefinition?.definition || currentCard.definition) && (
-                    <div className="desktop-card-definition">
-                      {currentCard.disambiguatedDefinition?.definition || currentCard.definition}
+                  
+                  {/* Contextual Explanation */}
+                  {currentCard.contextualExplanation && (
+                    <div className="desktop-card-context-explanation">
+                      {currentCard.contextualExplanation}
                     </div>
                   )}
-                  {/* Show context sentence if available */}
-                  {currentCard.contextSentence && (
-                    <div className="desktop-example-sentence">
-                      {currentCard.contextSentence}
-                    </div>
-                  )}
-                  {/* Show example if available */}
-                  {currentCard.example && currentCard.example !== currentCard.contextSentence && (
-                    <div className="desktop-example-sentence">
-                      {currentCard.example}
-                    </div>
-                  )}
+                  
                   {/* Show indicator that better examples are generating in background */}
                   {!currentCard.exampleSentencesGenerated && (
                     <div style={{
@@ -564,6 +547,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                       ⚡ Enhanced examples generating...
                     </div>
                   )}
+                  
                   <button 
                     className="desktop-audio-btn"
                     onClick={(e) => {
