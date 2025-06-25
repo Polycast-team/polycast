@@ -15,6 +15,7 @@ function Main() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isMobile, setIsMobile] = useState(false);
+  const [forceFlashcardMobile, setForceFlashcardMobile] = useState(false);
 
   // Check if device should use mobile app
   useEffect(() => {
@@ -29,8 +30,8 @@ function Main() {
     return () => window.removeEventListener('resize', checkDevice);
   }, []);
 
-  // If mobile device, render mobile app instead
-  if (isMobile) {
+  // If mobile device OR flashcard mode is forced, render mobile app instead
+  if (isMobile || forceFlashcardMobile) {
     return <MobileApp />;
   }
 
@@ -90,6 +91,7 @@ function Main() {
     onReset: () => {
       setRoomSetup(null);
       setSelectedLanguages(null);
+      setForceFlashcardMobile(false); // Reset mobile mode when resetting
     },
     roomSetup: roomSetup?.roomCode ? roomSetup : null, // Only pass room setup when there's a valid room code
     userRole: roomSetup?.isHost ? 'host' : 'student',
@@ -97,6 +99,10 @@ function Main() {
     onJoinRoom: (roomCode) => {
       // Update roomSetup to connect student to the room
       setRoomSetup({ isHost: false, roomCode: roomCode });
+    },
+    onFlashcardModeChange: (isFlashcardMode) => {
+      // Force mobile mode when entering flashcard mode
+      setForceFlashcardMobile(isFlashcardMode);
     }
   };
   

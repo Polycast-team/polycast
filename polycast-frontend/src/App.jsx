@@ -15,7 +15,7 @@ import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
 
 // App now receives an array of target languages and room setup as props
-function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom }) {
+function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange }) {
   // Debug logging
   console.log('App component received props:', { targetLanguages, roomSetup, userRole, studentHomeLanguage });
   
@@ -135,7 +135,12 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     }
   }, [showLiveTranscript, showTranslation]);
 
-
+  // Trigger mobile mode when entering flashcard mode
+  useEffect(() => {
+    if (onFlashcardModeChange) {
+      onFlashcardModeChange(appMode === 'flashcard');
+    }
+  }, [appMode, onFlashcardModeChange]);
 
   // Update refs when state changes
   useEffect(() => { modeRef.current = appMode === 'text'; }, [appMode]);
@@ -1124,7 +1129,8 @@ App.propTypes = {
     }), // Made optional for students not in a room
     userRole: PropTypes.oneOf(['host', 'student']),
     studentHomeLanguage: PropTypes.string,
-    onJoinRoom: PropTypes.func
+    onJoinRoom: PropTypes.func,
+    onFlashcardModeChange: PropTypes.func
 };
 
 // Define backend port in a config object or hardcode if simple
