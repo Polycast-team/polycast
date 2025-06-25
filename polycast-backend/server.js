@@ -730,7 +730,8 @@ Output ONLY a JSON object with these fields:
   "partOfSpeech": "The part of speech of the word in this context (noun, verb, adjective, etc.)",
   "definition": "A clear and concise definition appropriate for how the word is used in this context only",
   "example": "A simple example sentence showing a similar usage to the context",
-  "definitionNumber": A number representing this specific meaning (e.g., 1, 2, 3, etc.)
+  "definitionNumber": A number representing this specific meaning (e.g., 1, 2, 3, etc.),
+  "contextualExplanation": "A brief explanation IN ${targetLanguage} of what the word '${word}' means in the sentence '${context}'. Write this entirely in ${targetLanguage}, explaining the specific meaning in this context."
 }
 
 Do NOT provide multiple definitions or explanations outside the JSON.`;
@@ -760,6 +761,7 @@ Do NOT provide multiple definitions or explanations outside the JSON.`;
                     example: parsedResponse.example || ''
                 }],
                 definitionNumber: parsedResponse.definitionNumber || 1, // Include the definition number
+                contextualExplanation: parsedResponse.contextualExplanation || '', // Add contextual explanation in target language
                 isContextual: true
             };
             
@@ -1729,7 +1731,8 @@ Your response must be in JSON format with these fields:
   "partOfSpeech": "The part of speech (noun, verb, adjective, etc.) of the word in this context",
   "frequencyRating": "A number from 1 to 5 representing how common this word is in everyday English in this sense",
   "definition": "VERY SIMPLE and SHORT explanation in simple English for how the word is used in this context (1-2 short sentences max)",
-  "example": "A simple example sentence in English that uses this word in a similar way to the context."
+  "example": "A simple example sentence in English that uses this word in a similar way to the context.",
+  "contextualExplanation": "A brief explanation IN ${targetLanguage} of what the word '${word}' means in the sentence '${contextSentence}'. Write this entirely in ${targetLanguage}, explaining the specific meaning in this context."
 }
 
 IMPORTANT: ONLY provide the definition of the word as it is used in the context sentence. DO NOT provide multiple definitions or alternative meanings.
@@ -1765,6 +1768,7 @@ Only return the JSON object, nothing else.`;
                     translation: parsedResponse.translation || '',
                     partOfSpeech: parsedResponse.partOfSpeech || '',
                     frequencyRating: parsedResponse.frequencyRating || 3,
+                    contextualExplanation: parsedResponse.contextualExplanation || '',
                     definitions: [{
                         text: parsedResponse.definition || '',
                         example: parsedResponse.example || ''
