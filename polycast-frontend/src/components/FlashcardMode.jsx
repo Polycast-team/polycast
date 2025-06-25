@@ -426,8 +426,29 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     );
   }
 
-  // Flashcard study mode - extract just the card and buttons
-  if (!currentCard) return null;
+  // Flashcard study mode - show message if no cards available
+  if (!currentCard) {
+    return (
+      <div className="flashcard-study-container">
+        <div className="desktop-card-container">
+          <div className="no-flashcards-message">
+            <div className="no-flashcards-icon">📚</div>
+            <h2>No Flashcards Available</h2>
+            <p>You don't have any flashcards to study yet.</p>
+            <div className="no-flashcards-instructions">
+              <p><strong>To add flashcards:</strong></p>
+              <ol>
+                <li>Switch to <strong>Audio Mode</strong></li>
+                <li>Listen to content or speak into the microphone</li>
+                <li>Click on words in the transcript to save them</li>
+                <li>Return to <strong>Flashcard Mode</strong> to study</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const baseWord = currentCard.word || currentCard.wordSenseId?.replace(/\d+$/, '');
   const defNumber = currentCard.definitionNumber || currentCard.wordSenseId?.match(/\d+$/)?.[0] || '';
