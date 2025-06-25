@@ -1,319 +1,99 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import './FlashcardMode.css';
-import { calculateNextReview, formatNextReviewTime } from '../utils/srsAlgorithm';
-import { useFlashcardSession } from '../hooks/useFlashcardSession';
-import { useFlashcardSRS } from '../hooks/useFlashcardSRS';
-import { useFlashcardCalendar } from '../hooks/useFlashcardCalendar';
-import { playFlashcardAudio } from '../utils/flashcardAudio';
-import FlashcardCalendarModal from './shared/FlashcardCalendarModal';
-import ErrorPopup from './ErrorPopup';
+import MobileProfileSelector from '../mobile/components/MobileProfileSelector.jsx';
+import MobileFlashcardMode from '../mobile/components/MobileFlashcardMode.jsx';
+import '../mobile/styles/mobile.css';
+import '../mobile/styles/mobile-profile.css';
+import '../mobile/styles/mobile-flashcards.css';
+import { shouldUseMobileApp } from '../utils/deviceDetection.js';
 import { useErrorHandler } from '../hooks/useErrorHandler';
+import ErrorPopup from './ErrorPopup';
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
-  // Local UI state
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [audioState, setAudioState] = useState({ loading: false, error: null });
-  const [currentAudio, setCurrentAudio] = useState(null);
+  // State for mobile UI mode
+  const [currentMode, setCurrentMode] = useState('profile'); // 'profile' or 'flashcards'
   const { error: popupError, showError, clearError } = useErrorHandler();
-  
-  // Use shared session hook
-  const sessionData = useFlashcardSession(selectedProfile, wordDefinitions);
-  const {
-    currentCard,
-    isFlipped,
-    setIsFlipped,
-    dueCards,
-    currentDueIndex,
-    headerStats,
-    sessionDuration,
-    isSessionComplete,
-    processedCards,
-    calendarUpdateTrigger
-  } = sessionData;
-  
-  // Use shared SRS hook
-  const { markCard } = useFlashcardSRS(
-    sessionData,
-    setWordDefinitions,
-    selectedProfile,
-    currentAudio,
-    setCurrentAudio,
-    setAudioState
-  );
-  
-  // Use shared calendar hook
-  const { calendarData } = useFlashcardCalendar(
-    dueCards,
-    wordDefinitions,
-    sessionData.availableCards,
-    selectedProfile,
-    processedCards,
-    calendarUpdateTrigger
-  );
-  
-  // Calculate button times for SRS preview
-  const buttonTimes = useMemo(() => {
-    if (!currentCard) return { incorrect: { time: '' }, correct: { time: '' }, easy: { time: '' } };
-    
-    const incorrectResult = calculateNextReview(currentCard, 'incorrect');
-    const correctResult = calculateNextReview(currentCard, 'correct');
-    const easyResult = calculateNextReview(currentCard, 'easy');
-    
-    return {
-      incorrect: {
-        time: formatNextReviewTime(incorrectResult.nextReviewDate)
-      },
-      correct: {
-        time: formatNextReviewTime(correctResult.nextReviewDate)
-      },
-      easy: {
-        time: formatNextReviewTime(easyResult.nextReviewDate)
-      }
-    };
-  }, [currentCard]);
-  
-  // Audio playback handler
-  const handlePlayAudio = async () => {
-    if (!currentCard) return;
-    await playFlashcardAudio(currentCard.word, currentAudio, setCurrentAudio, setAudioState);
-  };
-  
-  // Listen for calendar event from toolbar
-  React.useEffect(() => {
-    const handleCalendarEvent = () => {
-      setShowCalendar(true);
-    };
-    
-    window.addEventListener('showFlashcardCalendar', handleCalendarEvent);
-    return () => window.removeEventListener('showFlashcardCalendar', handleCalendarEvent);
+  const isActuallyMobile = shouldUseMobileApp(); // Detect if we're on an actual mobile device
+
+  // Handle starting study session
+  const handleStartStudying = useCallback((profile, flashcards) => {
+    console.log(`[FLASHCARD] Starting study session for ${profile} with ${Object.keys(flashcards).length} flashcards`);
+    setCurrentMode('flashcards');
   }, []);
-  
-  // Show completion screen
-  if (isSessionComplete) {
-    return (
-      <div className="flashcard-container">
-        <div className="flashcard-header">
-          <button className="back-button" onClick={() => window.location.reload()}>
-            ← Back to Main
-          </button>
-          <div className="header-title">Study Complete</div>
-        </div>
-        
-        <div className="completion-state">
-          <div className="completion-icon">🎉</div>
-          <h2>Great work!</h2>
-          <p>You've completed all cards for today.</p>
-          
-          <div className="session-summary">
-            <div className="summary-stat">
-              <div className="summary-number">{sessionData.stats.cardsReviewed}</div>
-              <div className="summary-label">Cards Reviewed</div>
-            </div>
-            <div className="summary-stat">
-              <div className="summary-number">{headerStats.accuracy}%</div>
-              <div className="summary-label">Accuracy</div>
-            </div>
-            <div className="summary-stat">
-              <div className="summary-number">{sessionDuration}</div>
-              <div className="summary-label">Minutes</div>
-            </div>
-          </div>
-          
-          <button className="done-button" onClick={() => window.location.reload()}>
-            Return to Main
-          </button>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!currentCard) return null;
-  
-  const baseWord = currentCard.word || currentCard.wordSenseId?.replace(/\d+$/, '');
-  const defNumber = currentCard.definitionNumber || currentCard.wordSenseId?.match(/\d+$/)?.[0] || '';
-  const interval = currentCard?.srsData?.SRS_interval || 1;
-  
+
+  // Handle updating word definitions from flashcard mode
+  const handleSetWordDefinitions = useCallback((newDefinitions) => {
+    setWordDefinitions(newDefinitions);
+    
+    // Save to backend if not in non-saving mode
+    if (selectedProfile !== 'non-saving') {
+      setTimeout(async () => {
+        try {
+          await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              flashcards: newDefinitions,
+              selectedWords: Object.keys(newDefinitions)
+            })
+          });
+          console.log(`[FLASHCARD] Saved SRS updates for profile: ${selectedProfile}`);
+        } catch (error) {
+          console.error('Error saving SRS updates:', error);
+          showError(`Failed to save progress for profile "${selectedProfile}". Your study progress may be lost. Please check your connection.`);
+        }
+      }, 500);
+    }
+  }, [selectedProfile, showError, setWordDefinitions]);
+
+  // Handle returning to profile selection
+  const handleBackToProfile = useCallback(() => {
+    setCurrentMode('profile');
+  }, []);
+
+  // Handle going back to main app (only for desktop)
+  const handleBackToMain = useCallback(() => {
+    // This will trigger going back to the main app
+    if (window.location) {
+      window.location.reload();
+    }
+  }, []);
+
   return (
-    <div className="flashcard-container">
-      {/* Header - now hidden since controls moved to main toolbar */}
-      <div className="flashcard-header" style={{ display: 'none' }}>
-      </div>
-
-      {/* Card Container */}
-      <div className="desktop-card-container">
-        <div 
-          className="desktop-flashcard"
-          onClick={() => setIsFlipped(!isFlipped)}
-          style={{
-            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-            transition: 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            cursor: 'pointer'
-          }}
-        >
-          {/* Front of Card */}
-          <div className="desktop-card-front">
-            <div className="desktop-card-content">
-              {currentCard.exampleSentencesGenerated ? (
-                (() => {
-                  const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-                  const sentenceIndex = ((interval - 1) % 5) * 2;
-                  const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                  const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
-                  const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
-                  const exampleNumber = ((interval - 1) % 5) + 1;
-                  
-                  return (
-                    <div className="desktop-card-content">
-                      <div className="desktop-example-label">
-                        Example {exampleNumber}:
-                      </div>
-                      <div className="desktop-card-sentence">
-                        {clozeSentence}
-                      </div>
-                      {nativeTranslation && (
-                        <div 
-                          className="desktop-card-translation"
-                          dangerouslySetInnerHTML={{ 
-                            __html: nativeTranslation.replace(/~([^~]+)~/g, '<span class="highlighted-word">$1</span>') 
-                          }}
-                        />
-                      )}
-                      <div className="desktop-card-hint">
-                        Click to reveal answer
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="desktop-card-content">
-                  <div className="desktop-card-word">
-                    {baseWord}
-                    {defNumber && <span className="def-number">#{defNumber}</span>}
-                  </div>
-                  <div className="desktop-card-prompt">
-                    Click to see definition
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Back of Card */}
-          <div className="desktop-card-back">
-            <div className="desktop-card-content">
-              {currentCard.exampleSentencesGenerated ? (
-                (() => {
-                  const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-                  const sentenceIndex = ((interval - 1) % 5) * 2;
-                  const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                  const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
-                    return `<span class="highlighted-word">${word}</span>`;
-                  });
-                  const exampleNumber = ((interval - 1) % 5) + 1;
-                  
-                  return (
-                    <div className="desktop-card-answer">
-                      <div className="desktop-example-label">
-                        Example {exampleNumber}:
-                      </div>
-                      <div 
-                        className="desktop-example-sentence"
-                        dangerouslySetInnerHTML={{ __html: highlightedSentence }}
-                      />
-                      {currentCard.disambiguatedDefinition && (
-                        <div className="desktop-card-definition">
-                          {currentCard.disambiguatedDefinition.definition}
-                        </div>
-                      )}
-                      <button 
-                        className="desktop-audio-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayAudio();
-                        }}
-                        disabled={audioState.loading}
-                      >
-                        {audioState.loading ? '🔄' : '🔊'} Play Audio
-                      </button>
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="desktop-card-answer">
-                  <div className="desktop-card-word-large">
-                    {baseWord}
-                  </div>
-                  {currentCard.disambiguatedDefinition && (
-                    <div className="desktop-card-definition">
-                      {currentCard.disambiguatedDefinition.definition}
-                    </div>
-                  )}
-                  <button 
-                    className="desktop-audio-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePlayAudio();
-                    }}
-                    disabled={audioState.loading}
-                  >
-                    {audioState.loading ? '🔄' : '🔊'} Play Audio
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+    <div className="mobile-app">
+      <div className="mobile-header">
+        <h1 className="mobile-title">PolyCast</h1>
+        <div className="mobile-subtitle">
+          {currentMode === 'profile' ? 'Flashcard Study' : 'Study Session'}
         </div>
       </div>
 
-      {/* Answer Buttons */}
-      <div className="desktop-answer-buttons">
-        <button 
-          className="desktop-answer-btn desktop-incorrect-btn"
-          onClick={() => markCard('incorrect')}
-          disabled={!isFlipped}
-        >
-          <div className="desktop-btn-emoji">❌</div>
-          <div className="desktop-btn-label">Incorrect</div>
-          <div className="desktop-btn-time">
-            {buttonTimes.incorrect.time}
-          </div>
-        </button>
-        
-        <button 
-          className="desktop-answer-btn desktop-correct-btn"
-          onClick={() => markCard('correct')}
-          disabled={!isFlipped}
-        >
-          <div className="desktop-btn-emoji">✓</div>
-          <div className="desktop-btn-label">Correct</div>
-          <div className="desktop-btn-time">
-            {buttonTimes.correct.time}
-          </div>
-        </button>
-        
-        <button 
-          className="desktop-answer-btn desktop-easy-btn"
-          onClick={() => markCard('easy')}
-          disabled={!isFlipped}
-        >
-          <div className="desktop-btn-emoji">⭐</div>
-          <div className="desktop-btn-label">Easy</div>
-          <div className="desktop-btn-time">
-            {buttonTimes.easy.time}
-          </div>
-        </button>
+      <div className="mobile-content">
+        {currentMode === 'profile' ? (
+          <MobileProfileSelector 
+            selectedProfile={selectedProfile}
+            onStartStudying={handleStartStudying}
+            onBack={!isActuallyMobile ? handleBackToMain : null} // Only show back button on desktop
+          />
+        ) : currentMode === 'flashcards' ? (
+          <MobileFlashcardMode
+            selectedProfile={selectedProfile}
+            wordDefinitions={wordDefinitions}
+            setWordDefinitions={handleSetWordDefinitions}
+            onBack={handleBackToProfile}
+          />
+        ) : null}
       </div>
 
-      {/* Calendar Modal */}
-      <FlashcardCalendarModal 
-        calendarData={calendarData}
-        showCalendar={showCalendar}
-        setShowCalendar={setShowCalendar}
-        processedCards={processedCards}
-        dueCards={dueCards}
-        calendarUpdateTrigger={calendarUpdateTrigger}
-      />
+      {/* Only show footer on actual mobile devices */}
+      {isActuallyMobile && (
+        <div className="mobile-footer">
+          <div className="mobile-footer-text">
+            PolyCast Mobile • For full features, use desktop version
+          </div>
+        </div>
+      )}
 
       {/* Error Popup */}
       <ErrorPopup error={popupError} onClose={clearError} />

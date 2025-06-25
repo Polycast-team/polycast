@@ -135,12 +135,7 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     }
   }, [showLiveTranscript, showTranslation]);
 
-  // Trigger mobile mode when entering flashcard mode
-  useEffect(() => {
-    if (onFlashcardModeChange) {
-      onFlashcardModeChange(appMode === 'flashcard');
-    }
-  }, [appMode, onFlashcardModeChange]);
+  // Don't trigger mobile mode for flashcard mode anymore - we'll use mobile UI on desktop instead
 
   // Update refs when state changes
   useEffect(() => { modeRef.current = appMode === 'text'; }, [appMode]);
