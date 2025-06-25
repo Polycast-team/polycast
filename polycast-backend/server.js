@@ -751,8 +751,13 @@ Do NOT provide multiple definitions or explanations outside the JSON.`;
             const jsonStr = jsonMatch[0];
             const parsedResponse = JSON.parse(jsonStr);
             
+            // Generate a unique wordSenseId for frontend compatibility
+            const wordSenseId = `${word.toLowerCase()}_${parsedResponse.definitionNumber || 1}_${Date.now()}`;
+            
             // Format for backward compatibility with existing frontend
             const formattedResponse = {
+                wordSenseId: wordSenseId, // Add unique ID for frontend
+                word: word, // Ensure word field is included
                 translation: parsedResponse.translation || '',
                 partOfSpeech: parsedResponse.partOfSpeech || '',
                 definition: parsedResponse.definition || '',
