@@ -939,6 +939,16 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
             exampleSentencesRaw = sentences.join('//');
             wordFrequency = parseInt(contentParts[10]) || 3;
             definitionFrequency = parseInt(contentParts[11]) || 3;
+        } else {
+            // Don't create fallbacks - fix the Gemini prompt to work properly
+            console.error(`[Add Word API] Gemini response parsing failed for "${normalizedWord}":`, flashcardContent);
+            throw new Error(`Failed to generate proper example sentences for word "${normalizedWord}". Expected 12 parts but got ${contentParts.length}. Fix the Gemini prompt.`);
+        }
+        
+        // Validate that we have proper ~word~ markup
+        if (!exampleSentencesRaw.includes(`~${normalizedWord}~`)) {
+            console.error(`[Add Word API] Generated sentences missing ~word~ markup for "${normalizedWord}":`, exampleSentencesRaw);
+            throw new Error(`Generated examples for "${normalizedWord}" missing proper ~word~ markup. Fix the Gemini prompt.`);
         }
         
         // Insert into database

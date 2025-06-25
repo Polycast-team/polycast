@@ -474,20 +474,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           <div className="desktop-card-front">
             {(() => {
               if (!currentCard.exampleSentencesGenerated) {
-                // Fallback for cards without generated examples
-                return (
-                  <div className="desktop-card-content">
-                    <div className="desktop-card-sentence">
-                      Fill in the blank: _____
-                    </div>
-                    <div className="desktop-card-translation">
-                      {currentCard.translation || currentCard.definition || 'No translation available'}
-                    </div>
-                    <div className="desktop-card-hint">
-                      Click to reveal answer: {currentCard.word}
-                    </div>
-                  </div>
-                );
+                throw new Error(`Card "${currentCard.word || 'unknown'}" is missing exampleSentencesGenerated field. Backend must generate proper ~word~ markup data. No fallback UI allowed.`);
               }
               const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
               const sentenceIndex = ((interval - 1) % 5) * 2;
@@ -521,27 +508,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
             <div className="desktop-card-content">
               {(() => {
                 if (!currentCard.exampleSentencesGenerated) {
-                  // Fallback for cards without generated examples
-                  return (
-                    <div className="desktop-card-answer">
-                      <div className="desktop-example-sentence">
-                        <span className="desktop-highlighted-word">{currentCard.word}</span>
-                      </div>
-                      <div style={{ marginTop: '10px', fontSize: '14px', color: '#a0a0b8' }}>
-                        {currentCard.definition || currentCard.translation || 'No definition available'}
-                      </div>
-                      <button 
-                        className="desktop-audio-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayAudio();
-                        }}
-                        disabled={audioState.loading}
-                      >
-                        {audioState.loading ? '🔄' : '🔊'} Play Audio
-                      </button>
-                    </div>
-                  );
+                  throw new Error(`Card "${currentCard.word || 'unknown'}" is missing exampleSentencesGenerated field. Backend must generate proper ~word~ markup data. No fallback UI allowed.`);
                 }
                 const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
                 const sentenceIndex = ((interval - 1) % 5) * 2;

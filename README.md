@@ -21,6 +21,17 @@ A comprehensive language learning application that combines real-time transcript
 - Target word highlighting in yellow on back, native language on front
 - **CRITICAL**: All flashcards MUST have `exampleSentencesGenerated` field with proper `~word~` markup - no fallback UI exists
 
+## 🚫 CRITICAL DEVELOPMENT RULE: NO FALLBACK UI
+**NEVER create fallback UI to paper over missing data or broken functionality!**
+
+- **Always fix the root cause** instead of adding bandaid solutions
+- **If data is missing, throw a clear error** instead of showing wrong format
+- **No "basic" flashcard formats** - only the proper cloze deletion format
+- **If the backend doesn't generate proper data, fix the backend** - don't work around it in frontend
+- **Better to crash with a clear error** than to lie to the user with wrong functionality
+
+This prevents technical debt and ensures we actually solve problems instead of hiding them.
+
 ## 🎯 Overview
 
 Polycast is a full-stack language learning platform designed for immersive learning experiences. It features real-time audio/video processing with AI transcription, intelligent flashcard generation using spaced repetition algorithms, and mobile-optimized study sessions.
