@@ -132,10 +132,6 @@ const TranscriptionDisplay = ({
   translations, 
   showLiveTranscript, 
   showTranslation, 
-  isTextMode, 
-  onTextSubmit, 
-  textInputs, 
-  setTextInputs,
   selectedWords,
   setSelectedWords,
   wordDefinitions,
@@ -149,19 +145,7 @@ const TranscriptionDisplay = ({
 }) => {
   const englishRef = useRef(null);
   const translationRefs = useRef({});
-  const [fontSize, setFontSize] = useState(isTextMode ? 18 : 30); // Font size: default to 30 in audio mode
-  useEffect(() => {
-    // Update font size default when mode changes
-    setFontSize(isTextMode ? 18 : 30);
-    
-    // Auto-fill the text input with specific text when in text mode
-    if (isTextMode) {
-      setTextInputs(prev => ({
-        ...prev,
-        'English': "Testing this now. I will charge my phone\n\ni will charge into battle\n\ni will charge him with murder"
-      }));
-    }
-  }, [isTextMode, setTextInputs]);
+  const [fontSize, setFontSize] = useState(30); // Font size: default to 30
   
   // Add default transcript content regardless of mode
   useEffect(() => {
@@ -1086,15 +1070,6 @@ START NOW:`;
     }
   };
 
-  const handleInputChange = (lang, value) => {
-    setTextInputs(inputs => ({ ...inputs, [lang]: value }));
-  };
-
-  const handleSubmit = (lang) => {
-    if (onTextSubmit && typeof onTextSubmit === 'function') {
-      onTextSubmit(lang, textInputs[lang] || '');
-    }
-  };
 
   useEffect(() => {
     function updateSize() {
@@ -1245,51 +1220,15 @@ START NOW:`;
         }}
       >
         <span style={{ letterSpacing: 0.5, textAlign: 'center', fontWeight: 800, fontSize: 20, margin: '18px 0 10px 0', color: '#b3b3e7', textTransform: 'uppercase', opacity: 0.92 }}>
-          {isTextMode ? 'English' : 'Transcript'}
+          Transcript
         </span>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 8, overflow: 'auto' }} ref={englishRef}>
-          {isTextMode ? (
-            <>
-              <textarea
-                value={textInputs['English'] ?? ''}
-                onChange={e => handleInputChange('English', e.target.value)}
-                placeholder={`Type English text here...`}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  flex: 1,
-                  fontSize: fontSize,
-                  borderRadius: 6,
-                  border: `1.5px solid ${scheme.accent}`,
-                  padding: 8,
-                  resize: 'none',
-                  background: scheme.bg,
-                  color: scheme.fg,
-                  boxSizing: 'border-box',
-                  minHeight: 80,
-                }}
-                onKeyDown={e => {
-                  if (isTextMode && e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit('English');
-                  }
-                }}
-              />
-              <button
-                style={{ marginTop: 10, alignSelf: 'center', background: scheme.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}
-                onClick={() => handleSubmit('English')}
-              >
-                Submit
-              </button>
-            </>
-          ) : (
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              <span style={{ fontWeight: 400, fontSize: fontSize }}>
-                {renderSegmentsWithClickableWords(englishSegments, null, selectedWords, handleWordClick, isWordInSelectedList)}
-              </span>
-              <div className="scroll-end" />
-            </div>
-          )}
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            <span style={{ fontWeight: 400, fontSize: fontSize }}>
+              {renderSegmentsWithClickableWords(englishSegments, null, selectedWords, handleWordClick, isWordInSelectedList)}
+            </span>
+            <div className="scroll-end" />
+          </div>
         </div>
       </div>
     );
@@ -1297,7 +1236,7 @@ START NOW:`;
 
   // --- Main render ---
   // Use flex layout to fill the available vertical space
-  const transcriptVisible = showLiveTranscript || isTextMode;
+  const transcriptVisible = showLiveTranscript;
   const translationVisible = showTranslation;
 
   // ...existing logic...
@@ -1396,44 +1335,9 @@ START NOW:`;
                   {isStudentMode ? (studentHomeLanguage || 'Student Language') : lang}
                 </span>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 8, overflow: 'auto', minHeight: 0 }} ref={el => translationRefs.current[lang] = el}>
-                  {isTextMode ? (
-                    <>
-                      <textarea
-                        value={textInputs[lang] ?? ''}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          flex: 1,
-                          fontSize: fontSize,
-                          borderRadius: 6,
-                          border: `1.5px solid ${scheme.accent}`,
-                          padding: 8,
-                          resize: 'none',
-                          background: scheme.bg,
-                          color: scheme.fg,
-                          boxSizing: 'border-box',
-                          minHeight: 80,
-                        }}
-                        onChange={e => handleInputChange(lang, e.target.value)}
-                        onKeyDown={e => {
-                          if (isTextMode && e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSubmit(lang);
-                          }
-                        }}
-                      />
-                      <button
-                        style={{ marginTop: 10, alignSelf: 'center', background: scheme.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}
-                        onClick={() => handleSubmit(lang)}
-                      >
-                        Submit
-                      </button>
-                    </>
-                  ) : (
-                    <span style={{ fontWeight: 400, fontSize: fontSize }}>
-                      {renderHistoryStacked(segments)}
-                    </span>
-                  )}
+                  <span style={{ fontWeight: 400, fontSize: fontSize }}>
+                    {renderHistoryStacked(segments)}
+                  </span>
                 </div>
               </div>
             );
@@ -1453,10 +1357,6 @@ TranscriptionDisplay.propTypes = {
   translations: PropTypes.object.isRequired,
   showLiveTranscript: PropTypes.bool,
   showTranslation: PropTypes.bool,
-  isTextMode: PropTypes.bool.isRequired,
-  onTextSubmit: PropTypes.func,
-  textInputs: PropTypes.object.isRequired,
-  setTextInputs: PropTypes.func.isRequired,
   selectedWords: PropTypes.array.isRequired,
   setSelectedWords: PropTypes.func.isRequired,
   wordDefinitions: PropTypes.object.isRequired,
@@ -1470,8 +1370,6 @@ TranscriptionDisplay.defaultProps = {
   translations: {},
   showLiveTranscript: true,
   showTranslation: true,
-  isTextMode: false,
-  onTextSubmit: null
 };
 
 export default TranscriptionDisplay;

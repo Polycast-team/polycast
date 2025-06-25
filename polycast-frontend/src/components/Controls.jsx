@@ -68,13 +68,11 @@ function Controls({
                     disabled={isRecording} // Only disable while recording, allow students to change modes
                 >
                     <option value="audio">lecture mode</option>
-                    <option value="video">video mode</option>
-                    <option value="text">text mode</option>
                     <option value="dictionary">dictionary mode</option>
                     <option value="flashcard">flashcard mode</option>
                 </select>
-                {/* Only show the live transcript and translation checkboxes in audio and video modes */}
-                {(appMode === 'audio' || appMode === 'video') && (
+                {/* Only show the live transcript and translation checkboxes in audio mode */}
+                {appMode === 'audio' && (
                   <>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
                       <input
@@ -100,8 +98,8 @@ function Controls({
                     </label>
                   </>
                 )}
-                {/* Add auto-send checkbox in audio and video modes - host only */}
-                {(appMode === 'audio' || appMode === 'video') && isHostMode && (
+                {/* Add auto-send checkbox in audio mode - host only */}
+                {appMode === 'audio' && isHostMode && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
                     <input
                       type="checkbox"
@@ -114,8 +112,8 @@ function Controls({
                     Auto-send
                   </label>
                 )}
-                {/* Add show noise levels checkbox in audio and video modes */}
-                {(appMode === 'audio' || appMode === 'video') && (
+                {/* Add show noise levels checkbox in audio mode */}
+                {appMode === 'audio' && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
                     <input
                       type="checkbox"

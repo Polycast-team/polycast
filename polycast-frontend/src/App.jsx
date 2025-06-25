@@ -10,7 +10,6 @@ import Controls from './components/Controls';
 import TranscriptionDisplay from './components/TranscriptionDisplay';
 import DictionaryTable from './components/DictionaryTable';
 import FlashcardMode from './components/FlashcardMode';
-import VideoMode from './components/VideoMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
 
@@ -114,17 +113,14 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     }
     // Otherwise start in audio mode (hosts or students in rooms)
     return 'audio';
-  }); // Options: 'audio', 'text', 'dictionary', 'flashcard'
+  }); // Options: 'audio', 'dictionary', 'flashcard'
   const [selectedWords, setSelectedWords] = useState([]); // Selected words for dictionary
   const [wordDefinitions, setWordDefinitions] = useState({}); // Cache for word definitions
-  const [modeError, setModeError] = useState(null);
-  const [textInputs, setTextInputs] = useState({}); // Lifted state
   const [showNotification, setShowNotification] = useState(false);
   const [notificationOpacity, setNotificationOpacity] = useState(1);
   const [autoSend, setAutoSend] = useState(roomSetup && roomSetup.isHost ? false : true); // Off by default for host, on for students
   const [showNoiseLevel, setShowNoiseLevel] = useState(false); // Controls visibility of noise level display
   const notificationTimeoutRef = useRef(null);
-  const modeRef = useRef(appMode === 'text');
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
   const { error: popupError, showError, clearError } = useErrorHandler();
 
@@ -138,10 +134,9 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
   // Don't trigger mobile mode for flashcard mode anymore - we'll use mobile UI on desktop instead
 
   // Update refs when state changes
-  useEffect(() => { modeRef.current = appMode === 'text'; }, [appMode]);
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
 
-  // --- FIX: Only listen for spacebar in audio mode and only for hosts ---
+  // Listen for spacebar in audio mode (hosts only)
   useEffect(() => {
     let spacebarPressed = false;
     // Only add listeners in audio mode and only for hosts (not students)
@@ -190,122 +185,6 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     return () => window.removeEventListener("keydown", handlePageKey);
   }, [roomSetup]);
 
-  // Backend base URL for /mode endpoints
-  const BACKEND_HTTP_BASE = 'https://polycast-server.onrender.com';
-
-  // Fetch mode from backend
-  const fetchMode = useCallback(async () => {
-    try {
-      const res = await fetch(`${BACKEND_HTTP_BASE}/mode`);
-      const debugInfo = {
-        url: res.url,
-        status: res.status,
-        statusText: res.statusText,
-        headers: Object.fromEntries(res.headers.entries()),
-        mode: 'fetchMode',
-        frontendLocation: window.location.href,
-        userAgent: navigator.userAgent,
-        time: new Date().toISOString(),
-      };
-      let data;
-      try {
-        data = await res.json();
-      } catch (jsonErr) {
-        setModeError(`Could not fetch mode: JSON parse error (${jsonErr.message}). Debug: ${JSON.stringify(debugInfo)}`);
-        throw jsonErr;
-      }
-      // Only update appMode if not currently in dictionary or flashcard mode
-      setAppMode(current => (
-        current === 'dictionary' || current === 'flashcard'
-          ? current
-          : (data.isTextMode ? 'text' : 'audio')
-      ));
-      modeRef.current = data.isTextMode;
-    } catch (err) {
-      setModeError(`Could not fetch mode: ${err && err.message ? err.message : err}. Debug: ${JSON.stringify({
-        mode: 'fetchMode',
-        error: err && err.stack ? err.stack : err,
-        frontendLocation: window.location.href,
-        userAgent: navigator.userAgent,
-        time: new Date().toISOString(),
-        backendUrl: `${BACKEND_HTTP_BASE}/mode`,
-      })}`);
-      console.error('Failed to fetch mode:', err);
-    }
-  }, []);
-
-  // Update mode on backend
-  const updateMode = useCallback(async (value) => {
-    const previousMode = modeRef.current;
-    
-    // For dictionary mode, we just update the local state without backend call
-    if (value === 'dictionary') {
-      setAppMode('dictionary');
-      return;
-    }
-    
-    setAppMode(value === 'text' ? 'text' : 'audio'); // Optimistically update UI
-    setModeError(null);
-
-    // Clear text inputs when switching from text to audio mode
-    if (value !== 'text' && previousMode) { 
-      setTextInputs({});
-    }
-
-    try {
-      const res = await fetch(`${BACKEND_HTTP_BASE}/mode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isTextMode: value === 'text' })
-      });
-      const debugInfo = {
-        url: res.url,
-        status: res.status,
-        statusText: res.statusText,
-        headers: Object.fromEntries(res.headers.entries()),
-        requestBody: { isTextMode: value === 'text' },
-        mode: 'updateMode',
-        frontendLocation: window.location.href,
-        userAgent: navigator.userAgent,
-        time: new Date().toISOString(),
-      };
-      if (!res.ok) {
-        setModeError(`Could not update mode: HTTP ${res.status} ${res.statusText}. Debug: ${JSON.stringify(debugInfo)}`);
-        throw new Error('Failed to update mode: ' + res.status);
-      }
-      let data;
-      try {
-        data = await res.json();
-      } catch (jsonErr) {
-        setModeError(`Could not update mode: JSON parse error (${jsonErr.message}). Debug: ${JSON.stringify(debugInfo)}`);
-        throw jsonErr;
-      }
-      setAppMode(data.isTextMode ? 'text' : 'audio');
-      modeRef.current = data.isTextMode;
-    } catch (err) {
-      setModeError(`Could not update mode: ${err && err.message ? err.message : err}. Debug: ${JSON.stringify({
-        mode: 'updateMode',
-        error: err && err.stack ? err.stack : err,
-        frontendLocation: window.location.href,
-        userAgent: navigator.userAgent,
-        time: new Date().toISOString(),
-        backendUrl: `${BACKEND_HTTP_BASE}/mode`,
-        requestBody: { isTextMode: value === 'text' }
-      })}`);
-      setAppMode(previousMode ? 'text' : 'audio'); // Revert UI if error
-      console.error('Failed to update mode:', err);
-    }
-  }, []);
-
-  // On mount, fetch initial mode
-  useEffect(() => { fetchMode(); }, [fetchMode]);
-
-  // Poll mode every 5s to keep in sync
-  useEffect(() => {
-    const interval = setInterval(fetchMode, 5000);
-    return () => clearInterval(interval);
-  }, [fetchMode]);
-
   // Auto-switch modes for students based on room status
   useEffect(() => {
     if (userRole === 'student') {
@@ -315,16 +194,13 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
           setAppMode('audio');
         }
       } else {
-        // Student not in a room → switch to flashcard mode (but allow video mode)
-        if (appMode === 'audio' || appMode === 'text') {
+        // Student not in a room → switch to flashcard mode
+        if (appMode === 'audio') {
           setAppMode('flashcard');
         }
       }
     }
   }, [roomSetup, userRole, appMode]);
-
-  // --- FIX: Prevent text submission error in text mode ---
-  // (No code needed here, but ensure isTextMode is derived from appMode === 'text')
 
   // Join Room handler for students
   const handleJoinRoom = async () => {
@@ -496,13 +372,6 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             newTranslations[lang] = updatedSegments.slice(-3);
             return newTranslations;
           });
-          // Update textInputs in text mode
-          if (appMode === 'text') {
-            setTextInputs(inputs => ({
-              ...inputs,
-              [parsedData.lang]: parsedData.data
-            }));
-          }
         } else if (parsedData.type === 'translations_batch') {
           console.log('Received Translation Batch:', parsedData.data);
           // Update multiple translations
@@ -575,15 +444,6 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
     }, 1000); // Initial display duration
   }, []);
 
-  // Pass mode state and update logic to Controls
-  const handleSetIsTextMode = useCallback((value) => {
-    updateMode(value); // Update backend and local state
-  }, [updateMode]);
-
-  const setIsTextMode = useCallback((value) => {
-    setAppMode(value ? 'text' : 'audio');
-  }, []);
-
   // Handle app mode changes from dropdown menu
   const handleAppModeChange = useCallback((newMode) => {
     console.log(`Mode change requested: ${appMode} → ${newMode}`);
@@ -595,16 +455,12 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
       // Just update local state for flashcard mode
       console.log('Setting mode to flashcard (local only)');
       setAppMode('flashcard');
-    } else if (newMode === 'video') {
-      // Just update local state for video mode
-      console.log('Setting mode to video (local only)');
-      setAppMode('video');
-    } else {
-      // Call updateMode for audio/text modes to sync with backend
-      console.log(`Setting mode to ${newMode} (with backend sync)`);
-      updateMode(newMode);
+    } else if (newMode === 'audio') {
+      // Just update local state for audio mode
+      console.log('Setting mode to audio (local only)');
+      setAppMode('audio');
     }
-  }, [updateMode, appMode]);
+  }, [appMode]);
 
   // Get connection status string
   const connectionStatus = {
@@ -626,40 +482,6 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
 
   return (
     <div className="App">
-      {/* Remove the iguana overlay for audio mode 
-      {appMode === 'audio' && (
-        <div className="iguana-debug" style={{
-          position: 'fixed',
-          zIndex: 999,
-          top: '10px',
-          left: '10px',
-          background: 'rgba(0,0,0,0.7)',
-          color: 'white',
-          padding: '5px 10px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          pointerEvents: 'none'
-        }}>
-          {iguanaLoading ? 'Loading iguana...' : (iguanaImageUrl ? 'Iguana loaded!' : 'Failed to load iguana')}
-        </div>
-      )}
-      {appMode === 'audio' && iguanaImageUrl && (
-        <div className="iguana-bg" style={{
-          backgroundImage: `url(${iguanaImageUrl})`,
-          position: 'fixed',
-          zIndex: 1,
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          opacity: 0.93,
-          transition: 'opacity 0.6s',
-          pointerEvents: 'none',
-        }} />
-      )} */}
-      {/* Big Polycast Title */}
       {/* Header container with logo and room code */}
       <div style={{
         display: 'flex',
@@ -714,8 +536,8 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
       <div className="controls-container" style={{ marginBottom: 4 }}>
         {/* Main Toolbar */}
         <div className="main-toolbar" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch', marginBottom: 0 }}>
-          {/* Absolutely positioned Recording indicator in circled space */}
-          {(appMode === 'audio' || appMode === 'video') && isRecording && (
+          {/* Recording indicator for audio mode */}
+          {appMode === 'audio' && isRecording && (
             <div style={{
               position: 'absolute',
               top: 100,
@@ -734,8 +556,8 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            {/* Pass sendMessage down to components that need to send audio - only for hosts */}
-            {(appMode === 'audio' || appMode === 'video') && roomSetup && roomSetup.isHost && (
+            {/* Audio recorder for hosts in audio mode */}
+            {appMode === 'audio' && roomSetup && roomSetup.isHost && (
               <AudioRecorder
                 sendMessage={sendMessage}
                 isRecording={isRecording}
@@ -748,8 +570,6 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             isRecording={isRecording}
             onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
             onStopRecording={roomSetup && roomSetup.isHost ? handleStopRecording : null}
-            isTextMode={appMode === 'text'}
-            setIsTextMode={roomSetup && roomSetup.isHost ? setIsTextMode : null}
             appMode={appMode}
             setAppMode={handleAppModeChange}
             autoSend={autoSend}
@@ -772,14 +592,14 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
               console.log('Profile switched to:', profile);
             }}
           />
-          {/* Audio mode user instructions at the bottom of the toolbar */}
+          {/* User instructions for hosts in audio mode */}
           {appMode === 'audio' && roomSetup && roomSetup.isHost && (
             <div style={{
               marginTop: -45,
               marginBottom: 0,
               width: '100%',
               textAlign: 'center',
-              color: '#ffb84d',  /* Yellow color as per original */
+              color: '#ffb84d',
               fontWeight: 600,
               fontSize: '1.05rem',
               letterSpacing: 0.1,
@@ -790,13 +610,14 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
               Hold Spacebar to record.  Release Spacebar to send.
             </div>
           )}
+          {/* User instructions for students in audio mode */}
           {appMode === 'audio' && roomSetup && !roomSetup.isHost && (
             <div style={{
               marginTop: -45,
               marginBottom: 0,
               width: '100%',
               textAlign: 'center',
-              color: '#10b981',  /* Green for student mode */
+              color: '#10b981',
               fontWeight: 600,
               fontSize: '1.05rem',
               letterSpacing: 0.1,
@@ -809,12 +630,6 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
           )}
         </div>
       </div>
-      {/* Remove the floating Recording indicator entirely */}
-      {modeError && (
-        <div style={{ color: 'red', fontWeight: 500, marginBottom: 8 }}>
-          {modeError}
-        </div>
-      )}
       
       {/* Header with room buttons - positioned above toolbar */}
       <div style={{ 
@@ -988,8 +803,6 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             targetLanguages={effectiveLanguages}
             selectedProfile={selectedProfile}
           />
-        ) : appMode === 'video' ? (
-          <VideoMode />
         ) : (
           <TranscriptionDisplay 
             englishSegments={englishSegments} 
@@ -997,15 +810,8 @@ function App({ targetLanguages, onReset, roomSetup, userRole, studentHomeLanguag
             targetLanguages={effectiveLanguages} 
             showLiveTranscript={showLiveTranscript}
             showTranslation={showTranslation}
-            isTextMode={appMode === 'text'}
             isStudentMode={roomSetup && !roomSetup.isHost}
             studentHomeLanguage={studentHomeLanguage}
-            onTextSubmit={(lang, text) => {
-              // Send text submission for translation to backend
-              sendMessage(JSON.stringify({ type: 'text_submit', lang, text }));
-            }}
-            textInputs={textInputs}
-            setTextInputs={setTextInputs}
             selectedWords={selectedWords}
             setSelectedWords={setSelectedWords}
             wordDefinitions={wordDefinitions}
@@ -1126,11 +932,6 @@ App.propTypes = {
     studentHomeLanguage: PropTypes.string,
     onJoinRoom: PropTypes.func,
     onFlashcardModeChange: PropTypes.func
-};
-
-// Define backend port in a config object or hardcode if simple
-const config = {
-    backendPort: 8080
 };
 
 export default App
