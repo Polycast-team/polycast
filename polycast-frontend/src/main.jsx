@@ -108,6 +108,13 @@ function Main() {
     onFlashcardModeChange: (isFlashcardMode) => {
       // Force mobile mode when entering flashcard mode
       setForceFlashcardMobile(isFlashcardMode);
+    },
+    onProfileChange: (newProfile) => {
+      // Update profile in main.jsx state and recalculate languages
+      console.log('Profile change requested in main.jsx:', newProfile);
+      const newLanguage = getLanguageForProfile(newProfile);
+      setSelectedLanguages([newLanguage]);
+      setSelectedProfile(newProfile);
     }
   };
   

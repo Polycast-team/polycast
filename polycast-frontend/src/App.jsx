@@ -15,7 +15,7 @@ import { useErrorHandler } from './hooks/useErrorHandler';
 import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
 
 // App now receives an array of target languages and room setup as props
-function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange }) {
+function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange, onProfileChange }) {
   // Debug logging
   console.log('App component received props:', { targetLanguages, selectedProfile, roomSetup, userRole, studentHomeLanguage });
   
@@ -79,8 +79,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   
   // Fetch profile data when selectedProfile changes
   useEffect(() => {
-    fetchProfileData(internalSelectedProfile);
-  }, [internalSelectedProfile, fetchProfileData]);
+    const currentProfile = selectedProfile || internalSelectedProfile;
+    fetchProfileData(currentProfile);
+  }, [selectedProfile, internalSelectedProfile, fetchProfileData]);
   // Use the selected profile's language for all WebSocket communication
   const profileLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
   const effectiveLanguages = [profileLanguage];
@@ -588,8 +589,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             }}
             selectedProfile={selectedProfile || internalSelectedProfile}
             setSelectedProfile={profile => {
-              setSelectedProfile(profile);
               console.log('Profile switched to:', profile);
+              if (onProfileChange) {
+                onProfileChange(profile);
+              } else {
+                // Fallback for when no callback is provided
+                setSelectedProfile(profile);
+              }
             }}
             userRole={userRole}
           />
