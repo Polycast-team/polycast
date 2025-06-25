@@ -591,6 +591,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               setSelectedProfile(profile);
               console.log('Profile switched to:', profile);
             }}
+            userRole={userRole}
           />
           {/* User instructions for hosts in audio mode */}
           {appMode === 'audio' && roomSetup && roomSetup.isHost && (

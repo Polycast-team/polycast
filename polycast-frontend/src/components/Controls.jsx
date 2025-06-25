@@ -24,6 +24,7 @@ function Controls({
     setShowTranslation,
     selectedProfile,
     setSelectedProfile,
+    userRole,
 }) {
     // Check if we're in host mode (all control functions available) or student mode (view-only)
     const isHostMode = setIsTextMode !== null && onStartRecording !== null;
@@ -33,25 +34,29 @@ function Controls({
         <div className="controls">
             {/* Mode Dropdown */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {/* New Animal Dropdown */}
-                <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Profile:</label>
-                <select
-                  value={selectedProfile}
-                  onChange={e => {
-  console.log('Dropdown changed to:', e.target.value);
-  setSelectedProfile && setSelectedProfile(e.target.value);
-}}
-                  style={{ minWidth: 110, fontSize: 15, padding: '2px 6px', borderRadius: 6, marginRight: 12 }}
-                  aria-label="Profile Selection Dropdown"
-                >
-                  <option value="non-saving">non-saving</option>
-                  <option value="cat">cat</option>
-                  <option value="dog">dog</option>
-                  <option value="mouse">mouse</option>
-                  <option value="horse">horse</option>
-                  <option value="lizard">lizard</option>
-                  <option value="shirley">shirley</option>
-                </select>
+                {/* Profile Dropdown - only show for hosts */}
+                {userRole === 'host' && (
+                  <>
+                    <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Profile:</label>
+                    <select
+                      value={selectedProfile}
+                      onChange={e => {
+      console.log('Dropdown changed to:', e.target.value);
+      setSelectedProfile && setSelectedProfile(e.target.value);
+    }}
+                      style={{ minWidth: 110, fontSize: 15, padding: '2px 6px', borderRadius: 6, marginRight: 12 }}
+                      aria-label="Profile Selection Dropdown"
+                    >
+                      <option value="non-saving">non-saving</option>
+                      <option value="cat">cat</option>
+                      <option value="dog">dog</option>
+                      <option value="mouse">mouse</option>
+                      <option value="horse">horse</option>
+                      <option value="lizard">lizard</option>
+                      <option value="shirley">shirley</option>
+                    </select>
+                  </>
+                )}
                 <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Mode:</label>
                 <select 
                     value={appMode}
@@ -228,6 +233,7 @@ Controls.propTypes = {
     setShowTranslation: PropTypes.func,
     selectedProfile: PropTypes.string.isRequired,
     setSelectedProfile: PropTypes.func.isRequired,
+    userRole: PropTypes.string,
 };
 
 export default Controls;
