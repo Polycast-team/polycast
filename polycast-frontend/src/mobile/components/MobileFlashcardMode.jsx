@@ -656,45 +656,32 @@ const MobileFlashcardMode = ({
             className="mobile-card-front"
             style={dragState.isDragging ? { display: 'none' } : {}}
           >
-            {currentCard.exampleSentencesGenerated ? (
-              (() => {
-                const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-                const sentenceIndex = ((interval - 1) % 5) * 2;
-                const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
-                const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
-                
-                return (
-                  <div className="mobile-card-content">
-                    <div className="mobile-card-sentence">
-                      {clozeSentence}
-                    </div>
-                    {nativeTranslation && (
-                      <div 
-                        className="mobile-card-translation"
-                        dangerouslySetInnerHTML={{ 
-                          __html: nativeTranslation.replace(/~([^~]+)~/g, '<span class="mobile-highlighted-word">$1</span>') 
-                        }}
-                      />
-                    )}
-                    <div className="mobile-card-hint">
-                      Tap to reveal answer
-                    </div>
+            {(() => {
+              const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+              const sentenceIndex = ((interval - 1) % 5) * 2;
+              const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+              const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
+              const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
+              
+              return (
+                <div className="mobile-card-content">
+                  <div className="mobile-card-sentence">
+                    {clozeSentence}
                   </div>
-                );
-              })()
-            ) : (
-              <div className="mobile-card-content">
-                <div className="mobile-card-word">
-                  {baseWord}
-                  {defNumber && <span className="mobile-definition-number">({defNumber})</span>}
+                  {nativeTranslation && (
+                    <div 
+                      className="mobile-card-translation"
+                      dangerouslySetInnerHTML={{ 
+                        __html: nativeTranslation.replace(/~([^~]+)~/g, '<span class="mobile-highlighted-word">$1</span>') 
+                      }}
+                    />
+                  )}
+                  <div className="mobile-card-hint">
+                    Tap to reveal answer
+                  </div>
                 </div>
-                <div className="mobile-card-pos">{currentCard.partOfSpeech || 'word'}</div>
-                <div className="mobile-card-hint">
-                  Tap to see definition
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Back of Card */}
@@ -703,59 +690,39 @@ const MobileFlashcardMode = ({
             style={dragState.isDragging ? { transform: 'rotateY(0deg)' } : {}}
           >
             <div className="mobile-card-content">
-              {currentCard.exampleSentencesGenerated ? (
-                (() => {
-                  const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-                  const sentenceIndex = ((interval - 1) % 5) * 2;
-                  const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                  const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
-                    return `<span class="mobile-highlighted-word">${word}</span>`;
-                  });
-                  const exampleNumber = ((interval - 1) % 5) + 1;
-                  
-                  return (
-                    <div className="mobile-card-answer">
-                      <div className="mobile-example-label">
-                        Example {exampleNumber}:
+              {(() => {
+                const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+                const sentenceIndex = ((interval - 1) % 5) * 2;
+                const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+                const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
+                  return `<span class="mobile-highlighted-word">${word}</span>`;
+                });
+                const exampleNumber = ((interval - 1) % 5) + 1;
+                
+                return (
+                  <div className="mobile-card-answer">
+                    <div className="mobile-example-label">
+                      Example {exampleNumber}:
+                    </div>
+                    <div 
+                      className="mobile-example-sentence"
+                      dangerouslySetInnerHTML={{ __html: highlightedSentence }}
+                    />
+                    {currentCard.disambiguatedDefinition && (
+                      <div className="mobile-card-definition">
+                        {currentCard.disambiguatedDefinition.definition}
                       </div>
-                      <div 
-                        className="mobile-example-sentence"
-                        dangerouslySetInnerHTML={{ __html: highlightedSentence }}
-                      />
-                      {currentCard.disambiguatedDefinition && (
-                        <div className="mobile-card-definition">
-                          {currentCard.disambiguatedDefinition.definition}
-                        </div>
-                      )}
-                      <button 
-                        className="mobile-audio-btn"
-                        onClick={handlePlayAudio}
-                        disabled={audioState.loading}
-                      >
-                        {audioState.loading ? '🔄' : '🔊'} Play Audio
-                      </button>
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="mobile-card-answer">
-                  <div className="mobile-card-word-large">
-                    {baseWord}
+                    )}
+                    <button 
+                      className="mobile-audio-btn"
+                      onClick={handlePlayAudio}
+                      disabled={audioState.loading}
+                    >
+                      {audioState.loading ? '🔄' : '🔊'} Play Audio
+                    </button>
                   </div>
-                  {currentCard.disambiguatedDefinition && (
-                    <div className="mobile-card-definition">
-                      {currentCard.disambiguatedDefinition.definition}
-                    </div>
-                  )}
-                  <button 
-                    className="mobile-audio-btn"
-                    onClick={handlePlayAudio}
-                    disabled={audioState.loading}
-                  >
-                    {audioState.loading ? '🔄' : '🔊'} Play Audio
-                  </button>
-                </div>
-              )}
+                );
+              })()}
             </div>
             
           </div>

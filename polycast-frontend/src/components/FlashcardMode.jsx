@@ -472,119 +472,64 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         >
           {/* Front of Card */}
           <div className="desktop-card-front">
-            {currentCard.exampleSentencesGenerated ? (
-              (() => {
-                const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-                const sentenceIndex = ((interval - 1) % 5) * 2;
-                const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
-                const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
-                
-                return (
-                  <div className="desktop-card-content">
-                    <div className="desktop-card-sentence">
-                      {clozeSentence}
-                    </div>
-                    {nativeTranslation && (
-                      <div 
-                        className="desktop-card-translation"
-                        dangerouslySetInnerHTML={{ 
-                          __html: nativeTranslation.replace(/~([^~]+)~/g, '<span class="desktop-highlighted-word">$1</span>') 
-                        }}
-                      />
-                    )}
-                    <div className="desktop-card-hint">
-                      {t.clickToReveal}
-                    </div>
-                  </div>
-                );
-              })()
-            ) : (
-              <div className="desktop-card-content">
-                <div className="desktop-card-word">
-                  {baseWord}
-                  {defNumber && <span className="desktop-definition-number">#{defNumber}</span>}
-                </div>
-                {currentCard.contextSentence && (
+            {(() => {
+              const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+              const sentenceIndex = ((interval - 1) % 5) * 2;
+              const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+              const nativeTranslation = parts[sentenceIndex + 1] || parts[1] || '';
+              const clozeSentence = englishSentence.replace(/~[^~]+~/g, '_____');
+              
+              return (
+                <div className="desktop-card-content">
                   <div className="desktop-card-sentence">
-                    {currentCard.contextSentence}
+                    {clozeSentence}
                   </div>
-                )}
-                <div className="desktop-card-hint">
-                  {t.clickToReveal}
+                  {nativeTranslation && (
+                    <div 
+                      className="desktop-card-translation"
+                      dangerouslySetInnerHTML={{ 
+                        __html: nativeTranslation.replace(/~([^~]+)~/g, '<span class="desktop-highlighted-word">$1</span>') 
+                      }}
+                    />
+                  )}
+                  <div className="desktop-card-hint">
+                    {t.clickToReveal}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Back of Card */}
           <div className="desktop-card-back">
             <div className="desktop-card-content">
-              {currentCard.exampleSentencesGenerated ? (
-                (() => {
-                  const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-                  const sentenceIndex = ((interval - 1) % 5) * 2;
-                  const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
-                  const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
-                    return `<span class="desktop-highlighted-word">${word}</span>`;
-                  });
-                  
-                  return (
-                    <div className="desktop-card-answer">
-                      <div 
-                        className="desktop-example-sentence"
-                        dangerouslySetInnerHTML={{ __html: highlightedSentence }}
-                      />
-                      <button 
-                        className="desktop-audio-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayAudio();
-                        }}
-                        disabled={audioState.loading}
-                      >
-                        {audioState.loading ? '🔄' : '🔊'} Play Audio
-                      </button>
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="desktop-card-answer">
-                  {/* Fallback for cards without generated examples */}
-                  <div className="desktop-card-word-large">
-                    {baseWord}
+              {(() => {
+                const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+                const sentenceIndex = ((interval - 1) % 5) * 2;
+                const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
+                const highlightedSentence = englishSentence.replace(/~([^~]+)~/g, (match, word) => {
+                  return `<span class="desktop-highlighted-word">${word}</span>`;
+                });
+                
+                return (
+                  <div className="desktop-card-answer">
+                    <div 
+                      className="desktop-example-sentence"
+                      dangerouslySetInnerHTML={{ __html: highlightedSentence }}
+                    />
+                    <button 
+                      className="desktop-audio-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePlayAudio();
+                      }}
+                      disabled={audioState.loading}
+                    >
+                      {audioState.loading ? '🔄' : '🔊'} Play Audio
+                    </button>
                   </div>
-                  {currentCard.contextSentence && (
-                    <div className="desktop-example-sentence">
-                      {currentCard.contextSentence}
-                    </div>
-                  )}
-                  
-                  {/* Show indicator that better examples are generating in background */}
-                  {!currentCard.exampleSentencesGenerated && (
-                    <div style={{
-                      fontSize: '12px',
-                      color: '#888',
-                      fontStyle: 'italic',
-                      marginTop: '10px',
-                      opacity: 0.7
-                    }}>
-                      ⚡ Enhanced examples generating...
-                    </div>
-                  )}
-                  
-                  <button 
-                    className="desktop-audio-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePlayAudio();
-                    }}
-                    disabled={audioState.loading}
-                  >
-                    {audioState.loading ? '🔄' : '🔊'} Play Audio
-                  </button>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>
