@@ -26,6 +26,7 @@ function Controls({
     selectedProfile,
     setSelectedProfile,
     userRole,
+    roomSetup,
 }) {
     // Check if we're in host mode (all control functions available) or student mode (view-only)
     const isHostMode = setIsTextMode !== null && onStartRecording !== null;
@@ -61,8 +62,8 @@ function Controls({
                 )}
                 <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Mode:</label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    {/* Show transcript button only when not in audio mode and when in a room */}
-                    {appMode !== 'audio' && userRole === 'student' && (
+                    {/* Show transcript button only when not in audio mode, when user is student, and when in a room */}
+                    {appMode !== 'audio' && userRole === 'student' && roomSetup && (
                         <button
                             onClick={() => setAppMode && setAppMode('audio')}
                             disabled={isRecording}
@@ -287,6 +288,7 @@ Controls.propTypes = {
     selectedProfile: PropTypes.string.isRequired,
     setSelectedProfile: PropTypes.func.isRequired,
     userRole: PropTypes.string,
+    roomSetup: PropTypes.object,
 };
 
 export default Controls;

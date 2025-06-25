@@ -51,6 +51,7 @@ This ensures continuity and prevents future AIs from repeating mistakes or missi
 - **Replaced mode dropdown with emoji buttons** in `/polycast-frontend/src/components/Controls.jsx`
 - **Button layout**: 📝 Transcript (students in rooms only), 📚 Dictionary, 🔄 Flashcard
 - **Smart visibility**: Only show buttons for modes you're NOT currently in
+- **Transcript button logic**: Only appears for students when actually in a room (requires `roomSetup` prop)
 - **Location**: Top controls bar, next to profile selector
 
 ### Backend Flashcard Generation (December 2024)

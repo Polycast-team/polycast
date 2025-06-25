@@ -590,6 +590,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               setShowTranslation(checked);
               if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
             }}
+            roomSetup={roomSetup}
             selectedProfile={selectedProfile || internalSelectedProfile}
             setSelectedProfile={profile => {
               console.log('Profile switched to:', profile);
