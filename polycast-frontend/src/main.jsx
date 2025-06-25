@@ -5,6 +5,7 @@ import AppRouter from './AppRouter.jsx'
 import ProfileSelectorScreen from './components/ProfileSelectorScreen.jsx';
 import MobileApp from './mobile/MobileApp.jsx';
 import { shouldUseMobileApp } from './utils/deviceDetection.js';
+import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
 import './components/RoomSelectionScreen.css'; // Import styles
 import './index.css'
 
@@ -66,15 +67,25 @@ function Main() {
     );
   }
 
-  // Step 2: Profile selection
+  // Step 2: Profile selection (skip for hosts, auto-assign default profile)
   if (roomSetup && !selectedLanguages) {
-    return <ProfileSelectorScreen 
-      onProfileSelected={(languages, profile) => {
-        setSelectedLanguages(languages);
-        setSelectedProfile(profile);
-      }}
-      userRole={roomSetup.isHost ? 'host' : 'student'}
-    />;
+    if (roomSetup.isHost) {
+      // Auto-assign default profile for hosts and skip to main app
+      const defaultProfile = 'non-saving';
+      const defaultLanguage = getLanguageForProfile(defaultProfile);
+      setSelectedLanguages([defaultLanguage]);
+      setSelectedProfile(defaultProfile);
+      return null; // Will immediately proceed to Step 3
+    } else {
+      // Students still see profile selection screen
+      return <ProfileSelectorScreen 
+        onProfileSelected={(languages, profile) => {
+          setSelectedLanguages(languages);
+          setSelectedProfile(profile);
+        }}
+        userRole="student"
+      />;
+    }
   }
 
   // Step 3: Main app
