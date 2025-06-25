@@ -781,17 +781,34 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                       });
                       
                       if (!response.ok) {
-                        throw new Error(`Server responded with status: ${response.status}`);
+                        const errorText = await response.text();
+                        throw new Error(`Server responded with status: ${response.status}. ${errorText}`);
                       }
                       
                       console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
                     } catch (error) {
                       console.error(`Error saving profile data: ${error.message}`);
+                      
+                      // Revert frontend state if backend save failed
+                      console.log('Backend save failed, reverting deletion...');
+                      setWordDefinitions(prev => ({
+                        ...prev,
+                        [wordSenseId]: wordEntry // Restore the deleted entry
+                      }));
+                      
+                      // Restore word to selectedWords if needed
+                      if (isLastSenseOfWord) {
+                        setSelectedWords(prev => [...prev, word]);
+                      }
+                      
+                      // Show user-friendly error
+                      showError(`Failed to delete "${word}" from dictionary. Please check your connection and try again.`);
                     }
                   }, 100);
                 }
               } catch (error) {
                 console.error(`Error removing word from dictionary: ${error}`);
+                showError(`Failed to delete "${word}" from dictionary. Please try again.`);
               }
             }}
           />
