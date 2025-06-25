@@ -442,10 +442,9 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
             <div className="no-flashcards-instructions">
               <p><strong>How to add words:</strong></p>
               <ol>
-                <li>Go to 📚 <strong>Dictionary Mode</strong> (button above)</li>
-                <li>Type an English word in the input field</li>
-                <li>Click <strong>"+ Add Word"</strong> to create flashcards</li>
-                <li>Return here to start studying</li>
+                <li><strong>From Dictionary:</strong> Go to 📚 <strong>Dictionary Mode</strong> → type English word → click <strong>"+ Add Word"</strong></li>
+                <li><strong>From Transcript:</strong> Click 🏫 <strong>"加入教室"</strong> → join a room → click on words in live transcript</li>
+                <li>Return here to start studying your collected words</li>
               </ol>
             </div>
           </div>

@@ -65,7 +65,7 @@ This ensures continuity and prevents future AIs from repeating mistakes or missi
 - **Removed all fallback UI** that showed basic word format instead of proper cloze deletion
 - **Clear error throwing**: Components now fail clearly when `exampleSentencesGenerated` is missing
 - **Fixed session completion logic**: Only shows completion screen after reviewing cards, not when starting empty
-- **Improved no-cards message**: Clear numbered instructions on how to add words via Dictionary Mode
+- **Improved no-cards message**: Clear numbered instructions on how to add words via Dictionary Mode and transcript clicking
 - **Affected files**: `FlashcardMode.jsx`, `MobileFlashcardMode.jsx`, `useFlashcardSession.js`
 
 ## 🎯 Overview
