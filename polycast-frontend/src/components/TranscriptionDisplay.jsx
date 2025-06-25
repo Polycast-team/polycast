@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
+import { getLanguageForProfile } from '../utils/profileLanguageMapping';
 
 // Helper function to render segments
 const renderSegments = (segments, lastPersisted) => {
@@ -250,9 +251,10 @@ const TranscriptionDisplay = ({
     });
     
     try {
-      // Step 1: Fetch Gemini definition with context
-      const apiUrl = `https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}?context=${encodeURIComponent(contextSentence)}`;
-      console.log(`Fetching definition for "${word}" with context, from: ${apiUrl}`);
+      // Step 1: Fetch Gemini definition with context and target language
+      const profileLanguage = getLanguageForProfile(selectedProfile);
+      const apiUrl = `https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
+      console.log(`Fetching definition for "${word}" with context and language ${profileLanguage}, from: ${apiUrl}`);
       
       const geminiFetch = fetch(apiUrl)
         .then(res => res.json())
@@ -267,9 +269,9 @@ const TranscriptionDisplay = ({
       
       // Step 2: Fetch dictionary definition from JSON files
       const firstLetter = word.charAt(0).toLowerCase();
-      const dictUrl = `https://polycast-server.onrender.com/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?context=${encodeURIComponent(contextSentence)}`;
+      const dictUrl = `https://polycast-server.onrender.com/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
       
-      console.log(`Fetching dictionary definition for "${word}" from: ${dictUrl}`);
+      console.log(`Fetching dictionary definition for "${word}" with language ${profileLanguage} from: ${dictUrl}`);
       
       const dictFetch = fetch(dictUrl)
         .then(res => res.json())
@@ -301,7 +303,8 @@ const TranscriptionDisplay = ({
             body: JSON.stringify({
               word: word,
               contextSentence: contextSentence,
-              definitions: dictData.allDefinitions
+              definitions: dictData.allDefinitions,
+              targetLanguage: profileLanguage
             })
           }).then(res => res.json());
           
@@ -1269,7 +1272,7 @@ START NOW:`;
           onAddToDictionary={handleAddWordToDictionary}
           onRemoveFromDictionary={handleRemoveWordFromDictionary}
           loading={!wordDefinitions[popupInfo.word.toLowerCase()] || popupInfo.loading}
-          nativeLanguage={(isStudentMode && studentHomeLanguage) ? studentHomeLanguage : (targetLanguages[0] || 'Spanish')}
+          nativeLanguage={getLanguageForProfile(selectedProfile)}
           onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
         />
       )}
@@ -1362,7 +1365,8 @@ TranscriptionDisplay.propTypes = {
   wordDefinitions: PropTypes.object.isRequired,
   setWordDefinitions: PropTypes.func.isRequired,
   isStudentMode: PropTypes.bool,
-  studentHomeLanguage: PropTypes.string
+  studentHomeLanguage: PropTypes.string,
+  selectedProfile: PropTypes.string
 };
 
 TranscriptionDisplay.defaultProps = {

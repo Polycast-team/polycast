@@ -51,6 +51,11 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                      (definition?.translations && definition.translations.Spanish) || 
                      '';
   
+  // Get the contextual explanation from the API response (in target language)
+  const contextualExplanation = definition?.contextualExplanation || 
+                               disambiguatedDefinition?.contextualExplanation ||
+                               '';
+  
   // Format dictionary definition - prefer disambiguated definition if available
   let dictPartOfSpeech = '';
   let dictFullDefinition = '';
@@ -177,22 +182,18 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                 <div className="dict-translation">{translation}</div>
               )}
               
-              {dictFullDefinition && (
+              {contextualExplanation && (
                 <div className="dict-section">
                   <div className="dict-section-title">
-                    Word Meaning <span className="dict-matched">· In This Context</span>
+                    {nativeLanguage === 'Chinese' ? '语境含义' : 
+                     nativeLanguage === 'Spanish' ? 'Significado en contexto' :
+                     nativeLanguage === 'French' ? 'Sens en contexte' :
+                     nativeLanguage === 'German' ? 'Bedeutung im Kontext' :
+                     nativeLanguage === 'Italian' ? 'Significato nel contesto' :
+                     nativeLanguage === 'Portuguese' ? 'Significado no contexto' :
+                     'Contextual Meaning'}
                   </div>
-                  <div className="dict-full-definition dict-local">{dictFullDefinition}</div>
-                </div>
-              )}
-              
-              {fullDefinition && (
-                <div className="dict-section">
-                  <div className="dict-section-title">Translation</div>
-                  <div className="dict-full-definition">{fullDefinition}</div>
-                  {examples.length > 0 && (
-                    <div className="dict-example">{examples[0]}</div>
-                  )}
+                  <div className="dict-full-definition dict-local">{contextualExplanation}</div>
                 </div>
               )}
             </div>
