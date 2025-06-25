@@ -809,6 +809,7 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
                     
                     // Join all sentences for exampleSentencesRaw (used by frontend)
                     formattedResponse.exampleSentencesRaw = sentences.join('//');
+                    formattedResponse.exampleSentencesGenerated = sentences.join('//'); // Frontend expects this field name
                     formattedResponse.exampleSentences = sentences; // For backward compatibility
                     formattedResponse.wordFrequency = parseInt(wordFrequency) || 3;
                     formattedResponse.definitionFrequency = parseInt(definitionFrequency) || 3;
@@ -819,6 +820,7 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
                     const [sentence1, sentence2, sentence3, wordFrequency, definitionFrequency] = contentParts;
                     formattedResponse.exampleSentences = [sentence1, sentence2, sentence3];
                     formattedResponse.exampleSentencesRaw = `${sentence1}//${sentence2}//${sentence3}`;
+                    formattedResponse.exampleSentencesGenerated = `${sentence1}//${sentence2}//${sentence3}`; // Frontend expects this field name
                     formattedResponse.wordFrequency = parseInt(wordFrequency) || 3;
                     formattedResponse.definitionFrequency = parseInt(definitionFrequency) || 3;
                     console.log(`[Dictionary API] Using old format fallback. Word frequency: ${formattedResponse.wordFrequency}, Definition frequency: ${formattedResponse.definitionFrequency}`);
@@ -989,6 +991,7 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
             definitionNumber: parsedResponse.definitionNumber || 1,
             contextualExplanation: parsedResponse.contextualExplanation,
             exampleSentencesRaw: exampleSentencesRaw,
+            exampleSentencesGenerated: exampleSentencesRaw, // Frontend expects this field name
             wordFrequency: wordFrequency,
             definitionFrequency: definitionFrequency,
             inFlashcards: true,
