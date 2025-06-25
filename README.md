@@ -19,6 +19,7 @@ A comprehensive language learning application that combines real-time transcript
 - SRS interval determines which sentence is shown (rotating through all 5)
 - Cloze deletion format for active recall learning
 - Target word highlighting in yellow on back, native language on front
+- **CRITICAL**: All flashcards MUST have `exampleSentencesGenerated` field with proper `~word~` markup - no fallback UI exists
 
 ## 🎯 Overview
 

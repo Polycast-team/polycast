@@ -657,6 +657,9 @@ const MobileFlashcardMode = ({
             style={dragState.isDragging ? { display: 'none' } : {}}
           >
             {(() => {
+              if (!currentCard.exampleSentencesGenerated) {
+                throw new Error(`Card "${currentCard.word || 'unknown'}" is missing exampleSentencesGenerated field. All flashcards must have proper ~word~ markup data.`);
+              }
               const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
               const sentenceIndex = ((interval - 1) % 5) * 2;
               const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
@@ -691,6 +694,9 @@ const MobileFlashcardMode = ({
           >
             <div className="mobile-card-content">
               {(() => {
+                if (!currentCard.exampleSentencesGenerated) {
+                  throw new Error(`Card "${currentCard.word || 'unknown'}" is missing exampleSentencesGenerated field. All flashcards must have proper ~word~ markup data.`);
+                }
                 const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
                 const sentenceIndex = ((interval - 1) % 5) * 2;
                 const englishSentence = parts[sentenceIndex] || parts[0] || 'No example available';
