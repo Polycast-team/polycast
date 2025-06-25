@@ -66,6 +66,7 @@ This ensures continuity and prevents future AIs from repeating mistakes or missi
 - **Clear error throwing**: Components now fail clearly when `exampleSentencesGenerated` is missing
 - **Fixed session completion logic**: Only shows completion screen after reviewing cards, not when starting empty
 - **Improved no-cards message**: Clear numbered instructions on how to add words via Dictionary Mode and transcript clicking
+- **Localized instructions**: No-cards message now displays in user's native language (Chinese, Spanish, French, German, Italian, Portuguese)
 - **Affected files**: `FlashcardMode.jsx`, `MobileFlashcardMode.jsx`, `useFlashcardSession.js`
 
 ## 🎯 Overview

@@ -437,14 +437,14 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         <div className="desktop-card-container">
           <div className="no-flashcards-message">
             <div className="no-flashcards-icon">📚</div>
-            <h2>No Flashcards Available</h2>
-            <p>You haven't added any words to study yet.</p>
+            <h2>{t.noFlashcardsTitle}</h2>
+            <p>{t.noFlashcardsMessage}</p>
             <div className="no-flashcards-instructions">
-              <p><strong>How to add words:</strong></p>
+              <p><strong>{t.instructionsTitle}</strong></p>
               <ol>
-                <li><strong>From Dictionary:</strong> Go to 📚 <strong>Dictionary Mode</strong> → type English word → click <strong>"+ Add Word"</strong></li>
-                <li><strong>From Transcript:</strong> Click 🏫 <strong>"加入教室"</strong> → join a room → click on words in live transcript</li>
-                <li>Return here to start studying your collected words</li>
+                <li>{t.methodDictionary}</li>
+                <li>{t.methodTranscript}</li>
+                <li>{t.methodReturn}</li>
               </ol>
             </div>
           </div>
