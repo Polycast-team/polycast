@@ -270,6 +270,7 @@ npm start
 - Use functional React components with hooks
 - Implement proper error handling
 - Add console logging for debugging
+- **ALWAYS push changes to git after completing tasks**
 
 ### SRS Integration
 - Always use `frequency` field for card sorting
