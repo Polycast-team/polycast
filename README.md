@@ -57,8 +57,9 @@ This ensures continuity and prevents future AIs from repeating mistakes or missi
 ### Backend Flashcard Generation (December 2024)
 - **Fixed Gemini preamble issue**: Added cleanup patterns to strip "Here's the output:" from responses
 - **Enhanced validation**: Backend now validates proper `~word~` markup and throws clear errors
-- **Prompt improvements**: Explicitly forbids preambles in Gemini flashcard generation
-- **Location**: `/polycast-backend/server.js` lines 927-945
+- **Improved Gemini prompt**: More explicit structure requiring exactly 12 parts with concrete example
+- **Better error logging**: Detailed logging of failed responses for debugging
+- **Location**: `/polycast-backend/server.js` lines 915-975
 
 ### Flashcard Error Handling (December 2024)
 - **Removed all fallback UI** that showed basic word format instead of proper cloze deletion

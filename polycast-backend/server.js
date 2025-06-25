@@ -912,21 +912,23 @@ Do NOT provide multiple definitions or explanations outside the JSON.`;
         const wordSenseId = `${normalizedWord}_${parsedResponse.definitionNumber || 1}`;
         
         // Generate flashcard content with proper ~word~ markup
-        const flashcardPrompt = `Generate 5 pairs of example sentences for the word '${normalizedWord}' (definition: ${parsedResponse.definition}). Each pair should have:
-1. English sentence with the target word wrapped in ~tildes~
-2. Translation in ${targetLanguage} with the target word wrapped in ~tildes~
+        const flashcardPrompt = `Create flashcard sentences for the word "${normalizedWord}" (meaning: ${parsedResponse.definition}).
 
-Format each pair as: English sentence // Translation sentence
+You must provide EXACTLY 12 parts separated by " // ":
+- Parts 1-10: Five pairs of sentences (English sentence // ${targetLanguage} translation)
+- Part 11: Word frequency number (1-10)
+- Part 12: Definition frequency number (1-10)
 
-CRITICAL: The target word '${normalizedWord}' MUST be wrapped in ~tildes~ in both English and translation.
+CRITICAL REQUIREMENTS:
+1. The word "${normalizedWord}" must be wrapped in ~tildes~ in EVERY sentence
+2. Create natural, varied sentences showing different uses of the word
+3. Provide exactly 12 parts - no more, no less
+4. No extra text, explanations, or formatting
 
-After the 5 sentence pairs, provide two frequency ratings (1-10 scale):
-- Word frequency: How common '${normalizedWord}' is in general vocabulary (1=extremely rare, 10=ubiquitous)  
-- Definition frequency: How common this specific meaning is for this word (1=very rare meaning, 10=primary meaning)
+Example format:
+I love ~pizza~ for dinner // 我爱晚餐吃~披萨~ // The ~pizza~ was delicious // ~披萨~很好吃 // We ordered ~pizza~ yesterday // 我们昨天点了~披萨~ // Hot ~pizza~ tastes great // 热~披萨~很好吃 // Fresh ~pizza~ is the best // 新鲜的~披萨~最好 // 8 // 9
 
-DO NOT include any preamble, explanation, or phrases like "Here's the output:" - provide ONLY the requested format.
-
-Your output format: [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [English ~word~] // [Translation ~word~] // [word_freq] // [def_freq]`;
+Now create exactly this format for "${normalizedWord}":`;
         
         const flashcardContent = await generateTextWithGemini(flashcardPrompt, 0.2);
         
@@ -957,7 +959,13 @@ Your output format: [English ~word~] // [Translation ~word~] // [English ~word~]
             definitionFrequency = parseInt(contentParts[11]) || 3;
         } else {
             // Don't create fallbacks - fix the Gemini prompt to work properly
-            console.error(`[Add Word API] Gemini response parsing failed for "${normalizedWord}":`, flashcardContent);
+            console.error(`[Add Word API] Gemini response parsing failed for "${normalizedWord}":`, {
+                rawResponse: flashcardContent,
+                cleanedResponse: cleanedContent,
+                parts: contentParts,
+                expectedParts: 12,
+                actualParts: contentParts.length
+            });
             throw new Error(`Failed to generate proper example sentences for word "${normalizedWord}". Expected 12 parts but got ${contentParts.length}. Fix the Gemini prompt.`);
         }
         
