@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import AppRouter from './AppRouter.jsx'
 import ProfileSelectorScreen from './components/ProfileSelectorScreen.jsx';
+import LanguageSelectorScreen from './components/LanguageSelectorScreen.jsx';
 import MobileApp from './mobile/MobileApp.jsx';
 import { shouldUseMobileApp } from './utils/deviceDetection.js';
 import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
@@ -67,15 +68,16 @@ function Main() {
     );
   }
 
-  // Step 2: Profile selection (skip for hosts, auto-assign default profile)
+  // Step 2: Language/Profile selection
   if (roomSetup && !selectedLanguages) {
     if (roomSetup.isHost) {
-      // Auto-assign default profile for hosts and skip to main app
-      const defaultProfile = 'non-saving';
-      const defaultLanguage = getLanguageForProfile(defaultProfile);
-      setSelectedLanguages([defaultLanguage]);
-      setSelectedProfile(defaultProfile);
-      return null; // Will immediately proceed to Step 3
+      // Hosts see language selection screen
+      return <LanguageSelectorScreen 
+        onLanguageSelected={(languages) => {
+          setSelectedLanguages(languages);
+          setSelectedProfile('non-saving'); // Auto-assign default profile for hosts
+        }}
+      />;
     } else {
       // Students still see profile selection screen
       return <ProfileSelectorScreen 

@@ -85,9 +85,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     const currentProfile = selectedProfile || internalSelectedProfile;
     fetchProfileData(currentProfile);
   }, [selectedProfile, internalSelectedProfile, fetchProfileData]);
-  // Use the selected profile's language for all WebSocket communication
+  // Use host-selected languages for WebSocket communication, fallback to profile language for students
   const profileLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
-  const effectiveLanguages = [profileLanguage];
+  const effectiveLanguages = userRole === 'host' ? (targetLanguages || []) : [profileLanguage];
   const languagesQueryParam = effectiveLanguages.map(encodeURIComponent).join(',');
   
   console.log('Effective languages for WebSocket:', effectiveLanguages);
