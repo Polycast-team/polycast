@@ -1103,7 +1103,7 @@ app.get('/api/profile/:profile/words', async (req, res) => {
                         // Create the proper word sense ID by combining word and definition number
                         // This ensures consistency with how the frontend creates IDs
                         const definitionNumber = card.definition_number || 1;
-                        const properWordSenseId = `${card.word.toLowerCase()}${definitionNumber}`;
+                        const properWordSenseId = `${card.word.toLowerCase()}_${definitionNumber}`;
                         
                         console.log(`[Profile API] Creating flashcard entry with ID: ${properWordSenseId} (from DB ID: ${card.word_sense_id})`); 
                         

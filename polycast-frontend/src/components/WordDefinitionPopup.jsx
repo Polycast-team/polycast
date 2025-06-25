@@ -43,34 +43,16 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
   
   const examples = definition?.examples || [];
   
-  // DEBUG: Log all the data being passed to the popup
-  console.log(`[POPUP DEBUG] Word: "${word}", Native Language: "${nativeLanguage}"`);
-  console.log(`[POPUP DEBUG] Definition object:`, definition);
-  console.log(`[POPUP DEBUG] DictDefinition object:`, dictDefinition);
-  console.log(`[POPUP DEBUG] DisambiguatedDefinition object:`, disambiguatedDefinition);
-  
   // Look for translations in multiple possible locations in the API response
   const translation = definition?.translation || 
                      (definition?.translations && definition.translations[nativeLanguage.toLowerCase()]) ||
                      (definition?.translations && definition.translations[nativeLanguage]) ||
                      '';
   
-  // DEBUG: Log what translation was found
-  console.log(`[POPUP DEBUG] Found translation: "${translation}"`);
-  console.log(`[POPUP DEBUG] Translation sources checked:`, {
-    directTranslation: definition?.translation,
-    translationsObject: definition?.translations,
-    lowerCaseMatch: definition?.translations?.[nativeLanguage.toLowerCase()],
-    exactMatch: definition?.translations?.[nativeLanguage]
-  });
-  
   // Get the contextual explanation from the API response (in target language)
   const contextualExplanation = definition?.contextualExplanation || 
                                disambiguatedDefinition?.contextualExplanation ||
                                '';
-  
-  // DEBUG: Log contextual explanation
-  console.log(`[POPUP DEBUG] Found contextual explanation: "${contextualExplanation}"`);
   
   // Format dictionary definition - prefer disambiguated definition if available
   let dictPartOfSpeech = '';
