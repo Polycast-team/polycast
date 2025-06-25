@@ -751,8 +751,8 @@ Do NOT provide multiple definitions or explanations outside the JSON.`;
             const jsonStr = jsonMatch[0];
             const parsedResponse = JSON.parse(jsonStr);
             
-            // Generate a unique wordSenseId for frontend compatibility
-            const wordSenseId = `${word.toLowerCase()}_${parsedResponse.definitionNumber || 1}_${Date.now()}`;
+            // Generate a consistent wordSenseId for frontend compatibility
+            const wordSenseId = `${word.toLowerCase()}_${parsedResponse.definitionNumber || 1}`;
             
             // Format for backward compatibility with existing frontend
             const formattedResponse = {
