@@ -201,7 +201,14 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     }
     window.addEventListener("keydown", handlePageKey);
     return () => window.removeEventListener("keydown", handlePageKey);
-  }, [roomSetup]);
+  }, [roomSetup, handleStartRecording, handleStopRecording]); // Added dependencies
+
+  // Ensure recording stops if appMode changes from 'audio'
+  useEffect(() => {
+    if (appMode !== 'audio' && isRecording) {
+      setIsRecording(false);
+    }
+  }, [appMode, isRecording]);
 
   // Auto-switch modes for students based on room status
   useEffect(() => {
