@@ -148,14 +148,16 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     if (roomSetup && !roomSetup.isHost) return; // Skip for students
 
     const handleKeyDown = (event) => {
-      if (event.code === 'Space' && !isRecordingRef.current && !spacebarPressed) {
+      // Only allow spacebar to start recording if autoSend is OFF
+      if (!autoSend && event.code === 'Space' && !isRecordingRef.current && !spacebarPressed) {
         event.preventDefault();
         spacebarPressed = true;
         setIsRecording(true);
       }
     };
     const handleKeyUp = (event) => {
-      if (event.code === 'Space' && isRecordingRef.current) {
+      // Only allow spacebar to stop recording if autoSend is OFF
+      if (!autoSend && event.code === 'Space' && isRecordingRef.current) {
         event.preventDefault();
         spacebarPressed = false;
         setIsRecording(false);
@@ -167,7 +169,19 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [appMode, roomSetup]);
+  }, [appMode, roomSetup, autoSend]); // Add autoSend to dependencies
+
+  // Manage isRecording state based on autoSend for hosts in audio mode
+  useEffect(() => {
+    if (appMode === 'audio' && roomSetup && roomSetup.isHost) {
+      if (autoSend) {
+        setIsRecording(true);
+      } else {
+        // If autoSend is turned off, stop recording
+        setIsRecording(false);
+      }
+    }
+  }, [autoSend, appMode, roomSetup]);
 
   // Add Page Up/Page Down recording hotkeys (only for hosts)
   useEffect(() => {
