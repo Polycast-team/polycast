@@ -240,6 +240,9 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
             console.log('Auto-send: Simulating spacebar release after speech detection reset');
             speechDetectedRef.current = false;
             
+            // Set stop reason to 'auto' so onstop handler will send the audio
+            stopReasonRef.current = 'auto';
+            
             // Simulate spacebar release (stop recording)
             onSetRecording(false);
             
