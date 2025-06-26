@@ -587,6 +587,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                 sendMessage={sendMessage}
                 isRecording={isRecording}
                 onAudioSent={onAudioSent}
+                autoSend={autoSend}
+                onSetRecording={setIsRecording}
               />
             )}
           </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 
-function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNoiseLevel }) {
+function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNoiseLevel, onSetRecording }) {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null); 
@@ -232,60 +232,28 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
           setIsSilent(true);
           setSilenceDuration(silenceFramesRef.current * FRAME_MS);
           
-          // Check if we've had enough silence to send chunk (before resetting speech detection)
+          // Auto-send: simulate spacebar release when speech stops
           if (speechDetectedRef.current && 
-              silenceFramesRef.current * FRAME_MS >= GAP_MS &&
-              mediaRecorderRef.current.state === 'recording' &&
-              autoSend) { // Only auto-send if enabled
+              silenceFramesRef.current * FRAME_MS >= 500 &&
+              autoSend && onSetRecording) {
             
-            console.log(`Pause ≥ ${GAP_MS}ms detected - flushing chunk`);
-            stopReasonRef.current = 'auto';
-            try {
-              // Stop current recorder
-              mediaRecorderRef.current.stop();
-              
-              // Reset for next segment
-              silenceFramesRef.current = 0;
-              
-              // Create new recorder after a small delay
-              setTimeout(() => {
-                if (isRecording) {
-                  try {
-                    const newRecorder = new MediaRecorder(streamRef.current);
-                    mediaRecorderRef.current = newRecorder;
-                    audioChunksRef.current = [];
-                    
-                    newRecorder.ondataavailable = (e) => {
-                      if (e.data.size > 0) {
-                        audioChunksRef.current.push(e.data);
-                      }
-                    };
-                    
-                    newRecorder.onstop = () => {
-                      if (audioChunksRef.current.length > 0) {
-                        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                        console.log('Sending audio chunk, size:', blob.size, 'bytes, speech detected:', speechDetectedRef.current);
-                        sendMessage(blob);
-                        if (onAudioSent) onAudioSent();
-                      }
-                    };
-                    
-                    newRecorder.start();
-                    console.log('Started new recorder after pause');
-                    speechDetectedRef.current = false; // Reset speech detection after new recorder starts
-                  } catch (e) {
-                    console.error('Error creating new recorder:', e);
-                  }
-                }
-              }, 50);
-            } catch (e) {
-              console.error('Error stopping recorder:', e);
-            }
+            console.log('Auto-send: Simulating spacebar release after speech detection reset');
+            speechDetectedRef.current = false;
+            
+            // Simulate spacebar release (stop recording)
+            onSetRecording(false);
+            
+            // After a short delay, simulate spacebar press (start recording again)
+            setTimeout(() => {
+              if (autoSend) {
+                console.log('Auto-send: Simulating spacebar press to resume recording');
+                onSetRecording(true);
+              }
+            }, 100);
           }
           
-          // Reset speech detection status after 500ms of silence
-          // This ensures the Speech: YES/NO indicator accurately reflects current state
-          if (speechDetectedRef.current && silenceFramesRef.current * FRAME_MS >= 500) {
+          // Reset speech detection status after 500ms of silence (for UI display only)
+          else if (speechDetectedRef.current && silenceFramesRef.current * FRAME_MS >= 500) {
             speechDetectedRef.current = false;
             console.log('Speech detection reset after extended silence');
           }
@@ -382,6 +350,7 @@ AudioRecorder.propTypes = {
   onAudioSent: PropTypes.func,
   autoSend: PropTypes.bool,
   showNoiseLevel: PropTypes.bool,
+  onSetRecording: PropTypes.func,
 };
 
 export default AudioRecorder;
