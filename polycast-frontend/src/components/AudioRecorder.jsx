@@ -232,13 +232,6 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
           setIsSilent(true);
           setSilenceDuration(silenceFramesRef.current * FRAME_MS);
           
-          // Reset speech detection status after 500ms of silence
-          // This ensures the Speech: YES/NO indicator accurately reflects current state
-          if (speechDetectedRef.current && silenceFramesRef.current * FRAME_MS >= 500) {
-            speechDetectedRef.current = false;
-            console.log('Speech detection reset after extended silence');
-          }
-          
           // Check if we've had enough silence to send chunk
           if (speechDetectedRef.current && 
               silenceFramesRef.current * FRAME_MS >= GAP_MS &&
@@ -252,7 +245,6 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
               mediaRecorderRef.current.stop();
               
               // Reset for next segment
-              speechDetectedRef.current = false;
               silenceFramesRef.current = 0;
               
               // Create new recorder after a small delay
@@ -280,6 +272,7 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
                     
                     newRecorder.start();
                     console.log('Started new recorder after pause');
+                    speechDetectedRef.current = false; // Reset speech detection after new recorder starts
                   } catch (e) {
                     console.error('Error creating new recorder:', e);
                   }
@@ -293,23 +286,20 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
       }, FRAME_MS);
       
     } else {
-      // Stop recording if user releases key
+      // Stop recording if user releases key or autoSend is turned off
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        // Only send the final chunk when user stops recording if NOT in auto-send mode
-        console.log('Stopping recorder (user released key)');
-        if (!autoSend) {
-          // In manual mode, we send when recording stops
-          stopReasonRef.current = 'user';
-          mediaRecorderRef.current.stop();
-        } else {
-          // In auto-send mode, we just discard any remaining audio instead of sending it
-          stopReasonRef.current = 'user';
-          mediaRecorderRef.current.stop();
-          // Clear the chunks to prevent sending
+        console.log('Stopping recorder (user released key or autoSend off)');
+        stopReasonRef.current = 'user';
+        mediaRecorderRef.current.stop();
+        // Clear the chunks to prevent sending if autoSend was on and user stopped it
+        if (autoSend) {
           audioChunksRef.current = [];
         }
       }
       
+      // Reset speech detection status when recording stops
+      speechDetectedRef.current = false;
+
       // Clear silence detector
       if (silenceDetectorRef.current) {
         clearInterval(silenceDetectorRef.current);
