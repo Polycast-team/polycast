@@ -25,6 +25,11 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
   const MIN_SPEECH_MS = 250;     // need 250ms > thresh to mark as speech
   const MARGIN_DB = 6;           // threshold = noise + 6dB
   
+  // Speech detection constants
+  const SPEECH_ZCR_MIN = 0.02;   // Minimum ZCR for speech (too low = likely noise/hum)
+  const SPEECH_ZCR_MAX = 0.15;   // Maximum ZCR for speech (too high = likely noise/static)
+  const SPEECH_FRAMES_REQUIRED = 3; // Need 3 consecutive frames of speech-like audio
+  
   // Audio visualization state
   const [audioLevel, setAudioLevel] = useState(0);
   const [isSilent, setIsSilent] = useState(true);
@@ -34,6 +39,9 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
   
   // Track why the recorder was stopped
   const stopReasonRef = useRef('user'); // 'user' or 'auto'
+  
+  // Speech quality tracking
+  const speechLikeFramesRef = useRef(0); // Consecutive frames that look like speech
   
   // Helper functions
   function rawRMS(arr) {
@@ -148,6 +156,7 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
       // Reset speech detection for this segment
       speechDetectedRef.current = false;
       speechFramesRef.current = 0;
+      speechLikeFramesRef.current = 0;
       silenceFramesRef.current = 0;
       rmsHistoryRef.current = [];
       
@@ -213,22 +222,38 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
         // Check if current level is above threshold
         const isSound = smoothRMS > thresh;
         
-        if (isSound) {
-          // Sound detected
+        // Check if ZCR is in speech-like range
+        const isSpeechLikeZCR = zcr >= SPEECH_ZCR_MIN && zcr <= SPEECH_ZCR_MAX;
+        
+        // Combine volume and ZCR for better speech detection
+        const isSpeechLike = isSound && isSpeechLikeZCR;
+        
+        if (isSpeechLike) {
+          // Speech-like audio detected
           speechFramesRef.current++;
+          speechLikeFramesRef.current++;
           if (silenceFramesRef.current !== 0) silenceFramesRef.current = 0;
           setIsSilent(false);
           
-          // Mark as speech after MIN_SPEECH_MS
+          // Mark as speech only after enough consecutive speech-like frames
           if (!speechDetectedRef.current && 
+              speechLikeFramesRef.current >= SPEECH_FRAMES_REQUIRED &&
               speechFramesRef.current * FRAME_MS >= MIN_SPEECH_MS) {
             speechDetectedRef.current = true;
-            console.log(`Speech detected! RMS: ${(smoothRMS * 100).toFixed(1)}, Threshold: ${(thresh * 100).toFixed(1)}`);
+            console.log(`Speech detected! RMS: ${(smoothRMS * 100).toFixed(1)}, Threshold: ${(thresh * 100).toFixed(1)}, ZCR: ${zcr.toFixed(3)}`);
           }
+        } else if (isSound && !isSpeechLikeZCR) {
+          // Sound detected but doesn't look like speech (likely noise)
+          speechFramesRef.current++;
+          speechLikeFramesRef.current = 0; // Reset speech-like frame counter
+          if (silenceFramesRef.current !== 0) silenceFramesRef.current = 0;
+          setIsSilent(false);
+          console.log(`Noise detected (not speech-like): RMS: ${(smoothRMS * 100).toFixed(1)}, ZCR: ${zcr.toFixed(3)} (should be ${SPEECH_ZCR_MIN}-${SPEECH_ZCR_MAX})`);
         } else {
           // Silence detected
           silenceFramesRef.current++;
           speechFramesRef.current = 0;
+          speechLikeFramesRef.current = 0; // Reset speech-like frame counter
           setIsSilent(true);
           setSilenceDuration(silenceFramesRef.current * FRAME_MS);
           
