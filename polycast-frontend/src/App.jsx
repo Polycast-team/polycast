@@ -201,7 +201,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     }
     window.addEventListener("keydown", handlePageKey);
     return () => window.removeEventListener("keydown", handlePageKey);
-  }, [roomSetup, handleStartRecording, handleStopRecording]); // Added dependencies
+  }, [roomSetup]); // Reverted dependencies
 
   // Ensure recording stops if appMode changes from 'audio'
   useEffect(() => {
