@@ -243,13 +243,14 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
             // Simulate spacebar release (stop recording)
             onSetRecording(false);
             
-            // After a short delay, simulate spacebar press (start recording again)
+            // After a longer delay, simulate spacebar press (start recording again)
+            // Wait for onstop handler to complete sending the audio
             setTimeout(() => {
               if (autoSend) {
                 console.log('Auto-send: Simulating spacebar press to resume recording');
                 onSetRecording(true);
               }
-            }, 100);
+            }, 500);
           }
           
           // Reset speech detection status after 500ms of silence (for UI display only)
