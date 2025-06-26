@@ -264,12 +264,7 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
       // Stop recording if user releases key or autoSend is turned off
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         console.log('Stopping recorder (user released key or autoSend off)');
-        stopReasonRef.current = 'user';
         mediaRecorderRef.current.stop();
-        // Clear the chunks to prevent sending if autoSend was on and user stopped it
-        if (autoSend) {
-          audioChunksRef.current = [];
-        }
       }
       
       // Reset speech detection status when recording stops
