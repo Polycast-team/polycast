@@ -27,7 +27,7 @@ async function transcribeAudio(audioBuffer, filename = 'audio.webm') {
         contentType: 'audio/webm',
     });
     form.append('model', 'whisper-1');
-    // Add other parameters if needed, e.g., language: 'en'
+    form.append('language', 'en'); // Prime for English speech detection
 
     console.log(`Sending ${audioBuffer.length} bytes to Whisper API...`);
 
