@@ -232,7 +232,7 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
           setIsSilent(true);
           setSilenceDuration(silenceFramesRef.current * FRAME_MS);
           
-          // Check if we've had enough silence to send chunk
+          // Check if we've had enough silence to send chunk (before resetting speech detection)
           if (speechDetectedRef.current && 
               silenceFramesRef.current * FRAME_MS >= GAP_MS &&
               mediaRecorderRef.current.state === 'recording' &&
@@ -281,6 +281,13 @@ function AudioRecorder({ sendMessage, isRecording, onAudioSent, autoSend, showNo
             } catch (e) {
               console.error('Error stopping recorder:', e);
             }
+          }
+          
+          // Reset speech detection status after 500ms of silence
+          // This ensures the Speech: YES/NO indicator accurately reflects current state
+          if (speechDetectedRef.current && silenceFramesRef.current * FRAME_MS >= 500) {
+            speechDetectedRef.current = false;
+            console.log('Speech detection reset after extended silence');
           }
         }
       }, FRAME_MS);
