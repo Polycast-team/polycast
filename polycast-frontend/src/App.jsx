@@ -476,14 +476,26 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       // Just update local state for dictionary mode
       console.log('Setting mode to dictionary (local only)');
       setAppMode('dictionary');
+      // Reset mobile UI forcing when leaving flashcard mode
+      if (onFlashcardModeChange) {
+        onFlashcardModeChange(false);
+      }
     } else if (newMode === 'flashcard') {
       // Just update local state for flashcard mode
       console.log('Setting mode to flashcard (local only)');
       setAppMode('flashcard');
+      // Notify parent to force mobile UI for flashcards
+      if (onFlashcardModeChange) {
+        onFlashcardModeChange(true);
+      }
     } else if (newMode === 'audio') {
       // Just update local state for audio mode
       console.log('Setting mode to audio (local only)');
       setAppMode('audio');
+      // Reset mobile UI forcing when leaving flashcard mode
+      if (onFlashcardModeChange) {
+        onFlashcardModeChange(false);
+      }
     }
   }, [appMode]);
 
