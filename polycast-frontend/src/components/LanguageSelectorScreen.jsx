@@ -2,9 +2,9 @@ import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
 function LanguageSelectorScreen({ onLanguageSelected }) {
-    const [numLanguages, setNumLanguages] = useState(1); // Default to 1 language
+    const [numLanguages, setNumLanguages] = useState(0); // Default to 0 languages
     // Initialize languages array based on numLanguages
-    const [languages, setLanguages] = useState(Array(1).fill('')); 
+    const [languages, setLanguages] = useState(Array(0).fill('')); 
 
     const handleNumChange = (event) => {
         const count = parseInt(event.target.value, 10) || 0;

@@ -108,7 +108,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
-  const [showTranslation, setShowTranslation] = useState(false); 
+  const [showTranslation, setShowTranslation] = useState(targetLanguages && targetLanguages.length > 0); 
   // Students start in flashcard mode, hosts start in audio mode
   const [appMode, setAppMode] = useState(() => {
     // If student not in a room, start in flashcard mode
