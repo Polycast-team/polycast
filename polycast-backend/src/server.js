@@ -4,7 +4,7 @@ console.log('Server starting...');
 const http = require('http');
 const express = require('express');
 const WebSocket = require('ws');
-const config = require('../config/config');
+const config = require('./config/config');
 const setupExpress = require('./config/express');
 const setupHeartbeat = require('./websockets/heartbeat');
 const handleWebSocketConnection = require('./websockets/connectionHandler');
