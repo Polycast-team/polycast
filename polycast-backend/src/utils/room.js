@@ -1,4 +1,4 @@
-const redisService = require('../services/redisService');
+const redisService = require('../../services/redisService');
 const activeRooms = new Map(); // Map of roomCode -> {hostWs, students, transcript}
 
 // Generate a unique 5-digit room code

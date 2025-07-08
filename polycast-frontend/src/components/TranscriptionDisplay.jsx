@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile } from '../utils/profileLanguageMapping';
 
-
 // Helper function to render segments
 const renderSegments = (segments, lastPersisted) => {
   if ((!segments || segments.length === 0) && lastPersisted) {
@@ -129,7 +128,6 @@ function useWindowSize() {
  * Displays the received transcription and multiple translation texts in a split-screen style layout.
  */
 const TranscriptionDisplay = ({ 
-  showTBA, 
   englishSegments, 
   targetLanguages, 
   translations, 
@@ -149,29 +147,7 @@ const TranscriptionDisplay = ({
   const englishRef = useRef(null);
   const translationRefs = useRef({});
   const [fontSize, setFontSize] = useState(30); // Font size: default to 30
-
   
-  // Add default transcript content regardless of mode
-  useEffect(() => {
-    // Create demo transcript text
-    const demoText1 = "Testing this now. I will charge my phone";
-    const demoText2 = "i will charge into battle";
-    const demoText3 = "i will charge him with murder";
-    
-    // Override the segments directly in the component
-    if (englishSegments.length === 0 || (englishSegments.length === 1 && englishSegments[0].text === "Waiting...")) {
-      const segments = [
-        { text: demoText1, isNew: false },
-        { text: demoText2, isNew: false },
-        { text: demoText3, isNew: false }
-      ];
-      
-      // Use the englishSegments.splice hack to modify the array in place without a setter
-      if (englishSegments.splice) {
-        englishSegments.splice(0, englishSegments.length, ...segments);
-      }
-    }
-  }, [englishSegments]);
   const containerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
   const [langBoxStates, setLangBoxStates] = useState([]);
@@ -187,9 +163,7 @@ const TranscriptionDisplay = ({
   // Only shows the popup when a word is clicked, doesn't add the word to dictionary
   const handleWordClick = async (word, event) => {
     if (!event) return;
-    showTBA('Word definition feature is not yet implemented. This will be available in a future update.'); 
-    return; 
-
+    
     // Log the selectedWords array whenever a word is clicked
     console.log('🔴🔴🔴 SELECTED WORDS WHEN CLICKING', word, '🔴🔴🔴');
     console.log('📋 SELECTED WORDS ARRAY:', JSON.stringify(selectedWords));
@@ -258,7 +232,7 @@ const TranscriptionDisplay = ({
     try {
       // Step 1: Fetch Gemini definition with context and target language
       const profileLanguage = getLanguageForProfile(selectedProfile);
-      //const apiUrl = `https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
+      const apiUrl = `https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
       console.log(`Fetching definition for "${word}" with context and language ${profileLanguage}, from: ${apiUrl}`);
       
       const geminiFetch = fetch(apiUrl)
@@ -280,7 +254,7 @@ const TranscriptionDisplay = ({
       
       // Step 2: Fetch dictionary definition from JSON files
       const firstLetter = word.charAt(0).toLowerCase();
-      //const dictUrl = `https://polycast-server.onrender.com/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
+      const dictUrl = `https://polycast-server.onrender.com/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
       
       console.log(`Fetching dictionary definition for "${word}" with language ${profileLanguage} from: ${dictUrl}`);
       
@@ -306,18 +280,18 @@ const TranscriptionDisplay = ({
         try {
           console.log(`Disambiguating definition for "${word}" in context: "${contextSentence}"`);
           
-          // const disambiguationResponse = await fetch('https://polycast-server.onrender.com/api/disambiguate-word', {
-          //   method: 'POST',
-          //   headers: {
-          //     'Content-Type': 'application/json',
-          //   },
-          //   body: JSON.stringify({
-          //     word: word,
-          //     contextSentence: contextSentence,
-          //     definitions: dictData.allDefinitions,
-          //     targetLanguage: profileLanguage
-          //   })
-          // }).then(res => res.json());
+          const disambiguationResponse = await fetch('https://polycast-server.onrender.com/api/disambiguate-word', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              word: word,
+              contextSentence: contextSentence,
+              definitions: dictData.allDefinitions,
+              targetLanguage: profileLanguage
+            })
+          }).then(res => res.json());
           
           console.log(`Disambiguation result:`, disambiguationResponse);
           disambiguatedDefinition = disambiguationResponse.disambiguatedDefinition;
@@ -695,21 +669,21 @@ const TranscriptionDisplay = ({
       };
       
       // Send the updated data to the backend
-      // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(requestBody)
-      // });
+      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
       
       const result = await response.json();
       console.log(`Profile data saved successfully:`, result);
 
       // Immediately fetch the data back from the backend and print it
       try {
-        // const fetchResponse = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
-        // const fetchedData = await fetchResponse.json();
+        const fetchResponse = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
+        const fetchedData = await fetchResponse.json();
         console.log(`[DEBUG] Data fetched back from backend for profile '${selectedProfile}':`, fetchedData);
       } catch (fetchErr) {
         console.error(`[DEBUG] Error fetching data after save for profile '${selectedProfile}':`, fetchErr);
@@ -906,17 +880,17 @@ Example output:
 START NOW:`;
 
           // Make the API call to generate example sentences
-          // const response = await fetch('https://polycast-server.onrender.com/api/dictionary/generate-examples', {
-          //   method: 'POST',
-          //   headers: {
-          //     'Content-Type': 'application/json'
-          //   },
-          //   body: JSON.stringify({
-          //     word: wordLower,
-          //     definition: definition,
-          //     prompt: examplePrompt
-          //   })
-          // });
+          const response = await fetch('https://polycast-server.onrender.com/api/dictionary/generate-examples', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              word: wordLower,
+              definition: definition,
+              prompt: examplePrompt
+            })
+          });
 
           if (response.ok) {
             // Get the raw text response (no JSON parsing needed)
@@ -1366,7 +1340,6 @@ START NOW:`;
           })}
         </div>
       )}
-
     </div>
   );
 };

@@ -13,11 +13,6 @@ import FlashcardMode from './components/FlashcardMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
 import { getLanguageForProfile, getTranslationsForProfile } from './utils/profileLanguageMapping.js';
-import TBAPopup from './components/popups/TBAPopup';
-import { useTBAHandler } from './hooks/useTBAHandler';
-import apiService from './services/apiService.js'
-
-
 
 // App now receives an array of target languages and room setup as props
 function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange, onProfileChange }) {
@@ -45,13 +40,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       console.log('Switched to non-saving mode. Cleared flashcards and highlighted words.');
       return;
     }
-    showTBA('Profile data is currently unavailable. See non-saving mode for example usage.');
-    return;
-
+    
     try {
       console.log(`Fetching data for profile: ${profile}`);
-      // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${profile}/words`);
-      // const data = await response.json();
+      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${profile}/words`);
+      const data = await response.json();
       
       // Log the received data
       console.log('Received profile data:', data);
@@ -100,16 +93,15 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   console.log('Effective languages for WebSocket:', effectiveLanguages);
   console.log('WebSocket URL will use languages:', languagesQueryParam);
 
-  // WebSocket connection setup
-  const socketUrl = roomSetup ? apiService.roomWebSocketUrl(languagesQueryParam, roomSetup.roomCode, roomSetup.isHost) : null;
+  // Construct the WebSocket URL for Render backend, including room information
+  const wsBaseUrl = `wss://polycast-server.onrender.com`;
+  // Only connect to WebSocket if we have room setup (for hosts or students who joined a room)
+  const socketUrl = roomSetup ? `${wsBaseUrl}/?targetLangs=${languagesQueryParam}&roomCode=${roomSetup.roomCode}&isHost=${roomSetup.isHost}` : null;
   console.log("Constructed WebSocket URL:", socketUrl);
 
   const [messageHistory, setMessageHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [englishSegments, setEnglishSegments] = useState([
-    { text: "Testing this now. I will charge my phone", isNew: false },
-    { text: "i will charge into battle", isNew: false }
-  ]); 
+  const [englishSegments, setEnglishSegments] = useState([]); 
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
@@ -132,8 +124,6 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const notificationTimeoutRef = useRef(null);
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
   const { error: popupError, showError, clearError } = useErrorHandler();
-  const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
-
 
   // Ensure mutual exclusivity between transcript and translation checkboxes
   useEffect(() => {
@@ -247,9 +237,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     setJoinRoomError('');
     
     try {
-      const data = await apiService.fetchJson(apiService.checkRoomUrl(cleanedRoomCode));
-      console.log('Join room response:', data);
-
+      const response = await fetch(`https://polycast-server.onrender.com/api/check-room/${cleanedRoomCode}`);
+      const data = await response.json();
+      
       if (!data.exists) {
         throw new Error(data.message || 'Room not found');
       }
@@ -318,20 +308,29 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Function for students to generate their own translations
   const generateStudentTranslation = async (englishText, targetLanguage) => {
     try {
-      const data = await apiService.fetchJson(apiService.getTranslationUrl(targetLanguage, englishText));
-      console.log(`Received ${targetLanguage} translation:`, data);
-      const translationData = data; 
-      // Update translations state with the student's translation
-      setTranslations(prevTranslations => {
-        const newTranslations = { ...prevTranslations };
-        const currentLangSegments = newTranslations[targetLanguage] || [];
-        const updatedSegments = [
-          ...currentLangSegments.map(seg => ({ ...seg, isNew: false })),
-          { text: translationData.translation || translationData.data, isNew: true }
-        ];
-        newTranslations[targetLanguage] = updatedSegments.slice(-3);
-        return newTranslations;
+      // Use the correct GET endpoint: /api/translate/:language/:text
+      const encodedText = encodeURIComponent(englishText);
+      const encodedLanguage = encodeURIComponent(targetLanguage);
+      const response = await fetch(`https://polycast-server.onrender.com/api/translate/${encodedLanguage}/${encodedText}`);
+      
+      if (response.ok) {
+        const translationData = await response.json();
+        console.log(`Received ${targetLanguage} translation:`, translationData);
+        
+        // Update translations state with the student's translation
+        setTranslations(prevTranslations => {
+          const newTranslations = { ...prevTranslations };
+          const currentLangSegments = newTranslations[targetLanguage] || [];
+          const updatedSegments = [
+            ...currentLangSegments.map(seg => ({ ...seg, isNew: false })),
+            { text: translationData.translation || translationData.data, isNew: true }
+          ];
+          newTranslations[targetLanguage] = updatedSegments.slice(-3);
+          return newTranslations;
         });
+      } else {
+        console.error(`Failed to translate to ${targetLanguage}:`, response.statusText);
+      }
     } catch (error) {
       console.error(`Error generating ${targetLanguage} translation:`, error);
     }
@@ -591,7 +590,6 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             )}
           </div>
           <Controls
-            showTBA={showTBA}
             readyState={readyState}
             isRecording={isRecording}
             onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
@@ -803,14 +801,14 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                     try {
                       
                       // Save the updated flashcards to the backend
-                      // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
-                      //   method: 'POST',
-                      //   headers: { 'Content-Type': 'application/json' },
-                      //   body: JSON.stringify({ 
-                      //     flashcards: wordDefinitions, 
-                      //     selectedWords: updatedSelectedWords 
-                      //   })
-                      // });
+                      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                          flashcards: wordDefinitions, 
+                          selectedWords: updatedSelectedWords 
+                        })
+                      });
                       
                       if (!response.ok) {
                         const errorText = await response.text();
@@ -848,13 +846,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               try {
                 // Use the profile-specific add-word endpoint
                 const currentProfile = selectedProfile || internalSelectedProfile;
-                // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${currentProfile}/add-word`, {
-                //   method: 'POST',
-                //   headers: {
-                //     'Content-Type': 'application/json'
-                //   },
-                //   body: JSON.stringify({ word: word })
-                // });
+                const response = await fetch(`https://polycast-server.onrender.com/api/profile/${currentProfile}/add-word`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ word: word })
+                });
                 
                 if (response.status === 409) {
                   // Duplicate word
@@ -901,7 +899,6 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           />
         ) : (
           <TranscriptionDisplay 
-            showTBA={showTBA}
             englishSegments={englishSegments} 
             translations={translations} 
             targetLanguages={effectiveLanguages} 
@@ -1013,8 +1010,6 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
       {/* Error Popup */}
       <ErrorPopup error={popupError} onClose={clearError} />
-      <TBAPopup tba={popupTBA} onClose={clearTBA} />
-
     </div>
   )
 }

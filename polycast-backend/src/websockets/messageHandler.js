@@ -1,28 +1,28 @@
 const WebSocket = require('ws');
-const { transcribeAudio } = require('../services/deepgramService'); // Changed from whisperService
-const llmService = require('../services/llmService');
-const textModeLLM = require('../services/textModeLLM');
-const redisService = require('../services/redisService');
+const { transcribeAudio } = require('../../services/whisperService');
+const llmService = require('../../services/llmService');
+const textModeLLM = require('../../services/textModeLLM');
+const redisService = require('../../services/redisService');
 
 async function handleWebSocketMessage(ws, message, clientData) {
     const { clientRooms, clientTargetLanguages, activeRooms, isTextMode } = clientData;
-
+    
     console.log('[WS DEBUG] Raw message:', message);
     console.log('[WS DEBUG] typeof message:', typeof message);
-
+    
     const clientRoom = clientRooms.get(ws);
     const isInRoom = !!clientRoom;
     const isRoomHost = isInRoom && clientRoom.isHost;
-
+    
     if (isInRoom && !isRoomHost) {
         console.log(`[Room] Rejected message from student in room ${clientRoom.roomCode}`);
-        ws.send(JSON.stringify({
-            type: 'error',
-            message: 'Students cannot send audio or text for transcription'
+        ws.send(JSON.stringify({ 
+            type: 'error', 
+            message: 'Students cannot send audio or text for transcription' 
         }));
         return;
     }
-
+    
     if (Buffer.isBuffer(message)) {
         try {
             const msgString = message.toString('utf8');
@@ -66,17 +66,17 @@ async function handleTextSubmit(ws, data, clientData) {
     const sourceLang = data.lang;
     const targetLangs = clientTargetLanguages.get(ws) || [];
     const allLangs = Array.from(new Set(['English', ...targetLangs]));
-
+    
     const translations = await textModeLLM.translateTextBatch(translateThis, sourceLang, allLangs);
-
-    const hostResponse = {
-        type: 'recognized',
-        lang: sourceLang,
-        data: translateThis
+    
+    const hostResponse = { 
+        type: 'recognized', 
+        lang: sourceLang, 
+        data: translateThis 
     };
-
+    
     ws.send(JSON.stringify(hostResponse));
-
+    
     if (isRoomHost) {
         const room = activeRooms.get(clientRoom.roomCode);
         if (room) {
@@ -84,7 +84,7 @@ async function handleTextSubmit(ws, data, clientData) {
             if (room.transcript.length > 50) {
                 room.transcript.slice(-50);
             }
-
+            
             room.students.forEach(student => {
                 if (student.readyState === WebSocket.OPEN) {
                     student.send(JSON.stringify(hostResponse));
@@ -97,7 +97,7 @@ async function handleTextSubmit(ws, data, clientData) {
             });
         }
     }
-
+    
     for (const lang of allLangs) {
         if (lang !== sourceLang) {
             ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
@@ -111,18 +111,15 @@ async function handleAudioMessage(ws, message, clientData) {
     const isRoomHost = clientRoom && clientRoom.isHost;
 
     try {
-        // Use Deepgram instead of Whisper
-        console.log('[Audio] Processing audio with Deepgram Nova-3...');
         const transcription = await transcribeAudio(message, 'audio.webm');
-
         if (transcription && ws.readyState === ws.OPEN) {
             let targetLangs = clientTargetLanguages.get(ws) || [];
-
+            
             const translations = await llmService.translateTextBatch(transcription, targetLangs);
-
+            
             const recognizedResponse = { type: 'recognized', data: transcription };
             ws.send(JSON.stringify(recognizedResponse));
-
+            
             if (isRoomHost) {
                 const room = activeRooms.get(clientRoom.roomCode);
                 if (room) {
@@ -130,7 +127,7 @@ async function handleAudioMessage(ws, message, clientData) {
                     if (room.transcript.length > 50) {
                         room.transcript = room.transcript.slice(-50);
                     }
-
+                    
                     room.students.forEach(student => {
                         if (student.readyState === WebSocket.OPEN) {
                             student.send(JSON.stringify(recognizedResponse));
@@ -139,35 +136,20 @@ async function handleAudioMessage(ws, message, clientData) {
                             }
                         }
                     });
-
+                    
                     redisService.updateTranscript(clientRoom.roomCode, room.transcript)
                         .catch(err => console.error(`[Redis] Failed to update transcript for room ${clientRoom.roomCode}:`, err));
                 }
             }
-
+            
             for (const lang of targetLangs) {
                 ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
             }
         }
     } catch (err) {
-        console.error('Deepgram transcription error:', err);
+        console.error('Whisper transcription error:', err);
         if (ws.readyState === ws.OPEN) {
-            // Update error message to mention Deepgram
-            let errorMessage = 'Transcription failed: ' + err.message;
-            if (err.message.includes('Network connection failed')) {
-                errorMessage += ' (Check internet connection)';
-            } else if (err.message.includes('Invalid API key')) {
-                errorMessage += ' (Server configuration error)';
-            } else if (err.message.includes('Rate limit exceeded')) {
-                errorMessage += ' (Service temporarily unavailable)';
-            } else {
-                errorMessage += ' (Try using Chrome or Edge with a clear audio signal)';
-            }
-
-            ws.send(JSON.stringify({
-                type: 'error',
-                message: errorMessage
-            }));
+            ws.send(JSON.stringify({ type: 'error', message: 'Transcription failed: ' + err.message + ' (Try using Chrome or Edge)' }));
         }
     }
 }
