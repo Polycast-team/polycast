@@ -1,8 +1,8 @@
 const WebSocket = require('ws');
-const { transcribeAudio } = require('../../services/whisperService');
-const llmService = require('../../services/llmService');
-const textModeLLM = require('../../services/textModeLLM');
-const redisService = require('../../services/redisService');
+const { transcribeAudio } = require('../services/whisperService');
+const llmService = require('../services/llmService');
+const textModeLLM = require('../services/textModeLLM');
+const redisService = require('../services/redisService');
 
 async function handleWebSocketMessage(ws, message, clientData) {
     const { clientRooms, clientTargetLanguages, activeRooms, isTextMode } = clientData;

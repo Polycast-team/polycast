@@ -2,10 +2,10 @@
 // Service for generating images using OpenAI's image generation API
 
 const { OpenAI } = require('openai');
-require('dotenv').config();
+const config = require('../config/config');
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: config.openaiApiKey,
 });
 
 /**
@@ -27,7 +27,7 @@ async function generateImage(prompt, size = '1024x1024', moderation = 'auto') {
         const response = await fetchFn(apiUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                'Authorization': `Bearer ${config.openaiApiKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({

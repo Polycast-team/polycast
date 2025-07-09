@@ -9,10 +9,13 @@ const config = {
 
     // OpenAI Whisper Configuration
     openaiApiKey: process.env.OPENAI_API_KEY,
+    
+    // Redis Configuration
+    redisUrl: process.env.REDIS_URL,
 };
 
-// Debug log for OpenAI API Key
-console.log('Config openaiApiKey:', config.openaiApiKey ? config.openaiApiKey.slice(0, 8) + '...' : 'NOT SET');
+// Debug log for API key status
+console.log('Config openaiApiKey:', config.openaiApiKey ? 'CONFIGURED' : 'NOT SET');
 
 // Perform validation immediately when the module is loaded
 config.validateKeys = function() {

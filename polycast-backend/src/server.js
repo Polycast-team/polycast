@@ -1,4 +1,3 @@
-require('dotenv').config();
 console.log('Server starting...');
 
 const http = require('http');
@@ -12,11 +11,11 @@ const handleTextModeConnection = require('./websockets/textModeHandler');
 const apiRoutes = require('./api/routes');
 const { loadModeFromDisk } = require('./utils/mode');
 
-// Debug: Print OpenAI API Key (should be defined, or print warning)
-if (process.env.OPENAI_API_KEY) {
-    console.log('OpenAI API Key loaded:', process.env.OPENAI_API_KEY.slice(0, 8) + '...');
+// Check if API keys are configured
+if (config.openaiApiKey) {
+    console.log('OpenAI API Key is configured');
 } else {
-    console.warn('OpenAI API Key is NOT loaded! Check your .env file and dotenv config.');
+    console.warn('OpenAI API Key is NOT configured! Check your .env file and dotenv config.');
 }
 
 const app = express();
