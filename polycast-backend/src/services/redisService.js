@@ -1,14 +1,15 @@
 // Redis service for room persistence using ioredis
 const Redis = require('ioredis');
+const config = require('../config/config');
 let redis;
 
 // Check if Redis environment variable is configured
-const hasRedisConfig = process.env.REDIS_URL;
+const hasRedisConfig = config.redisUrl;
 
 // Create Redis client only if environment variable is available
 if (hasRedisConfig) {
     try {
-        redis = new Redis(process.env.REDIS_URL);
+        redis = new Redis(config.redisUrl);
         console.log('[Redis] Successfully initialized Redis client');
     } catch (error) {
         console.error('[Redis] Error initializing Redis client:', error);

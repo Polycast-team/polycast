@@ -1,6 +1,6 @@
 // src/websockets/textModeHandler.js
 const url = require('url');
-const textModeLLM = require('../../services/textModeLLM');
+const textModeLLM = require('../services/textModeLLM');
 
 const clientTargetLanguages = new Map();
 

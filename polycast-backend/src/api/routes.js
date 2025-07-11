@@ -1,8 +1,8 @@
 const express = require('express');
 const { generateRoomCode, activeRooms } = require('../utils/room');
-const redisService = require('../../services/redisService');
-const llmService = require('../../services/llmService');
-const { generateTextWithGemini } = require('../../services/llmService'); // Assuming this is where it is
+const redisService = require('../services/redisService');
+const llmService = require('../services/llmService');
+const { generateTextWithGemini } = require('../services/llmService'); // Assuming this is where it is
 
 const router = express.Router();
 

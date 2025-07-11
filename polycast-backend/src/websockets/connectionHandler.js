@@ -1,7 +1,7 @@
 const url = require('url');
 const handleWebSocketMessage = require('./messageHandler');
 const { activeRooms } = require('../utils/room');
-const redisService = require('../../services/redisService');
+const redisService = require('../services/redisService');
 
 const rejectedRoomCodes = new Set();
 const clientTextBuffers = new Map();
