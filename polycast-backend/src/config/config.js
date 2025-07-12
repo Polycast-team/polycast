@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 console.log('Loading configuration from config.js...');
 
 const config = {
@@ -14,15 +15,11 @@ const config = {
     redisUrl: process.env.REDIS_URL,
 };
 
-// Debug log for API key status
-console.log('Config openaiApiKey:', config.openaiApiKey ? 'CONFIGURED' : 'NOT SET');
-
 // Perform validation immediately when the module is loaded
 config.validateKeys = function() {
     console.log('Validating API keys...');
     const requiredKeys = ['GOOGLE_API_KEY', 'OPENAI_API_KEY'];
     const missingKeys = requiredKeys.filter(key => !process.env[key]);
-
     if (missingKeys.length > 0) {
         missingKeys.forEach(key => console.error(`ERROR: ${key} is not set in .env file.`));
         console.error('Application cannot start without required API keys. Please check your .env file.');
