@@ -9,6 +9,7 @@ import { shouldUseMobileApp } from './utils/deviceDetection.js';
 import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
 import './components/RoomSelectionScreen.css'; // Import styles
 import './index.css'
+import apiService from './services/apiService.js'
 
 function Main() {
   const [roomSetup, setRoomSetup] = useState(null);
