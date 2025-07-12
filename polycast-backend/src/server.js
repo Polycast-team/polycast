@@ -11,13 +11,6 @@ const handleTextModeConnection = require('./websockets/textModeHandler');
 const apiRoutes = require('./api/routes');
 const { loadModeFromDisk } = require('./utils/mode');
 
-// Check if API keys are configured
-if (config.openaiApiKey) {
-    console.log('OpenAI API Key is configured');
-} else {
-    console.warn('OpenAI API Key is NOT configured! Check your .env file and dotenv config.');
-}
-
 const app = express();
 setupExpress(app);
 
