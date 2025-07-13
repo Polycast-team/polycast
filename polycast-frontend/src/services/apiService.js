@@ -86,15 +86,6 @@ class ApiService {
       body: JSON.stringify(data)
     });
   }
-
-  // Convenience methods for common operations
-  async createRoom() {
-    return this.fetchJson(this.createRoomUrl(), { method: 'POST' });
-  }
-
-  async checkRoom(roomCode) {
-    return this.fetchJson(this.checkRoomUrl(roomCode));
-  }
 }
 
 // Export a singleton instance
