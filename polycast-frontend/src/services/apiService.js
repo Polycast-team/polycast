@@ -11,14 +11,14 @@ class ApiService {
     this.wsBaseUrl = config.wsBaseUrl;
   }
 
-  // Room Management
-  createRoomUrl() {
-    return `${this.baseUrl}/api/create-room`;
-  }
+  // API Endpoint URLs
+  createRoomUrl = () => `${this.baseUrl}/api/create-room`;
+  // checkRoomUrl = roomCode => `${this.baseUrl}/api/check-room/${roomCode}`;
+  generateAudioUrl = () => `${this.baseUrl}/api/generate-audio`;
 
-  checkRoomUrl(roomCode) {
-    return `${this.baseUrl}/api/check-room/${roomCode}`;
-  }
+
+
+
 
   // Dictionary API
   getDictionaryDefinition(word, context, targetLanguage) {
@@ -62,6 +62,9 @@ class ApiService {
     const params = new URLSearchParams({ role: userRole });
     return `${this.wsBaseUrl}/ws/room/${roomCode}?${params}`;
   }
+
+
+
 
   // Helper methods for common API patterns
   async fetchJson(url, options = {}) {
