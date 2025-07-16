@@ -13,7 +13,7 @@ class ApiService {
 
   // API Endpoint URLs
   createRoomUrl = () => `${this.baseUrl}/api/create-room`;
-  // checkRoomUrl = roomCode => `${this.baseUrl}/api/check-room/${roomCode}`;
+  checkRoomUrl = roomCode => `${this.baseUrl}/api/check-room/${roomCode}`;
   generateAudioUrl = () => `${this.baseUrl}/api/generate-audio`;
 
 

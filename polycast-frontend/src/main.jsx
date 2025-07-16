@@ -39,6 +39,7 @@ function Main() {
       setRoomSetup({ isHost: true, roomCode: data.roomCode });
         
     } catch (err) {
+      console.error('Error creating room:', err);
       setError(`Failed to create room: ${err.message}`);
     } finally {
       setIsLoading(false);
