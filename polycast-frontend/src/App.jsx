@@ -13,6 +13,9 @@ import FlashcardMode from './components/FlashcardMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
 import { getLanguageForProfile, getTranslationsForProfile } from './utils/profileLanguageMapping.js';
+import TBAPopup from './components/popups/TBAPopup';
+import { useTBAHandler } from './hooks/useTBAHandler';
+
 
 // App now receives an array of target languages and room setup as props
 function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange, onProfileChange }) {
@@ -40,7 +43,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       console.log('Switched to non-saving mode. Cleared flashcards and highlighted words.');
       return;
     }
-    
+    showTBA('Profile data is currently unavailable. See non-saving mode for example usage.');
+    return;
+
     try {
       console.log(`Fetching data for profile: ${profile}`);
       const response = await fetch(`https://polycast-server.onrender.com/api/profile/${profile}/words`);
@@ -127,6 +132,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const notificationTimeoutRef = useRef(null);
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
   const { error: popupError, showError, clearError } = useErrorHandler();
+  const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
+
 
   // Ensure mutual exclusivity between transcript and translation checkboxes
   useEffect(() => {
@@ -1013,6 +1020,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
       {/* Error Popup */}
       <ErrorPopup error={popupError} onClose={clearError} />
+      <TBAPopup tba={popupTBA} onClose={clearTBA} />
+
     </div>
   )
 }

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import './DictionaryTable.css';
+import TBAPopup from './popups/TBAPopup';
+import { useTBAHandler } from '../hooks/useTBAHandler';
+
 
 // Component to display word frequency rating (1-5)
 const FrequencyIndicator = ({ word }) => {
@@ -156,6 +159,8 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
   const [isAddingWord, setIsAddingWord] = useState(false);
   const searchInputRef = React.useRef(null);
   const addWordInputRef = React.useRef(null);
+  const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
+
 
   // Group entries by word
   useEffect(() => {
@@ -330,6 +335,10 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
   // Function to handle manually adding a word
   const handleAddWord = async (e) => {
     e.preventDefault();
+    
+    showTBA('Adding words is currently disabled. This feature will be available in a future update.');
+    return;
+
     const word = newWordInput.trim();
     
     if (!word) {
@@ -751,6 +760,8 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
           );
         })}
       </div>
+      {/* TBA Popup */}
+      <TBAPopup tba={popupTBA} onClose={clearTBA} />
     </div>
   );
 };
