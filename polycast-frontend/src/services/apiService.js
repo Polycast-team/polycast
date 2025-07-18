@@ -11,60 +11,17 @@ class ApiService {
     this.wsBaseUrl = config.wsBaseUrl;
   }
 
+  // WebSocket URL
+  roomWebSocketUrl = (targetLangs, roomCode, isHost) => {
+    const params = new URLSearchParams({ targetLangs, roomCode, isHost });
+    return `${this.wsBaseUrl}/ws/room/${roomCode}?${params}`;
+  }
+
   // API Endpoint URLs
   createRoomUrl = () => `${this.baseUrl}/api/create-room`;
   checkRoomUrl = roomCode => `${this.baseUrl}/api/check-room/${roomCode}`;
   generateAudioUrl = () => `${this.baseUrl}/api/generate-audio`;
-
-
-
-
-
-  // Dictionary API
-  getDictionaryDefinition(word, context, targetLanguage) {
-    const params = new URLSearchParams({
-      context: context,
-      targetLanguage: targetLanguage
-    });
-    return `${this.baseUrl}/api/dictionary/${encodeURIComponent(word)}?${params}`;
-  }
-
-  getLocalDictionary(firstLetter, word, context, targetLanguage) {
-    const params = new URLSearchParams({
-      context: context,
-      targetLanguage: targetLanguage
-    });
-    return `${this.baseUrl}/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?${params}`;
-  }
-
-  // Word disambiguation
-  getDisambiguationUrl() {
-    return `${this.baseUrl}/api/disambiguate-word`;
-  }
-
-  // Example generation
-  getExamplesUrl() {
-    return `${this.baseUrl}/api/dictionary/generate-examples`;
-  }
-
-  // Profile API
-  getProfileWordsUrl(profile) {
-    return `${this.baseUrl}/api/profile/${profile}/words`;
-  }
-
-  // Translation API
-  getTranslationUrl(language, text) {
-    return `${this.baseUrl}/api/translate/${encodeURIComponent(language)}/${encodeURIComponent(text)}`;
-  }
-
-  // WebSocket URLs
-  getRoomWebSocketUrl(roomCode, userRole) {
-    const params = new URLSearchParams({ role: userRole });
-    return `${this.wsBaseUrl}/ws/room/${roomCode}?${params}`;
-  }
-
-
-
+  getTranslationUrl = (language, text) => `${this.baseUrl}/api/translate/${encodeURIComponent(language)}/${encodeURIComponent(text)}`;
 
   // Helper methods for common API patterns
   async fetchJson(url, options = {}) {
@@ -93,3 +50,36 @@ class ApiService {
 
 // Export a singleton instance
 export default new ApiService();
+
+// Potentially useful stuff for future use
+  // // Dictionary API
+  // getDictionaryDefinition(word, context, targetLanguage) {
+  //   const params = new URLSearchParams({
+  //     context: context,
+  //     targetLanguage: targetLanguage
+  //   });
+  //   return `${this.baseUrl}/api/dictionary/${encodeURIComponent(word)}?${params}`;
+  // }
+
+  // getLocalDictionary(firstLetter, word, context, targetLanguage) {
+  //   const params = new URLSearchParams({
+  //     context: context,
+  //     targetLanguage: targetLanguage
+  //   });
+  //   return `${this.baseUrl}/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?${params}`;
+  // }
+
+  // // Word disambiguation
+  // getDisambiguationUrl() {
+  //   return `${this.baseUrl}/api/disambiguate-word`;
+  // }
+
+  // // Example generation
+  // getExamplesUrl() {
+  //   return `${this.baseUrl}/api/dictionary/generate-examples`;
+  // }
+
+  // // Profile API
+  // getProfileWordsUrl(profile) {
+  //   return `${this.baseUrl}/api/profile/${profile}/words`;
+  // }

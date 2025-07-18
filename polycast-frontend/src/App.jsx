@@ -15,6 +15,8 @@ import { useErrorHandler } from './hooks/useErrorHandler';
 import { getLanguageForProfile, getTranslationsForProfile } from './utils/profileLanguageMapping.js';
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
+import apiService from './services/apiService.js'
+
 
 
 // App now receives an array of target languages and room setup as props
@@ -98,10 +100,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   console.log('Effective languages for WebSocket:', effectiveLanguages);
   console.log('WebSocket URL will use languages:', languagesQueryParam);
 
-  // Construct the WebSocket URL for Render backend, including room information
-  const wsBaseUrl = `wss://polycast-server.onrender.com`;
-  // Only connect to WebSocket if we have room setup (for hosts or students who joined a room)
-  const socketUrl = roomSetup ? `${wsBaseUrl}/?targetLangs=${languagesQueryParam}&roomCode=${roomSetup.roomCode}&isHost=${roomSetup.isHost}` : null;
+  // WebSocket connection setup
+  const socketUrl = roomSetup ? apiService.roomWebSocketUrl(languagesQueryParam, roomSetup.roomCode, roomSetup.isHost) : null;
   console.log("Constructed WebSocket URL:", socketUrl);
 
   const [messageHistory, setMessageHistory] = useState([]);
@@ -247,9 +247,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     setJoinRoomError('');
     
     try {
-      const response = await fetch(`https://polycast-server.onrender.com/api/check-room/${cleanedRoomCode}`);
-      const data = await response.json();
-      
+      const data = await apiService.fetchJson(apiService.checkRoomUrl(cleanedRoomCode));
+      console.log('Join room response:', data);
+
       if (!data.exists) {
         throw new Error(data.message || 'Room not found');
       }
@@ -318,29 +318,20 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Function for students to generate their own translations
   const generateStudentTranslation = async (englishText, targetLanguage) => {
     try {
-      // Use the correct GET endpoint: /api/translate/:language/:text
-      const encodedText = encodeURIComponent(englishText);
-      const encodedLanguage = encodeURIComponent(targetLanguage);
-      const response = await fetch(`https://polycast-server.onrender.com/api/translate/${encodedLanguage}/${encodedText}`);
-      
-      if (response.ok) {
-        const translationData = await response.json();
-        console.log(`Received ${targetLanguage} translation:`, translationData);
-        
-        // Update translations state with the student's translation
-        setTranslations(prevTranslations => {
-          const newTranslations = { ...prevTranslations };
-          const currentLangSegments = newTranslations[targetLanguage] || [];
-          const updatedSegments = [
-            ...currentLangSegments.map(seg => ({ ...seg, isNew: false })),
-            { text: translationData.translation || translationData.data, isNew: true }
-          ];
-          newTranslations[targetLanguage] = updatedSegments.slice(-3);
-          return newTranslations;
+      const data = await apiService.fetchJson(apiService.getTranslationUrl(targetLanguage, englishText));
+      console.log(`Received ${targetLanguage} translation:`, data);
+      const translationData = data; 
+      // Update translations state with the student's translation
+      setTranslations(prevTranslations => {
+        const newTranslations = { ...prevTranslations };
+        const currentLangSegments = newTranslations[targetLanguage] || [];
+        const updatedSegments = [
+          ...currentLangSegments.map(seg => ({ ...seg, isNew: false })),
+          { text: translationData.translation || translationData.data, isNew: true }
+        ];
+        newTranslations[targetLanguage] = updatedSegments.slice(-3);
+        return newTranslations;
         });
-      } else {
-        console.error(`Failed to translate to ${targetLanguage}:`, response.statusText);
-      }
     } catch (error) {
       console.error(`Error generating ${targetLanguage} translation:`, error);
     }
