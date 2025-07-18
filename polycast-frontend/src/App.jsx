@@ -600,6 +600,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             )}
           </div>
           <Controls
+            showTBA={showTBA}
             readyState={readyState}
             isRecording={isRecording}
             onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
