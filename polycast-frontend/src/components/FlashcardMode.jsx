@@ -14,6 +14,10 @@ import { getTranslationsForProfile } from '../utils/profileLanguageMapping';
 import '../mobile/styles/mobile-flashcards.css';
 import '../services/apiService.js';
 import apiService from '../services/apiService.js';
+import { use } from 'react';
+import TBAPopup from './popups/TBAPopup';
+import { useTBAHandler } from '../hooks/useTBAHandler';
+
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
   // Get translations for this profile's language
@@ -31,6 +35,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   const [currentAudio, setCurrentAudio] = useState(null);
   const [hasAutoPlayedThisFlip, setHasAutoPlayedThisFlip] = useState(false);
   const { error: popupError, showError, clearError } = useErrorHandler();
+  const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
   const isActuallyMobile = shouldUseMobileApp();
 
   // Use shared session hook
@@ -165,6 +170,9 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
 
   // Generate and play audio for current sentence
   const generateAndPlayAudio = useCallback(async (text, card) => {
+    showTBA('Generate Audio Unavailable. Will be available in future updates.');
+    return null;
+
     if (!text || !card) return;
     
     const cacheKey = getSentenceCacheKey(card);
@@ -333,37 +341,37 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     }
   }, [currentMode, dueCards, preGenerateAudioForSession]);
 
-  // Auto-play audio when card is flipped (with correct sentence)
-  useEffect(() => {
-    if (isFlipped && currentCard && !hasAutoPlayedThisFlip) {
-      setHasAutoPlayedThisFlip(true);
+  // // Auto-play audio when card is flipped (with correct sentence)
+  // useEffect(() => {
+  //   if (isFlipped && currentCard && !hasAutoPlayedThisFlip) {
+  //     setHasAutoPlayedThisFlip(true);
       
-      let textToPlay = '';
+  //     let textToPlay = '';
       
-      if (currentCard.exampleSentencesGenerated) {
-        // Use generated examples if available
-        const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-        const srsInterval = currentCard?.srsData?.SRS_interval || 1;
-        const sentenceIndex = ((srsInterval - 1) % 5) * 2;
-        textToPlay = parts[sentenceIndex] || parts[0] || '';
-      } else if (currentCard.contextSentence) {
-        // Fallback to context sentence
-        textToPlay = currentCard.contextSentence;
-      } else if (currentCard.example) {
-        // Fallback to example
-        textToPlay = currentCard.example;
-      } else {
-        // Last resort: just the word
-        textToPlay = currentCard.word;
-      }
+  //     if (currentCard.exampleSentencesGenerated) {
+  //       // Use generated examples if available
+  //       const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+  //       const srsInterval = currentCard?.srsData?.SRS_interval || 1;
+  //       const sentenceIndex = ((srsInterval - 1) % 5) * 2;
+  //       textToPlay = parts[sentenceIndex] || parts[0] || '';
+  //     } else if (currentCard.contextSentence) {
+  //       // Fallback to context sentence
+  //       textToPlay = currentCard.contextSentence;
+  //     } else if (currentCard.example) {
+  //       // Fallback to example
+  //       textToPlay = currentCard.example;
+  //     } else {
+  //       // Last resort: just the word
+  //       textToPlay = currentCard.word;
+  //     }
       
-      if (textToPlay) {
-        setTimeout(() => {
-          generateAndPlayAudio(textToPlay, currentCard);
-        }, 300);
-      }
-    }
-  }, [isFlipped, currentCard, hasAutoPlayedThisFlip, generateAndPlayAudio]);
+  //     if (textToPlay) {
+  //       setTimeout(() => {
+  //         generateAndPlayAudio(textToPlay, currentCard);
+  //       }, 300);
+  //     }
+  //   }
+  // }, [isFlipped, currentCard, hasAutoPlayedThisFlip, generateAndPlayAudio]);
 
   // Clear audio cache when switching profiles or modes
   useEffect(() => {
@@ -586,6 +594,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
 
       {/* Error Popup */}
       <ErrorPopup error={popupError} onClose={clearError} />
+      <TBAPopup tba={popupTBA} onClose={clearTBA} />
     </div>
   );
 };
