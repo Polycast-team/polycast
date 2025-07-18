@@ -910,6 +910,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           />
         ) : (
           <TranscriptionDisplay 
+            showTBA={showTBA}
             englishSegments={englishSegments} 
             translations={translations} 
             targetLanguages={effectiveLanguages} 

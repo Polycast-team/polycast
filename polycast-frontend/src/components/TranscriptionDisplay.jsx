@@ -2,8 +2,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile } from '../utils/profileLanguageMapping';
-import TBAPopup from './popups/TBAPopup';
-import { useTBAHandler } from '../hooks/useTBAHandler';
 
 
 // Helper function to render segments
@@ -131,6 +129,7 @@ function useWindowSize() {
  * Displays the received transcription and multiple translation texts in a split-screen style layout.
  */
 const TranscriptionDisplay = ({ 
+  showTBA, 
   englishSegments, 
   targetLanguages, 
   translations, 
@@ -150,7 +149,6 @@ const TranscriptionDisplay = ({
   const englishRef = useRef(null);
   const translationRefs = useRef({});
   const [fontSize, setFontSize] = useState(30); // Font size: default to 30
-  const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
 
   
   // Add default transcript content regardless of mode
@@ -1368,8 +1366,7 @@ START NOW:`;
           })}
         </div>
       )}
-      {/* TBA Popup */}
-      <TBAPopup tba={popupTBA} onClose={clearTBA} />
+
     </div>
   );
 };
