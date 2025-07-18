@@ -2,6 +2,9 @@ import React, { useRef, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile } from '../utils/profileLanguageMapping';
+import TBAPopup from './popups/TBAPopup';
+import { useTBAHandler } from '../hooks/useTBAHandler';
+
 
 // Helper function to render segments
 const renderSegments = (segments, lastPersisted) => {
@@ -147,6 +150,8 @@ const TranscriptionDisplay = ({
   const englishRef = useRef(null);
   const translationRefs = useRef({});
   const [fontSize, setFontSize] = useState(30); // Font size: default to 30
+  const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
+
   
   // Add default transcript content regardless of mode
   useEffect(() => {
@@ -184,7 +189,9 @@ const TranscriptionDisplay = ({
   // Only shows the popup when a word is clicked, doesn't add the word to dictionary
   const handleWordClick = async (word, event) => {
     if (!event) return;
-    
+    showTBA('Word definition feature is not yet implemented. This will be available in a future update.'); 
+    return; 
+
     // Log the selectedWords array whenever a word is clicked
     console.log('🔴🔴🔴 SELECTED WORDS WHEN CLICKING', word, '🔴🔴🔴');
     console.log('📋 SELECTED WORDS ARRAY:', JSON.stringify(selectedWords));
@@ -1361,6 +1368,8 @@ START NOW:`;
           })}
         </div>
       )}
+      {/* TBA Popup */}
+      <TBAPopup tba={popupTBA} onClose={clearTBA} />
     </div>
   );
 };
