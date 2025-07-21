@@ -19,6 +19,7 @@ const config = {
 
 // Debug log for API key status
 console.log('Config deepgramApiKey:', config.deepgramApiKey ? 'CONFIGURED' : 'NOT SET');
+console.log('Config googleApiKey:', config.googleApiKey ? 'CONFIGURED' : 'NOT SET');
 console.log('Config openaiApiKey:', config.openaiApiKey ? 'CONFIGURED' : 'NOT SET');
 
 // Perform validation immediately when the module is loaded
