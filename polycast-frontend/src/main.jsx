@@ -9,6 +9,7 @@ import { shouldUseMobileApp } from './utils/deviceDetection.js';
 import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
 import './components/RoomSelectionScreen.css'; // Import styles
 import './index.css'
+import apiService from './services/apiService.js'
 
 function Main() {
   const [roomSetup, setRoomSetup] = useState(null);
@@ -34,16 +35,13 @@ function Main() {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch('https://polycast-server.onrender.com/api/create-room', {
-        method: 'POST'
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to create room: ${response.statusText}`);
-      }
-      const data = await response.json();
+      const data = await apiService.postJson(apiService.createRoomUrl(), {});
       setRoomSetup({ isHost: true, roomCode: data.roomCode });
+        
     } catch (err) {
+      console.error('Error creating room:', err);
       setError(`Failed to create room: ${err.message}`);
+    } finally {
       setIsLoading(false);
     }
   };

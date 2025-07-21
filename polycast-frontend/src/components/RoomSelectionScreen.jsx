@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
+import apiService from '../services/apiService';
 
 function RoomSelectionScreen({ onRoomSetup }) {
   const [roomCode, setRoomCode] = useState('');
@@ -23,15 +24,8 @@ function RoomSelectionScreen({ onRoomSetup }) {
     
     try {
       console.log(`Attempting to join room: ${cleanedRoomCode}`);
-      
-      // Check if room exists
-      const response = await fetch(`https://polycast-server.onrender.com/api/check-room/${cleanedRoomCode}`);
-      const data = await response.json();
-      
-      if (!response.ok || !data.exists) {
-        console.log('Room check response:', { status: response.status, data });
-        throw new Error(data.message || 'Room not found');
-      }
+
+      const data = await apiService.fetchJson(apiService.checkRoomUrl(cleanedRoomCode));
       
       onRoomSetup({ 
         isHost: false, 
@@ -39,7 +33,8 @@ function RoomSelectionScreen({ onRoomSetup }) {
       });
     } catch (err) {
       console.error('Error joining room:', err);
-      setError(`Failed to join room: ${err.message || 'Room not found. Please check the code and try again.'}`);
+      setError(`Failed to join room: ${err.message}}`);
+    } finally {
       setIsLoading(false);
     }
   };
