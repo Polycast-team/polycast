@@ -50,8 +50,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
     try {
       console.log(`Fetching data for profile: ${profile}`);
-      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${profile}/words`);
-      const data = await response.json();
+      // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${profile}/words`);
+      // const data = await response.json();
       
       // Log the received data
       console.log('Received profile data:', data);
@@ -803,14 +803,14 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                     try {
                       
                       // Save the updated flashcards to the backend
-                      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                          flashcards: wordDefinitions, 
-                          selectedWords: updatedSelectedWords 
-                        })
-                      });
+                      // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
+                      //   method: 'POST',
+                      //   headers: { 'Content-Type': 'application/json' },
+                      //   body: JSON.stringify({ 
+                      //     flashcards: wordDefinitions, 
+                      //     selectedWords: updatedSelectedWords 
+                      //   })
+                      // });
                       
                       if (!response.ok) {
                         const errorText = await response.text();
@@ -848,13 +848,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               try {
                 // Use the profile-specific add-word endpoint
                 const currentProfile = selectedProfile || internalSelectedProfile;
-                const response = await fetch(`https://polycast-server.onrender.com/api/profile/${currentProfile}/add-word`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({ word: word })
-                });
+                // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${currentProfile}/add-word`, {
+                //   method: 'POST',
+                //   headers: {
+                //     'Content-Type': 'application/json'
+                //   },
+                //   body: JSON.stringify({ word: word })
+                // });
                 
                 if (response.status === 409) {
                   // Duplicate word

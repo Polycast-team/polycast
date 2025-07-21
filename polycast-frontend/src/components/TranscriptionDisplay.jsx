@@ -258,7 +258,7 @@ const TranscriptionDisplay = ({
     try {
       // Step 1: Fetch Gemini definition with context and target language
       const profileLanguage = getLanguageForProfile(selectedProfile);
-      const apiUrl = `https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
+      //const apiUrl = `https://polycast-server.onrender.com/api/dictionary/${encodeURIComponent(word)}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
       console.log(`Fetching definition for "${word}" with context and language ${profileLanguage}, from: ${apiUrl}`);
       
       const geminiFetch = fetch(apiUrl)
@@ -280,7 +280,7 @@ const TranscriptionDisplay = ({
       
       // Step 2: Fetch dictionary definition from JSON files
       const firstLetter = word.charAt(0).toLowerCase();
-      const dictUrl = `https://polycast-server.onrender.com/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
+      //const dictUrl = `https://polycast-server.onrender.com/api/local-dictionary/${encodeURIComponent(firstLetter)}/${encodeURIComponent(word.toUpperCase())}?context=${encodeURIComponent(contextSentence)}&targetLanguage=${encodeURIComponent(profileLanguage)}`;
       
       console.log(`Fetching dictionary definition for "${word}" with language ${profileLanguage} from: ${dictUrl}`);
       
@@ -306,18 +306,18 @@ const TranscriptionDisplay = ({
         try {
           console.log(`Disambiguating definition for "${word}" in context: "${contextSentence}"`);
           
-          const disambiguationResponse = await fetch('https://polycast-server.onrender.com/api/disambiguate-word', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              word: word,
-              contextSentence: contextSentence,
-              definitions: dictData.allDefinitions,
-              targetLanguage: profileLanguage
-            })
-          }).then(res => res.json());
+          // const disambiguationResponse = await fetch('https://polycast-server.onrender.com/api/disambiguate-word', {
+          //   method: 'POST',
+          //   headers: {
+          //     'Content-Type': 'application/json',
+          //   },
+          //   body: JSON.stringify({
+          //     word: word,
+          //     contextSentence: contextSentence,
+          //     definitions: dictData.allDefinitions,
+          //     targetLanguage: profileLanguage
+          //   })
+          // }).then(res => res.json());
           
           console.log(`Disambiguation result:`, disambiguationResponse);
           disambiguatedDefinition = disambiguationResponse.disambiguatedDefinition;
@@ -695,21 +695,21 @@ const TranscriptionDisplay = ({
       };
       
       // Send the updated data to the backend
-      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
+      // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify(requestBody)
+      // });
       
       const result = await response.json();
       console.log(`Profile data saved successfully:`, result);
 
       // Immediately fetch the data back from the backend and print it
       try {
-        const fetchResponse = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
-        const fetchedData = await fetchResponse.json();
+        // const fetchResponse = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`);
+        // const fetchedData = await fetchResponse.json();
         console.log(`[DEBUG] Data fetched back from backend for profile '${selectedProfile}':`, fetchedData);
       } catch (fetchErr) {
         console.error(`[DEBUG] Error fetching data after save for profile '${selectedProfile}':`, fetchErr);
@@ -906,17 +906,17 @@ Example output:
 START NOW:`;
 
           // Make the API call to generate example sentences
-          const response = await fetch('https://polycast-server.onrender.com/api/dictionary/generate-examples', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              word: wordLower,
-              definition: definition,
-              prompt: examplePrompt
-            })
-          });
+          // const response = await fetch('https://polycast-server.onrender.com/api/dictionary/generate-examples', {
+          //   method: 'POST',
+          //   headers: {
+          //     'Content-Type': 'application/json'
+          //   },
+          //   body: JSON.stringify({
+          //     word: wordLower,
+          //     definition: definition,
+          //     prompt: examplePrompt
+          //   })
+          // });
 
           if (response.ok) {
             // Get the raw text response (no JSON parsing needed)
