@@ -13,6 +13,11 @@ import FlashcardMode from './components/FlashcardMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
 import { getLanguageForProfile, getTranslationsForProfile } from './utils/profileLanguageMapping.js';
+import TBAPopup from './components/popups/TBAPopup';
+import { useTBAHandler } from './hooks/useTBAHandler';
+import apiService from './services/apiService.js'
+
+
 
 // App now receives an array of target languages and room setup as props
 function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange, onProfileChange }) {
@@ -40,11 +45,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       console.log('Switched to non-saving mode. Cleared flashcards and highlighted words.');
       return;
     }
-    
+    showTBA('Profile data is currently unavailable. See non-saving mode for example usage.');
+    return;
+
     try {
       console.log(`Fetching data for profile: ${profile}`);
-      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${profile}/words`);
-      const data = await response.json();
+      // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${profile}/words`);
+      // const data = await response.json();
       
       // Log the received data
       console.log('Received profile data:', data);
@@ -93,15 +100,15 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   console.log('Effective languages for WebSocket:', effectiveLanguages);
   console.log('WebSocket URL will use languages:', languagesQueryParam);
 
-  // Construct the WebSocket URL for Render backend, including room information
-  const wsBaseUrl = `wss://polycast-server.onrender.com`;
-  // Only connect to WebSocket if we have room setup (for hosts or students who joined a room)
-  const socketUrl = roomSetup ? `${wsBaseUrl}/?targetLangs=${languagesQueryParam}&roomCode=${roomSetup.roomCode}&isHost=${roomSetup.isHost}` : null;
+  // WebSocket connection setup
+  const socketUrl = roomSetup ? apiService.roomWebSocketUrl(languagesQueryParam, roomSetup.roomCode, roomSetup.isHost) : null;
   console.log("Constructed WebSocket URL:", socketUrl);
 
   const [messageHistory, setMessageHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [englishSegments, setEnglishSegments] = useState([]); 
+  // For streaming transcription
+  const [fullTranscript, setFullTranscript] = useState('');
+  const [currentPartial, setCurrentPartial] = useState(''); 
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
@@ -119,11 +126,12 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [wordDefinitions, setWordDefinitions] = useState({}); // Cache for word definitions
   const [showNotification, setShowNotification] = useState(false);
   const [notificationOpacity, setNotificationOpacity] = useState(1);
-  const [autoSend, setAutoSend] = useState(roomSetup && roomSetup.isHost ? false : true); // Off by default for host, on for students
-  const [showNoiseLevel, setShowNoiseLevel] = useState(false); // Controls visibility of noise level display
+  // Auto-send functionality removed - using manual Record/Stop button instead
   const notificationTimeoutRef = useRef(null);
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
   const { error: popupError, showError, clearError } = useErrorHandler();
+  const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
+
 
   // Ensure mutual exclusivity between transcript and translation checkboxes
   useEffect(() => {
@@ -137,48 +145,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Update refs when state changes
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
 
-  // Listen for spacebar in audio mode (hosts only)
-  useEffect(() => {
-    let spacebarPressed = false;
-    // Only add listeners in audio mode and only for hosts (not students)
-    if (appMode !== 'audio') return;
-    if (roomSetup && !roomSetup.isHost) return; // Skip for students
+  // Spacebar recording removed - using Record/Stop button instead
 
-    const handleKeyDown = (event) => {
-      // Only allow spacebar to start recording if autoSend is OFF
-      if (!autoSend && event.code === 'Space' && !isRecordingRef.current && !spacebarPressed) {
-        event.preventDefault();
-        spacebarPressed = true;
-        setIsRecording(true);
-      }
-    };
-    const handleKeyUp = (event) => {
-      // Only allow spacebar to stop recording if autoSend is OFF
-      if (!autoSend && event.code === 'Space' && isRecordingRef.current) {
-        event.preventDefault();
-        spacebarPressed = false;
-        setIsRecording(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [appMode, roomSetup, autoSend]); // Add autoSend to dependencies
-
-  // Manage isRecording state based on autoSend for hosts in audio mode
-  useEffect(() => {
-    if (appMode === 'audio' && roomSetup && roomSetup.isHost) {
-      if (autoSend) {
-        setIsRecording(true);
-      } else {
-        // If autoSend is turned off, stop recording
-        setIsRecording(false);
-      }
-    }
-  }, [autoSend, appMode, roomSetup]);
+  // Recording is now controlled only by the Record/Stop button
 
   // Add Page Up/Page Down recording hotkeys (only for hosts)
   useEffect(() => {
@@ -237,9 +206,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     setJoinRoomError('');
     
     try {
-      const response = await fetch(`https://polycast-server.onrender.com/api/check-room/${cleanedRoomCode}`);
-      const data = await response.json();
-      
+      const data = await apiService.fetchJson(apiService.checkRoomUrl(cleanedRoomCode));
+      console.log('Join room response:', data);
+
       if (!data.exists) {
         throw new Error(data.message || 'Room not found');
       }
@@ -308,29 +277,20 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Function for students to generate their own translations
   const generateStudentTranslation = async (englishText, targetLanguage) => {
     try {
-      // Use the correct GET endpoint: /api/translate/:language/:text
-      const encodedText = encodeURIComponent(englishText);
-      const encodedLanguage = encodeURIComponent(targetLanguage);
-      const response = await fetch(`https://polycast-server.onrender.com/api/translate/${encodedLanguage}/${encodedText}`);
-      
-      if (response.ok) {
-        const translationData = await response.json();
-        console.log(`Received ${targetLanguage} translation:`, translationData);
-        
-        // Update translations state with the student's translation
-        setTranslations(prevTranslations => {
-          const newTranslations = { ...prevTranslations };
-          const currentLangSegments = newTranslations[targetLanguage] || [];
-          const updatedSegments = [
-            ...currentLangSegments.map(seg => ({ ...seg, isNew: false })),
-            { text: translationData.translation || translationData.data, isNew: true }
-          ];
-          newTranslations[targetLanguage] = updatedSegments.slice(-3);
-          return newTranslations;
+      const data = await apiService.fetchJson(apiService.getTranslationUrl(targetLanguage, englishText));
+      console.log(`Received ${targetLanguage} translation:`, data);
+      const translationData = data; 
+      // Update translations state with the student's translation
+      setTranslations(prevTranslations => {
+        const newTranslations = { ...prevTranslations };
+        const currentLangSegments = newTranslations[targetLanguage] || [];
+        const updatedSegments = [
+          ...currentLangSegments.map(seg => ({ ...seg, isNew: false })),
+          { text: translationData.translation || translationData.data, isNew: true }
+        ];
+        newTranslations[targetLanguage] = updatedSegments.slice(-3);
+        return newTranslations;
         });
-      } else {
-        console.error(`Failed to translate to ${targetLanguage}:`, response.statusText);
-      }
     } catch (error) {
       console.error(`Error generating ${targetLanguage} translation:`, error);
     }
@@ -345,26 +305,24 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         console.log('Received parsed message:', parsedData);
 
         // Check message type and update state accordingly
-        if (parsedData.type === 'recognized') {
-          // Replace any existing interim segment with the final one
-          setEnglishSegments(prevSegments => [
-            // Find the index of the last segment (which might be an interim one)
-            // Keep all segments *except* the last one if it was interim, then add final.
-            // OR simpler: just mark all as old and add final.
-            ...prevSegments.map(seg => ({ ...seg, isNew: false })),
-            { text: parsedData.data, isNew: true }
-          ]);
-          
-          // For students: generate their own translation when receiving host's transcript
-          if (userRole === 'student' && studentHomeLanguage && parsedData.data) {
-            console.log(`Student generating ${studentHomeLanguage} translation for: "${parsedData.data}"`);
-            generateStudentTranslation(parsedData.data, studentHomeLanguage);
+        if (parsedData.type === 'streaming_transcript') {
+          if (parsedData.isInterim) {
+            // Update partial transcript with interim results
+            setCurrentPartial(parsedData.text);
+          } else {
+            // Append finalized text and clear partial
+            setFullTranscript(prev => {
+              const newText = prev + (prev && !prev.endsWith(' ') ? ' ' : '') + parsedData.text;
+              return newText;
+            });
+            setCurrentPartial('');
+            
+            // For students: generate their own translation when receiving host's final transcript
+            if (userRole === 'student' && studentHomeLanguage && parsedData.text) {
+              console.log(`Student generating ${studentHomeLanguage} translation for: "${parsedData.text}"`);
+              generateStudentTranslation(parsedData.text, studentHomeLanguage);
+            }
           }
-        } else if (parsedData.type === 'recognizing_interim') { 
-           // Only update if toggle is on
-           if (showLiveTranscript) {
-             setEnglishSegments([{ text: parsedData.data, isNew: false }]); 
-           }
         } else if (parsedData.type === 'error') {
           console.error('Backend Error:', parsedData.message);
           setErrorMessages(prev => [...prev, `Error: ${parsedData.message}`]);
@@ -584,22 +542,17 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                 sendMessage={sendMessage}
                 isRecording={isRecording}
                 onAudioSent={onAudioSent}
-                autoSend={autoSend}
-                onSetRecording={setIsRecording}
               />
             )}
           </div>
           <Controls
+            showTBA={showTBA}
             readyState={readyState}
             isRecording={isRecording}
             onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
             onStopRecording={roomSetup && roomSetup.isHost ? handleStopRecording : null}
             appMode={appMode}
             setAppMode={handleAppModeChange}
-            autoSend={autoSend}
-            setAutoSend={roomSetup && roomSetup.isHost ? setAutoSend : null}
-            showNoiseLevel={showNoiseLevel}
-            setShowNoiseLevel={roomSetup && roomSetup.isHost ? setShowNoiseLevel : null}
             showLiveTranscript={showLiveTranscript}
             setShowLiveTranscript={(checked) => {
               setShowLiveTranscript(checked);
@@ -623,24 +576,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             }}
             userRole={userRole}
           />
-          {/* User instructions for hosts in audio mode */}
-          {appMode === 'audio' && roomSetup && roomSetup.isHost && (
-            <div style={{
-              marginTop: -45,
-              marginBottom: 0,
-              width: '100%',
-              textAlign: 'center',
-              color: '#ffb84d',
-              fontWeight: 600,
-              fontSize: '1.05rem',
-              letterSpacing: 0.1,
-              textShadow: '0 1px 2px #2228',
-              opacity: 0.96,
-              userSelect: 'none',
-            }}>
-              Hold Spacebar to record.  Release Spacebar to send.
-            </div>
-          )}
+          {/* User instructions for hosts in audio mode - removed */}
           {/* User instructions for students in audio mode */}
           {appMode === 'audio' && roomSetup && !roomSetup.isHost && (
             <div style={{
@@ -801,14 +737,14 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                     try {
                       
                       // Save the updated flashcards to the backend
-                      const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                          flashcards: wordDefinitions, 
-                          selectedWords: updatedSelectedWords 
-                        })
-                      });
+                      // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
+                      //   method: 'POST',
+                      //   headers: { 'Content-Type': 'application/json' },
+                      //   body: JSON.stringify({ 
+                      //     flashcards: wordDefinitions, 
+                      //     selectedWords: updatedSelectedWords 
+                      //   })
+                      // });
                       
                       if (!response.ok) {
                         const errorText = await response.text();
@@ -846,13 +782,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               try {
                 // Use the profile-specific add-word endpoint
                 const currentProfile = selectedProfile || internalSelectedProfile;
-                const response = await fetch(`https://polycast-server.onrender.com/api/profile/${currentProfile}/add-word`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({ word: word })
-                });
+                // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${currentProfile}/add-word`, {
+                //   method: 'POST',
+                //   headers: {
+                //     'Content-Type': 'application/json'
+                //   },
+                //   body: JSON.stringify({ word: word })
+                // });
                 
                 if (response.status === 409) {
                   // Duplicate word
@@ -893,13 +829,15 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             selectedWords={selectedWords}
             wordDefinitions={wordDefinitions}
             setWordDefinitions={setWordDefinitions}
-            englishSegments={englishSegments}
+            fullTranscript={fullTranscript}
             targetLanguages={effectiveLanguages}
             selectedProfile={selectedProfile || internalSelectedProfile}
           />
         ) : (
           <TranscriptionDisplay 
-            englishSegments={englishSegments} 
+            showTBA={showTBA}
+            fullTranscript={fullTranscript}
+            currentPartial={currentPartial}
             translations={translations} 
             targetLanguages={effectiveLanguages} 
             showLiveTranscript={showLiveTranscript}
@@ -1010,6 +948,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
       {/* Error Popup */}
       <ErrorPopup error={popupError} onClose={clearError} />
+      <TBAPopup tba={popupTBA} onClose={clearTBA} />
+
     </div>
   )
 }

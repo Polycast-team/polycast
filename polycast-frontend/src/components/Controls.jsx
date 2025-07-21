@@ -3,10 +3,12 @@ import PropTypes from 'prop-types';
 import { ReadyState } from 'react-use-websocket';
 import { getTranslationsForProfile } from '../utils/profileLanguageMapping';
 
+
 /**
  * Component for mode controls, language selection, font size, and recording indicator.
  */
 function Controls({ 
+    showTBA,
     readyState,
     isRecording, 
     onStartRecording,
@@ -15,10 +17,6 @@ function Controls({
     setIsTextMode,
     appMode,
     setAppMode,
-    autoSend,
-    setAutoSend,
-    showNoiseLevel,
-    setShowNoiseLevel,
     showLiveTranscript,
     setShowLiveTranscript,
     showTranslation,
@@ -158,46 +156,35 @@ function Controls({
                     </label>
                   </>
                 )}
-                {/* Add auto-send toggle button in audio mode - host only */}
+                {/* Add Record/Stop button in audio mode - host only */}
                 {appMode === 'audio' && isHostMode && (
                   <button
                     onClick={() => {
-                      setAutoSend && setAutoSend(!autoSend);
+                      if (isRecording) {
+                        onStopRecording && onStopRecording();
+                      } else {
+                        onStartRecording && onStartRecording();
+                      }
                     }}
-                    disabled={isRecording} // Disable while recording
                     style={{
                       marginLeft: 14,
-                      padding: '8px 12px',
+                      padding: '8px 16px',
                       border: 'none',
                       borderRadius: '6px',
                       fontSize: '14px',
                       fontWeight: '500',
-                      backgroundColor: autoSend ? '#ff4444' : '#666',
+                      backgroundColor: isRecording ? '#ff4444' : '#4CAF50',
                       color: 'white',
-                      cursor: isRecording ? 'not-allowed' : 'pointer',
-                      opacity: isRecording ? 0.6 : 1,
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                       transition: 'background-color 0.2s ease'
                     }}
                   >
-                    <span style={{ fontSize: '16px' }}>🎙️</span>
-                    Auto-send
+                    <span style={{ fontSize: '16px' }}>{isRecording ? '⏹️' : '🎙️'}</span>
+                    {isRecording ? 'Stop Recording' : 'Record'}
                   </button>
-                )}
-                {/* Add show noise levels checkbox in audio mode */}
-                {appMode === 'audio' && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
-                    <input
-                      type="checkbox"
-                      checked={showNoiseLevel}
-                      onChange={e => {
-                        setShowNoiseLevel && setShowNoiseLevel(e.target.checked);
-                      }}
-                    />
-                    Show Noise Levels
-                  </label>
                 )}
             </div>
             
@@ -213,10 +200,12 @@ function Controls({
                 >
                   {t.backToMain}
                 </button>
+                
                 <button 
                   onClick={() => {
+                    showTBA('Flashcard calendar is not yet implemented. This will be available in a future update.');
                     // We'll need to pass this function down from App.jsx
-                    window.dispatchEvent(new CustomEvent('showFlashcardCalendar'));
+                    // window.dispatchEvent(new CustomEvent('showFlashcardCalendar'));
                   }}
                   style={{
                     background: 'none', border: '1px solid #2196f3', borderRadius: '6px',
@@ -225,6 +214,7 @@ function Controls({
                 >
                   {t.calendar}
                 </button>
+                
                 <div style={{ color: '#ccc', fontSize: '12px' }}>
                   <span style={{color: '#5f72ff'}}>{t.new}: 5</span> • 
                   <span style={{color: '#ef4444', marginLeft: '4px'}}>{t.learning}: 0</span> • 
@@ -291,10 +281,6 @@ Controls.propTypes = {
     setIsTextMode: PropTypes.func,
     appMode: PropTypes.string.isRequired,
     setAppMode: PropTypes.func,
-    autoSend: PropTypes.bool,
-    setAutoSend: PropTypes.func,
-    showNoiseLevel: PropTypes.bool,
-    setShowNoiseLevel: PropTypes.func,
     showLiveTranscript: PropTypes.bool.isRequired,
     setShowLiveTranscript: PropTypes.func,
     showTranslation: PropTypes.bool.isRequired,

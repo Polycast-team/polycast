@@ -1,28 +1,26 @@
 const WebSocket = require('ws');
-const { transcribeAudio } = require('../../services/whisperService');
-const llmService = require('../../services/llmService');
-const textModeLLM = require('../../services/textModeLLM');
-const redisService = require('../../services/redisService');
+const { createStreamingSession } = require('../services/deepgramService'); // For real-time streaming
+const llmService = require('../services/llmService');
+const textModeLLM = require('../services/textModeLLM');
+const redisService = require('../services/redisService');
 
 async function handleWebSocketMessage(ws, message, clientData) {
     const { clientRooms, clientTargetLanguages, activeRooms, isTextMode } = clientData;
-    
-    console.log('[WS DEBUG] Raw message:', message);
-    console.log('[WS DEBUG] typeof message:', typeof message);
-    
+
+
     const clientRoom = clientRooms.get(ws);
     const isInRoom = !!clientRoom;
     const isRoomHost = isInRoom && clientRoom.isHost;
-    
+
     if (isInRoom && !isRoomHost) {
         console.log(`[Room] Rejected message from student in room ${clientRoom.roomCode}`);
-        ws.send(JSON.stringify({ 
-            type: 'error', 
-            message: 'Students cannot send audio or text for transcription' 
+        ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Students cannot send audio or text for transcription'
         }));
         return;
     }
-    
+
     if (Buffer.isBuffer(message)) {
         try {
             const msgString = message.toString('utf8');
@@ -66,17 +64,17 @@ async function handleTextSubmit(ws, data, clientData) {
     const sourceLang = data.lang;
     const targetLangs = clientTargetLanguages.get(ws) || [];
     const allLangs = Array.from(new Set(['English', ...targetLangs]));
-    
+
     const translations = await textModeLLM.translateTextBatch(translateThis, sourceLang, allLangs);
-    
-    const hostResponse = { 
-        type: 'recognized', 
-        lang: sourceLang, 
-        data: translateThis 
+
+    const hostResponse = {
+        type: 'recognized',
+        lang: sourceLang,
+        data: translateThis
     };
-    
+
     ws.send(JSON.stringify(hostResponse));
-    
+
     if (isRoomHost) {
         const room = activeRooms.get(clientRoom.roomCode);
         if (room) {
@@ -84,7 +82,7 @@ async function handleTextSubmit(ws, data, clientData) {
             if (room.transcript.length > 50) {
                 room.transcript.slice(-50);
             }
-            
+
             room.students.forEach(student => {
                 if (student.readyState === WebSocket.OPEN) {
                     student.send(JSON.stringify(hostResponse));
@@ -97,7 +95,7 @@ async function handleTextSubmit(ws, data, clientData) {
             });
         }
     }
-    
+
     for (const lang of allLangs) {
         if (lang !== sourceLang) {
             ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
@@ -110,47 +108,79 @@ async function handleAudioMessage(ws, message, clientData) {
     const clientRoom = clientRooms.get(ws);
     const isRoomHost = clientRoom && clientRoom.isHost;
 
-    try {
-        const transcription = await transcribeAudio(message, 'audio.webm');
-        if (transcription && ws.readyState === ws.OPEN) {
-            let targetLangs = clientTargetLanguages.get(ws) || [];
-            
-            const translations = await llmService.translateTextBatch(transcription, targetLangs);
-            
-            const recognizedResponse = { type: 'recognized', data: transcription };
-            ws.send(JSON.stringify(recognizedResponse));
-            
-            if (isRoomHost) {
-                const room = activeRooms.get(clientRoom.roomCode);
-                if (room) {
-                    room.transcript.push({ text: transcription, timestamp: Date.now() });
-                    if (room.transcript.length > 50) {
-                        room.transcript = room.transcript.slice(-50);
-                    }
-                    
-                    room.students.forEach(student => {
-                        if (student.readyState === WebSocket.OPEN) {
-                            student.send(JSON.stringify(recognizedResponse));
-                            for (const lang of targetLangs) {
-                                student.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
+    // Handle stop streaming signal
+    if (message.toString() === 'STOP_STREAM') {
+        if (ws.deepgramSession) {
+            console.log('[Audio] Closing Deepgram streaming session');
+            ws.deepgramSession.close();
+            ws.deepgramSession = null;
+        }
+        return;
+    }
+
+    // Initialize Deepgram streaming session if not exists
+    if (!ws.deepgramSession) {
+        console.log('[Audio] Creating new Deepgram streaming session');
+        ws.deepgramSession = createStreamingSession(
+            (transcript, isInterim) => {
+                // Send real-time updates to frontend
+                const response = {
+                    type: 'streaming_transcript',
+                    text: transcript,
+                    isInterim: isInterim
+                };
+                ws.send(JSON.stringify(response));
+                
+                // Broadcast to students if host
+                if (isRoomHost) {
+                    const room = activeRooms.get(clientRoom.roomCode);
+                    if (room) {
+                        room.students.forEach(student => {
+                            if (student.readyState === WebSocket.OPEN) {
+                                student.send(JSON.stringify(response));
                             }
+                        });
+                        
+                        // Store only final transcripts
+                        if (!isInterim) {
+                            room.transcript.push({ text: transcript, timestamp: Date.now() });
+                            if (room.transcript.length > 50) {
+                                room.transcript = room.transcript.slice(-50);
+                            }
+                            redisService.updateTranscript(clientRoom.roomCode, room.transcript)
+                                .catch(err => console.error(`[Redis] Failed to update transcript:`, err));
                         }
-                    });
-                    
-                    redisService.updateTranscript(clientRoom.roomCode, room.transcript)
-                        .catch(err => console.error(`[Redis] Failed to update transcript for room ${clientRoom.roomCode}:`, err));
+                    }
                 }
+                
+                // Translation calls are commented out for now
+                // if (!isInterim) {
+                //     const targetLangs = clientTargetLanguages.get(ws) || [];
+                //     const translations = await llmService.translateTextBatch(transcript, targetLangs);
+                //     for (const lang of targetLangs) {
+                //         ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
+                //     }
+                // }
+            },
+            (error) => {
+                console.error('Deepgram streaming error:', error);
+                ws.send(JSON.stringify({
+                    type: 'error',
+                    message: 'Streaming transcription error: ' + error.message
+                }));
             }
-            
-            for (const lang of targetLangs) {
-                ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
-            }
-        }
+        );
+    }
+    
+    // Forward audio chunk to Deepgram
+    try {
+        ws.deepgramSession.send(message);
     } catch (err) {
-        console.error('Whisper transcription error:', err);
-        if (ws.readyState === ws.OPEN) {
-            ws.send(JSON.stringify({ type: 'error', message: 'Transcription failed: ' + err.message + ' (Try using Chrome or Edge)' }));
-        }
+        console.error('Error sending audio to Deepgram:', err);
+        ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Failed to send audio to transcription service'
+        }));
     }
 }
 

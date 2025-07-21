@@ -1,4 +1,4 @@
-const { createClient } = require('@deepgram/sdk');
+const { createClient, LiveTranscriptionEvents } = require('@deepgram/sdk');
 const config = require('../config/config');
 
 let deepgram = null;
@@ -20,7 +20,7 @@ function initializeDeepgram() {
 }
 
 /**
- * Transcribes audio data using the Deepgram Nova-2 API.
+ * Transcribes audio data using the Deepgram Nova-3 API.
  * @param {Buffer} audioBuffer The audio data as a Buffer.
  * @param {string} [filename='audio.webm'] The filename to use for the request.
  * @param {Object} [options={}] Additional transcription options.
@@ -46,7 +46,7 @@ async function transcribeAudio(audioBuffer, filename = 'audio.webm', options = {
 
         // Deepgram transcription options
         const transcriptionOptions = {
-            model: 'nova-2', // Use Nova-2 model for high accuracy
+            model: 'nova-3', // Use Nova-3 model for high accuracy
             language: 'en', // Primary language
             smart_format: true, // Enable smart formatting (punctuation, etc.)
             punctuate: true, // Add punctuation
@@ -124,7 +124,7 @@ function createStreamingSession(onTranscript, onError, options = {}) {
     const client = initializeDeepgram();
 
     const streamingOptions = {
-        model: 'nova-2',
+        model: 'nova-3',
         language: 'en',
         smart_format: true,
         punctuate: true,
@@ -132,17 +132,20 @@ function createStreamingSession(onTranscript, onError, options = {}) {
         endpointing: 300, // ms of silence before considering utterance complete
         utterance_end_ms: 1000, // ms of silence before finalizing utterance
         vad_events: true, // Voice activity detection events
+        encoding: 'linear16', // Raw PCM 16-bit
+        sample_rate: 16000, // 16kHz sample rate
+        channels: 1, // Mono audio
         ...options
     };
 
     try {
-        const connection = client.listen.live.transcription(streamingOptions);
+        const connection = client.listen.live(streamingOptions);
 
-        connection.on('open', () => {
+        connection.on(LiveTranscriptionEvents.Open, () => {
             console.log('Deepgram streaming connection opened');
         });
 
-        connection.on('Results', (data) => {
+        connection.on(LiveTranscriptionEvents.Transcript, (data) => {
             const transcript = data.channel?.alternatives?.[0]?.transcript;
             if (transcript) {
                 const isInterim = !data.is_final;
@@ -150,12 +153,16 @@ function createStreamingSession(onTranscript, onError, options = {}) {
             }
         });
 
-        connection.on('error', (error) => {
+        connection.on(LiveTranscriptionEvents.Error, (error) => {
             console.error('Deepgram streaming error:', error);
             onError(error);
         });
 
-        connection.on('close', () => {
+        connection.on(LiveTranscriptionEvents.Metadata, (data) => {
+            // Metadata received - connection info
+        });
+
+        connection.on(LiveTranscriptionEvents.Close, () => {
             console.log('Deepgram streaming connection closed');
         });
 
