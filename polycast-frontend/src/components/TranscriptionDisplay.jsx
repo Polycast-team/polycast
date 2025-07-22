@@ -2,6 +2,8 @@ import React, { useRef, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile } from '../utils/profileLanguageMapping';
+import apiService from '../services/apiService.js';
+
 
 
 // Helper function to render segments
@@ -149,29 +151,6 @@ const TranscriptionDisplay = ({
   const englishRef = useRef(null);
   const translationRefs = useRef({});
   const [fontSize, setFontSize] = useState(30); // Font size: default to 30
-
-  
-  // Add default transcript content regardless of mode
-  useEffect(() => {
-    // Create demo transcript text
-    const demoText1 = "Testing this now. I will charge my phone";
-    const demoText2 = "i will charge into battle";
-    const demoText3 = "i will charge him with murder";
-    
-    // Override the segments directly in the component
-    if (englishSegments.length === 0 || (englishSegments.length === 1 && englishSegments[0].text === "Waiting...")) {
-      const segments = [
-        { text: demoText1, isNew: false },
-        { text: demoText2, isNew: false },
-        { text: demoText3, isNew: false }
-      ];
-      
-      // Use the englishSegments.splice hack to modify the array in place without a setter
-      if (englishSegments.splice) {
-        englishSegments.splice(0, englishSegments.length, ...segments);
-      }
-    }
-  }, [englishSegments]);
   const containerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
   const [langBoxStates, setLangBoxStates] = useState([]);
@@ -187,8 +166,8 @@ const TranscriptionDisplay = ({
   // Only shows the popup when a word is clicked, doesn't add the word to dictionary
   const handleWordClick = async (word, event) => {
     if (!event) return;
-    showTBA('Word definition feature is not yet implemented. This will be available in a future update.'); 
-    return; 
+    // showTBA('Word definition feature is not yet implemented. This will be available in a future update.'); 
+    // return; // Disable TBA for now, since currently WIP
 
     // Log the selectedWords array whenever a word is clicked
     console.log('🔴🔴🔴 SELECTED WORDS WHEN CLICKING', word, '🔴🔴🔴');
@@ -1366,7 +1345,6 @@ START NOW:`;
           })}
         </div>
       )}
-
     </div>
   );
 };

@@ -162,9 +162,9 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       
       return audioData.audioUrl;
       
-    } catch (err) {
-      console.error('Audio generation error:', err);
-      throw err;
+    } catch (error) {
+      console.error('Audio generation error:', error);
+      throw error;
     }
   }, [selectedProfile]);
 

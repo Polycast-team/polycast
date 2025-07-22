@@ -2,7 +2,7 @@ const express = require('express');
 const { generateRoomCode, activeRooms } = require('../utils/room');
 const redisService = require('../services/redisService');
 const llmService = require('../services/llmService');
-const { generateTextWithGemini } = require('../services/llmService'); // Assuming this is where it is
+const { generateTextWithGemini } = require('../services/llmService');
 
 const router = express.Router();
 
@@ -112,10 +112,5 @@ router.get('/dictionary/:word', async (req, res) => {
     }
 });
 
-// Profile API
-router.post('/profile/:profile/add-word', async (req, res) => {
-    // This is a placeholder for the add-word logic
-    res.status(501).json({ message: 'Not Implemented' });
-});
 
 module.exports = router;

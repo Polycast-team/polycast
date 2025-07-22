@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const { transcribeAudio } = require('../services/deepgramService'); // Changed from whisperService
+const { transcribeAudio } = require('../services/deepgramService');
 const llmService = require('../services/llmService');
 const textModeLLM = require('../services/textModeLLM');
 const redisService = require('../services/redisService');
@@ -84,7 +84,6 @@ async function handleTextSubmit(ws, data, clientData) {
             if (room.transcript.length > 50) {
                 room.transcript.slice(-50);
             }
-
             room.students.forEach(student => {
                 if (student.readyState === WebSocket.OPEN) {
                     student.send(JSON.stringify(hostResponse));
@@ -97,7 +96,6 @@ async function handleTextSubmit(ws, data, clientData) {
             });
         }
     }
-
     for (const lang of allLangs) {
         if (lang !== sourceLang) {
             ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
@@ -111,7 +109,6 @@ async function handleAudioMessage(ws, message, clientData) {
     const isRoomHost = clientRoom && clientRoom.isHost;
 
     try {
-        // Use Deepgram instead of Whisper
         console.log('[Audio] Processing audio with Deepgram Nova-3...');
         const transcription = await transcribeAudio(message, 'audio.webm');
 
@@ -130,7 +127,6 @@ async function handleAudioMessage(ws, message, clientData) {
                     if (room.transcript.length > 50) {
                         room.transcript = room.transcript.slice(-50);
                     }
-
                     room.students.forEach(student => {
                         if (student.readyState === WebSocket.OPEN) {
                             student.send(JSON.stringify(recognizedResponse));
@@ -139,12 +135,10 @@ async function handleAudioMessage(ws, message, clientData) {
                             }
                         }
                     });
-
                     redisService.updateTranscript(clientRoom.roomCode, room.transcript)
                         .catch(err => console.error(`[Redis] Failed to update transcript for room ${clientRoom.roomCode}:`, err));
                 }
             }
-
             for (const lang of targetLangs) {
                 ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
             }

@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import { ReadyState } from 'react-use-websocket';
 import { getTranslationsForProfile } from '../utils/profileLanguageMapping';
 
-
 /**
  * Component for mode controls, language selection, font size, and recording indicator.
  */

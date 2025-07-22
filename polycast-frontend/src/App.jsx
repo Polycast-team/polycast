@@ -106,10 +106,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
   const [messageHistory, setMessageHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [englishSegments, setEnglishSegments] = useState([
-    { text: "Testing this now. I will charge my phone", isNew: false },
-    { text: "i will charge into battle", isNew: false }
-  ]); 
+  const [englishSegments, setEnglishSegments] = useState([]); 
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 

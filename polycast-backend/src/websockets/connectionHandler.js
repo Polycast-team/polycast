@@ -1,5 +1,5 @@
 const url = require('url');
-const WebSocket = require('ws'); // Add missing import
+const WebSocket = require('ws');
 const handleWebSocketMessage = require('./messageHandler');
 const { activeRooms } = require('../utils/room');
 const redisService = require('../services/redisService');
@@ -65,14 +65,14 @@ function handleWebSocketConnection(ws, req, heartbeat, isTextMode) {
         }
     }, 60000);
 
-    // Parse target languages with better error handling
+    // Parse target languages
     let targetLangsArray = [];
     try {
         if (query && query.targetLangs) {
             targetLangsArray = query.targetLangs
                 .split(',')
                 .map(lang => decodeURIComponent(lang.trim()))
-                .filter(lang => lang.length > 0 && lang.length < 50); // Add length validation
+                .filter(lang => lang.length > 0 && lang.length < 50);
             console.log(`Client connected. Target languages from URL: ${targetLangsArray.join(', ')}`);
         } else {
             console.log(`Client connected. No targetLangs in URL, no languages set`);
@@ -226,45 +226,16 @@ function handleWebSocketConnection(ws, req, heartbeat, isTextMode) {
                 if (isHost) {
                     console.log(`[Room] Host disconnected from room: ${roomCode}`);
                     room.hostWs = null; // Clear the host reference
-
-                    const keepRoomOpen = true;
-                    if (!keepRoomOpen) {
-                        // Notify all students that host disconnected
-                        const hostDisconnectedMessage = JSON.stringify({
-                            type: 'host_disconnected',
-                            message: 'The host has ended the session.'
-                        });
-
-                        room.students.forEach(student => {
-                            if (student.readyState === WebSocket.OPEN) {
-                                try {
-                                    student.send(hostDisconnectedMessage);
-                                } catch (error) {
-                                    console.error('[Room] Error notifying student of host disconnect:', error);
-                                }
-                            }
-                        });
-
-                        try {
-                            await redisService.deleteRoom(roomCode);
-                            console.log(`[Room] Successfully deleted room ${roomCode} from Redis`);
-                        } catch (error) {
-                            console.error(`[Room] Failed to delete room ${roomCode} from Redis:`, error);
-                        }
-                        activeRooms.delete(roomCode);
-                    } else {
-                        console.log(`[Room] Keeping room ${roomCode} open even though host disconnected`);
-                        try {
-                            await redisService.saveRoom(roomCode, room);
-                        } catch (error) {
-                            console.error(`[Room] Failed to update room ${roomCode} in Redis after host disconnect:`, error);
-                        }
+                    console.log(`[Room] Keeping room ${roomCode} open even though host disconnected`);
+                    try {
+                        await redisService.saveRoom(roomCode, room);
+                    } catch (error) {
+                        console.error(`[Room] Failed to update room ${roomCode} in Redis after host disconnect:`, error);
                     }
                 } else {
                     console.log(`[Room] Student disconnected from room: ${roomCode}`);
                     room.students = room.students.filter(student => student !== ws);
                     console.log(`[Room] Room ${roomCode} now has ${room.students.length} student(s)`);
-
                     try {
                         await redisService.saveRoom(roomCode, room);
                     } catch (error) {

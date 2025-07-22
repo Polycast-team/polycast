@@ -84,7 +84,7 @@ async function saveRoom(roomCode, roomData) {
         await redis.set(
             `${ROOM_PREFIX}${roomCode}`,
             JSON.stringify(serializableRoom),
-            'EX', // Use EX instead of object syntax for better compatibility
+            'EX',
             ROOM_EXPIRY
         );
 
@@ -179,7 +179,7 @@ async function updateTranscript(roomCode, transcript) {
         await redis.set(
             `${ROOM_PREFIX}${roomCode}`,
             JSON.stringify(roomData),
-            'EX', // Use EX instead of object syntax for better compatibility
+            'EX',
             ROOM_EXPIRY
         );
 
@@ -216,5 +216,5 @@ module.exports = {
     deleteRoom,
     updateTranscript,
     getAllRooms,
-    isRedisAvailable // Export for debugging/monitoring
+    isRedisAvailable
 };
