@@ -3,8 +3,7 @@ import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile } from '../utils/profileLanguageMapping';
 import apiService from '../services/apiService.js';
-
-
+import config from '../config/config.js';
 
 // Helper function to tokenize text into words and punctuation
 const tokenizeText = (text) => {
@@ -12,12 +11,13 @@ const tokenizeText = (text) => {
 };
 
 // Helper function to split text into sentences based on punctuation (excluding commas)
-// Only creates new lines for sentences with more than 3 words
+// Creates new lines for sentences with more than 3 words OR after 3 complete sentences
 const splitIntoSentences = (text) => {
   // Split on sentence-ending punctuation (periods, exclamation, question marks) but NOT commas
   const parts = text.split(/([.!?])/);
   const sentences = [];
   let currentSentence = '';
+  let sentencesOnCurrentLine = 0;
   
   for (let i = 0; i < parts.length; i += 2) {
     const textPart = parts[i] || '';
@@ -28,13 +28,19 @@ const splitIntoSentences = (text) => {
       // Count words in this sentence (exclude punctuation and whitespace)
       const words = textPart.trim().split(/\s+/).filter(word => word.length > 0);
       
-      if (punct && words.length > 3) {
-        // This sentence has more than 3 words and ends with punctuation - make it a new line
+      if (punct) {
+        // This is a complete sentence
         currentSentence += fullSentence;
-        sentences.push(currentSentence.trim());
-        currentSentence = '';
+        sentencesOnCurrentLine++;
+        
+        // Start new line if: sentence has >3 words OR we've reached 3 sentences on this line
+        if (words.length > 3 || sentencesOnCurrentLine >= 3) {
+          sentences.push(currentSentence.trim());
+          currentSentence = '';
+          sentencesOnCurrentLine = 0;
+        }
       } else {
-        // This sentence has 3 or fewer words, or no punctuation - continue on same line
+        // This sentence has no punctuation - continue on same line
         currentSentence += fullSentence;
       }
     }
@@ -76,6 +82,7 @@ const TranscriptionDisplay = ({
     word: '',
     position: { x: 0, y: 0 }
   });
+  const [loadingDefinition, setLoadingDefinition] = useState(false);
 
   // Check if user is at bottom of scroll container
   const isAtBottom = () => {
@@ -138,7 +145,7 @@ const TranscriptionDisplay = ({
     return () => window.removeEventListener('changeFontSize', handler);
   }, [fontSize]);
 
-  const handleWordClick = (word, event) => {
+  const handleWordClick = async (word, event) => {
     if (!event) return;
     
     const rect = event.currentTarget.getBoundingClientRect();
@@ -157,6 +164,22 @@ const TranscriptionDisplay = ({
         y: rect.top - 5
       }
     });
+    
+    // Fetch definition from API
+    setLoadingDefinition(true);
+    try {
+      const targetLanguage = getLanguageForProfile(selectedProfile);
+      const contextSentence = fullTranscript; // Use full transcript as context
+      const data = await apiService.fetchJson(apiService.getWordPopupUrl(word, contextSentence, targetLanguage));
+      setWordDefinitions(prev => ({
+        ...prev,
+        [word.toLowerCase()]: data.definition
+      }));
+    } catch (error) {
+      console.error('Error fetching word definition:', error);
+    } finally {
+      setLoadingDefinition(false);
+    }
   };
 
   const renderClickableWord = (word, index, isPartial = false) => {
@@ -188,11 +211,22 @@ const TranscriptionDisplay = ({
       <div style={{ fontSize, lineHeight: 1.6, padding: '20px', minHeight: '100%' }}>
         {sentences.map((sentence, sentIdx) => {
           const tokens = tokenizeText(sentence);
+          const isLastSentence = sentIdx === sentences.length - 1;
+          
           return (
             <div key={sentIdx}>
               <div style={{ marginBottom: '10px' }}>
                 {tokens.map((token, tokenIdx) => 
                   renderClickableWord(token, `${sentIdx}-${tokenIdx}`)
+                )}
+                {/* Append currentPartial to the last sentence line to avoid jumping */}
+                {isLastSentence && currentPartial && (
+                  <>
+                    {' '}
+                    {tokenizeText(currentPartial).map((token, idx) => 
+                      renderClickableWord(token, `partial-${idx}`, true)
+                    )}
+                  </>
                 )}
               </div>
               {sentIdx < sentences.length - 1 && (
@@ -212,7 +246,8 @@ const TranscriptionDisplay = ({
             </div>
           );
         })}
-        {currentPartial && (
+        {/* Only show currentPartial as separate block if there are no sentences yet */}
+        {sentences.length === 0 && currentPartial && (
           <div style={{ 
             marginBottom: '10px',
             backgroundColor: 'white',
@@ -261,7 +296,7 @@ const TranscriptionDisplay = ({
           isInDictionary={false}
           onAddToDictionary={() => showTBA('Dictionary feature coming soon')}
           onRemoveFromDictionary={() => {}}
-          loading={false}
+          loading={loadingDefinition}
           nativeLanguage={getLanguageForProfile(selectedProfile)}
           onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
         />

@@ -3,7 +3,7 @@ const config = require('../config/config');
 
 class PopupGeminiService {
   constructor() {    
-    this.genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+    this.genAI = new GoogleGenerativeAI(config.googleApiKey);
     // Configure Gemini 2.5 Flash Lite with thinking off
     this.model = this.genAI.getGenerativeModel({ 
       model: 'gemini-2.5-flash-lite',

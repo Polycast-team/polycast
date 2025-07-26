@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types'; // Add PropTypes import
 import useWebSocket, { ReadyState } from 'react-use-websocket';
+import config from './config/config.js';
 import './App.css'
 
 // Import planned components (will be created next)
@@ -15,7 +16,7 @@ import { useErrorHandler } from './hooks/useErrorHandler';
 import { getLanguageForProfile, getTranslationsForProfile } from './utils/profileLanguageMapping.js';
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
-import apiService from './services/apiService.js'
+import apiService from './services/apiService.js';
 
 
 
@@ -45,6 +46,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       console.log('Switched to non-saving mode. Cleared flashcards and highlighted words.');
       return;
     }
+    
+    // TODO: Add room creation logic via POST /api/create-room when switching to host mode
+    // TODO: Generate unique 5-digit room code and store in backend
+    // TODO: Create room state management for tracking participants
+    // TODO: Handle room persistence across server restarts with Redis
     showTBA('Profile data is currently unavailable. See non-saving mode for example usage.');
     return;
 
@@ -101,12 +107,14 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   console.log('WebSocket URL will use languages:', languagesQueryParam);
 
   // WebSocket connection setup
+  // TODO: Add room-specific WebSocket routing: ws://localhost:8080/ws/room/:roomCode with room parameters
+  // TODO: Parse room code from roomSetup and validate room exists before connecting
+  // TODO: Include targetLangs, roomCode, and isHost parameters in WebSocket URL for room management
   const socketUrl = roomSetup ? apiService.roomWebSocketUrl(languagesQueryParam, roomSetup.roomCode, roomSetup.isHost) : null;
   console.log("Constructed WebSocket URL:", socketUrl);
 
   const [messageHistory, setMessageHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
-  // For streaming transcription
   const [fullTranscript, setFullTranscript] = useState('');
   const [currentPartial, setCurrentPartial] = useState(''); 
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
@@ -140,14 +148,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     }
   }, [showLiveTranscript, showTranslation]);
 
-  // Don't trigger mobile mode for flashcard mode anymore - we'll use mobile UI on desktop instead
-
   // Update refs when state changes
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
-
-  // Spacebar recording removed - using Record/Stop button instead
-
-  // Recording is now controlled only by the Record/Stop button
 
   // Add Page Up/Page Down recording hotkeys (only for hosts)
   useEffect(() => {
@@ -195,6 +197,17 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
   // Join Room handler for students
   const handleJoinRoom = async () => {
+    // TODO: Add room code validation via GET /api/check-room/:code
+    // TODO: Validate room exists and is accepting new students
+    // TODO: Handle room joining with proper error handling and state management
+    // TODO: Update app state to join room and switch to student mode
+    // TODO: Establish WebSocket connection to specific room
+    
+    setJoinRoomError('Room joining functionality will be added in a future update');
+    return;
+    
+    // DISABLED: Room joining logic
+    /*
     const cleanedRoomCode = joinRoomCode.replace(/[^0-9]/g, '').trim();
     
     if (cleanedRoomCode.length !== 5) {
@@ -227,6 +240,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       setJoinRoomError(`Failed to join room: ${error.message}`);
       setIsJoiningRoom(false);
     }
+    */
   };
 
   // Track reconnection attempts and invalid room state
