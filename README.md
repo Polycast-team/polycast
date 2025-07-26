@@ -2,6 +2,27 @@
 
 A comprehensive language learning application that combines real-time transcription, translation, and spaced repetition flashcards with AI-powered content generation.
 
+## Quick Setup
+**Setup and run the backend:**
+```bash
+cd polycast-backend # Change to backend directory from root
+cp .env.example .env # Create .env file
+
+## Update env vars with your api keys
+
+npm install # Install req packages
+npm run dev # Run in Development mode
+```
+**Setup and run the frontend:**
+```bash
+cd polycast-frontend # Change to frontend directory from root
+cp .env.example .env # Create .env file, defaults to localhost
+
+npm install # Install req packages
+npm run dev # Run in Development mode
+```
+Access at http://localhost:5173/
+
 ## ⚠️ CRITICAL: Flashcard Format Reference
 **ALWAYS check this section when working on flashcards - the format is very specific!**
 
