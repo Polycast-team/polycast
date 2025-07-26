@@ -7,9 +7,7 @@ const config = require('./config/config');
 const setupExpress = require('./config/express');
 const setupHeartbeat = require('./websockets/heartbeat');
 const handleWebSocketConnection = require('./websockets/connectionHandler');
-const handleTextModeConnection = require('./websockets/textModeHandler');
 const apiRoutes = require('./api/routes');
-const { loadModeFromDisk } = require('./utils/mode');
 
 const app = express();
 setupExpress(app);
@@ -23,14 +21,8 @@ const wss = new WebSocket.Server({
 
 const heartbeat = setupHeartbeat(wss);
 
-let isTextMode = loadModeFromDisk();
-
 wss.on('connection', (ws, req) => {
-    if (isTextMode) {
-        handleTextModeConnection(ws, req);
-    } else {
-        handleWebSocketConnection(ws, req, heartbeat, isTextMode);
-    }
+    handleWebSocketConnection(ws, req, heartbeat);
 });
 
 app.use('/api', apiRoutes);

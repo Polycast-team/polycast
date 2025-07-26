@@ -1,11 +1,10 @@
 const WebSocket = require('ws');
 const { createStreamingSession } = require('../services/deepgramService');
 const llmService = require('../services/llmService');
-const textModeLLM = require('../services/textModeLLM');
 const redisService = require('../services/redisService');
 
 async function handleWebSocketMessage(ws, message, clientData) {
-    const { clientRooms, clientTargetLanguages, activeRooms, isTextMode } = clientData;
+    const { clientRooms, clientTargetLanguages, activeRooms } = clientData;
 
 
     const clientRoom = clientRooms.get(ws);
@@ -26,11 +25,7 @@ async function handleWebSocketMessage(ws, message, clientData) {
             const msgString = message.toString('utf8');
             const data = JSON.parse(msgString);
             if (data && data.type === 'text_submit') {
-                if (isTextMode) {
-                    await handleTextSubmit(ws, data, clientData);
-                } else {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Text submissions are only allowed in text mode.' }));
-                }
+                ws.send(JSON.stringify({ type: 'error', message: 'Text submissions are not supported.' }));
                 return;
             }
         } catch (err) {
@@ -41,11 +36,7 @@ async function handleWebSocketMessage(ws, message, clientData) {
         try {
             const data = JSON.parse(message);
             if (data.type === 'text_submit') {
-                if (isTextMode) {
-                    await handleTextSubmit(ws, data, clientData);
-                } else {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Text submissions are only allowed in text mode.' }));
-                }
+                ws.send(JSON.stringify({ type: 'error', message: 'Text submissions are not supported.' }));
             }
         } catch (err) {
             console.error('Failed to parse or handle text_submit:', err);
@@ -65,7 +56,7 @@ async function handleTextSubmit(ws, data, clientData) {
     const targetLangs = clientTargetLanguages.get(ws) || [];
     const allLangs = Array.from(new Set(['English', ...targetLangs]));
 
-    const translations = await textModeLLM.translateTextBatch(translateThis, sourceLang, allLangs);
+    const translations = await llmService.translateTextBatch(translateThis, allLangs, sourceLang);
 
     const hostResponse = {
         type: 'recognized',

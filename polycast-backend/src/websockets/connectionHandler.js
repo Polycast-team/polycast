@@ -31,14 +31,22 @@ process.on('SIGTERM', () => {
     clearInterval(cleanupInterval);
 });
 
-function handleWebSocketConnection(ws, req, heartbeat, isTextMode) {
+function handleWebSocketConnection(ws, req, heartbeat) {
     ws.isAlive = true;
     ws.on('pong', heartbeat);
 
+    // TODO: Parse room-specific WebSocket URL: /ws/room/:roomCode
+    // TODO: Extract room code from URL path instead of query parameters
+    // TODO: Validate room exists in activeRooms or Redis before allowing connection
+    // TODO: Handle host vs student role assignment based on room state
+    // TODO: Add room participant limit and access control
+    
+    // SIMPLIFIED: Direct connection without room routing
     const parsedUrl = url.parse(req.url, true);
     const query = parsedUrl.query;
 
-    // Early rejection for known bad room codes
+    // DISABLED: Room validation logic
+    /*
     if (query && query.roomCode && query.isHost === 'false' && rejectedRoomCodes.has(query.roomCode)) {
         console.log(`[Room] Immediately rejected student connection for known bad room code: ${query.roomCode}`);
         ws.send(JSON.stringify({
@@ -181,15 +189,21 @@ function handleWebSocketConnection(ws, req, heartbeat, isTextMode) {
             console.error(`[Room] Error sending room_joined message:`, error);
         }
     }
+    */
+
+    // TODO: Add room participant management and state tracking
+    // TODO: Implement proper room joining/leaving with participant limits
+    // TODO: Add room broadcast functionality for multi-user transcription
 
     // Set client data
+    const targetLangsArray = []; // Simplified - no target languages for now
     clientTargetLanguages.set(ws, targetLangsArray);
     clientTextBuffers.set(ws, { text: '', lastEndTimeMs: 0 });
 
     // Message handler
     ws.on('message', (message) => {
         try {
-            handleWebSocketMessage(ws, message, { clientRooms, clientTargetLanguages, activeRooms, isTextMode });
+            handleWebSocketMessage(ws, message, { clientRooms, clientTargetLanguages, activeRooms});
         } catch (error) {
             console.error('[WebSocket] Error handling message:', error);
             try {
@@ -205,6 +219,14 @@ function handleWebSocketConnection(ws, req, heartbeat, isTextMode) {
 
     // Connection close handler
     ws.on('close', async () => {
+        // TODO: Add room cleanup logic when participants disconnect
+        // TODO: Handle host disconnection and room closure
+        // TODO: Notify remaining participants when someone leaves
+        // TODO: Save room state to Redis for persistence
+        console.log('[WebSocket] Client disconnected');
+        
+        // DISABLED: Room cleanup logic
+        /*
         clearTimeout(joinRoomTimeout);
 
         // Clean up Deepgram streaming session if exists
@@ -245,11 +267,11 @@ function handleWebSocketConnection(ws, req, heartbeat, isTextMode) {
             }
             clientRooms.delete(ws);
         }
-
-        // Clean up client data
+        */
+        
+        // Client cleanup
         clientTextBuffers.delete(ws);
         clientTargetLanguages.delete(ws);
-        console.log('Client disconnected and cleaned up');
     });
 
     // Error handler

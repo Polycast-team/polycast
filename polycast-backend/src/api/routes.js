@@ -3,6 +3,7 @@ const { generateRoomCode, activeRooms } = require('../utils/room');
 const redisService = require('../services/redisService');
 const llmService = require('../services/llmService');
 const { generateTextWithGemini } = require('../services/llmService');
+const popupGeminiService = require('../services/popupGeminiService');
 
 const router = express.Router();
 
@@ -75,35 +76,19 @@ router.get('/dictionary/:word', async (req, res) => {
         const targetLanguage = req.query.targetLanguage || 'Spanish';
         console.log(`[Dictionary API] Getting definition for: ${word}${context ? ' with context: "' + context + '"' : ''} in ${targetLanguage}`);
         
-        const prompt = `You are an expert language teacher helping a student understand a word in its specific context.\n\nThe word "${word}" appears in this context: "${context}"\n\nYour task is to:\n1. Identify the SINGLE best definition that applies to how this word is used in this specific context\n2. Provide a definition number that represents this specific meaning (you can use any appropriate number)\n\nOutput ONLY a JSON object with these fields:\n{\n  "translation": "${targetLanguage} translation of the word as used in this specific context",\n  "partOfSpeech": "The part of speech of the word in this context (noun, verb, adjective, etc.)",\n  "definition": "A clear and concise definition appropriate for how the word is used in this context only",\n  "example": "A simple example sentence showing a similar usage to the context",\n  "definitionNumber": A number representing this specific meaning (e.g., 1, 2, 3, etc.),\n  "contextualExplanation": "A short phrase IN ${targetLanguage} (10 words max) explaining what '${word}' means here."\n}\n\nDo NOT provide multiple definitions or explanations outside the JSON.`;
+        // Use the new popupGeminiService
+        const definition = await popupGeminiService.getContextualDefinition(word, context, targetLanguage);
         
-        const llmResponse = await generateTextWithGemini(prompt, 0.2);
-        
-        const jsonMatch = llmResponse.match(/\{[\s\S]*?\}/);
-        if (!jsonMatch) {
-            throw new Error('Could not extract JSON from LLM response');
-        }
-        const jsonStr = jsonMatch[0];
-        const parsedResponse = JSON.parse(jsonStr);
-        
-        const wordSenseId = `${word.toLowerCase()}_${parsedResponse.definitionNumber || 1}`;
-        
+        // Format response to match existing popup expectations
         const formattedResponse = {
-            wordSenseId: wordSenseId,
             word: word,
-            translation: parsedResponse.translation || '',
-            partOfSpeech: parsedResponse.partOfSpeech || '',
-            definition: parsedResponse.definition || '',
-            definitions: [{
-                text: parsedResponse.definition || '',
-                example: parsedResponse.example || ''
-            }],
-            definitionNumber: parsedResponse.definitionNumber || 1,
-            contextualExplanation: parsedResponse.contextualExplanation || '',
+            translation: definition.translation,
+            contextualExplanation: definition.contextualExplanation,
+            // Additional fields that may be used by the popup
+            partOfSpeech: '',
+            definition: definition.contextualExplanation,
             isContextual: true
         };
-
-        // Flashcard content generation would go here...
 
         res.json(formattedResponse);
     } catch (error) {
