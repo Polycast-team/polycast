@@ -170,6 +170,8 @@ function createStreamingSession(onTranscript, onError, options = {}) {
             send: (audioChunk) => {
                 if (connection.getReadyState() === 1) {
                     connection.send(audioChunk);
+
+    
                 }
             },
             close: () => {

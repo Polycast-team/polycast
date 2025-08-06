@@ -6,6 +6,8 @@ const redisService = require('../services/redisService');
 async function handleWebSocketMessage(ws, message, clientData) {
     const { clientRooms, clientTargetLanguages, activeRooms } = clientData;
 
+    // Debug logging for Cloud Run
+    console.log(`[WebSocket] Received message type: ${typeof message}, isBuffer: ${Buffer.isBuffer(message)}, length: ${message.length || 0}`);
 
     const clientRoom = clientRooms.get(ws);
     const isInRoom = !!clientRoom;
@@ -97,16 +99,22 @@ async function handleAudioMessage(ws, message, clientData) {
     const clientRoom = clientRooms.get(ws);
     const isRoomHost = clientRoom && clientRoom.isHost;
 
+    console.log(`[Audio] Processing audio message, length: ${message.length}`);
+
     // Handle stop streaming signal
     if (message.toString() === 'STOP_STREAM') {
+        console.log('[Audio] Received STOP_STREAM signal');
         if (ws.deepgramSession) {
             console.log('[Audio] Closing Deepgram streaming session');
+            
+            
             ws.deepgramSession.close();
             ws.deepgramSession = null;
         }
         return;
     }
 
+    
     // Initialize Deepgram streaming session if not exists
     if (!ws.deepgramSession) {
         console.log('[Audio] Creating new Deepgram streaming session');
@@ -134,14 +142,15 @@ async function handleAudioMessage(ws, message, clientData) {
                         if (!isInterim) {
                             room.transcript.push({ text: transcript, timestamp: Date.now() });
                             if (room.transcript.length > 50) {
-                                room.transcript = room.transcript.slice(-50);
-                            }
-                            redisService.updateTranscript(clientRoom.roomCode, room.transcript)
-                                .catch(err => console.error(`[Redis] Failed to update transcript:`, err));
+                                room.transcript = room.transcript.slice(-50);                    }
                         }
+                        redisService.updateTranscript(clientRoom.roomCode, room.transcript)
+                        .catch(err => console.error(`[Redis] Failed to update transcript:`, err));
                     }
+                    
+
                 }
-                
+                                
                 // Translation calls are commented out for now
                 // if (!isInterim) {
                 //     const targetLangs = clientTargetLanguages.get(ws) || [];
@@ -157,6 +166,7 @@ async function handleAudioMessage(ws, message, clientData) {
                     type: 'error',
                     message: 'Streaming transcription error: ' + error.message
                 }));
+
             }
         );
     }
@@ -169,7 +179,7 @@ async function handleAudioMessage(ws, message, clientData) {
         ws.send(JSON.stringify({
             type: 'error',
             message: 'Failed to send audio to transcription service'
-        }));
+        })); 
     }
 }
 
