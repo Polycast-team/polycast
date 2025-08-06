@@ -6,6 +6,8 @@ const redisService = require('../services/redisService');
 async function handleWebSocketMessage(ws, message, clientData) {
     const { clientRooms, clientTargetLanguages, activeRooms } = clientData;
 
+    // Debug logging for Cloud Run
+    console.log(`[WebSocket] Received message type: ${typeof message}, isBuffer: ${Buffer.isBuffer(message)}, length: ${message.length || 0}`);
 
     const clientRoom = clientRooms.get(ws);
     const isInRoom = !!clientRoom;
@@ -97,8 +99,11 @@ async function handleAudioMessage(ws, message, clientData) {
     const clientRoom = clientRooms.get(ws);
     const isRoomHost = clientRoom && clientRoom.isHost;
 
+    console.log(`[Audio] Processing audio message, length: ${message.length}`);
+
     // Handle stop streaming signal
     if (message.toString() === 'STOP_STREAM') {
+        console.log('[Audio] Received STOP_STREAM signal');
         if (ws.deepgramSession) {
             console.log('[Audio] Closing Deepgram streaming session');
             ws.deepgramSession.close();
@@ -110,66 +115,100 @@ async function handleAudioMessage(ws, message, clientData) {
     // Initialize Deepgram streaming session if not exists
     if (!ws.deepgramSession) {
         console.log('[Audio] Creating new Deepgram streaming session');
-        ws.deepgramSession = createStreamingSession(
-            (transcript, isInterim) => {
-                // Send real-time updates to frontend
-                const response = {
-                    type: 'streaming_transcript',
-                    text: transcript,
-                    isInterim: isInterim
-                };
-                ws.send(JSON.stringify(response));
-                
-                // Broadcast to students if host
-                if (isRoomHost) {
-                    const room = activeRooms.get(clientRoom.roomCode);
-                    if (room) {
-                        room.students.forEach(student => {
-                            if (student.readyState === WebSocket.OPEN) {
-                                student.send(JSON.stringify(response));
+        
+        // Queue audio chunks while waiting for connection
+        if (!ws.audioQueue) {
+            ws.audioQueue = [];
+        }
+        ws.audioQueue.push(message);
+        
+        try {
+            ws.deepgramSession = await createStreamingSession(
+                (transcript, isInterim) => {
+                    // Send real-time updates to frontend
+                    const response = {
+                        type: 'streaming_transcript',
+                        text: transcript,
+                        isInterim: isInterim
+                    };
+                    ws.send(JSON.stringify(response));
+                    
+                    // Broadcast to students if host
+                    if (isRoomHost) {
+                        const room = activeRooms.get(clientRoom.roomCode);
+                        if (room) {
+                            room.students.forEach(student => {
+                                if (student.readyState === WebSocket.OPEN) {
+                                    student.send(JSON.stringify(response));
+                                }
+                            });
+                            
+                            // Store only final transcripts
+                            if (!isInterim) {
+                                room.transcript.push({ text: transcript, timestamp: Date.now() });
+                                if (room.transcript.length > 50) {
+                                    room.transcript = room.transcript.slice(-50);
+                                }
+                                redisService.updateTranscript(clientRoom.roomCode, room.transcript)
+                                    .catch(err => console.error(`[Redis] Failed to update transcript:`, err));
                             }
-                        });
-                        
-                        // Store only final transcripts
-                        if (!isInterim) {
-                            room.transcript.push({ text: transcript, timestamp: Date.now() });
-                            if (room.transcript.length > 50) {
-                                room.transcript = room.transcript.slice(-50);
-                            }
-                            redisService.updateTranscript(clientRoom.roomCode, room.transcript)
-                                .catch(err => console.error(`[Redis] Failed to update transcript:`, err));
                         }
                     }
+                    
+                    // Translation calls are commented out for now
+                    // if (!isInterim) {
+                    //     const targetLangs = clientTargetLanguages.get(ws) || [];
+                    //     const translations = await llmService.translateTextBatch(transcript, targetLangs);
+                    //     for (const lang of targetLangs) {
+                    //         ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
+                    //     }
+                    // }
+                },
+                (error) => {
+                    console.error('Deepgram streaming error:', error);
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        message: 'Streaming transcription error: ' + error.message
+                    }));
                 }
-                
-                // Translation calls are commented out for now
-                // if (!isInterim) {
-                //     const targetLangs = clientTargetLanguages.get(ws) || [];
-                //     const translations = await llmService.translateTextBatch(transcript, targetLangs);
-                //     for (const lang of targetLangs) {
-                //         ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
-                //     }
-                // }
-            },
-            (error) => {
-                console.error('Deepgram streaming error:', error);
-                ws.send(JSON.stringify({
-                    type: 'error',
-                    message: 'Streaming transcription error: ' + error.message
-                }));
+            );
+            
+            console.log('[Audio] Deepgram streaming session created successfully');
+            
+            // Send any queued audio chunks
+            if (ws.audioQueue && ws.audioQueue.length > 0) {
+                console.log(`[Audio] Sending ${ws.audioQueue.length} queued audio chunks`);
+                ws.audioQueue.forEach(chunk => {
+                    try {
+                        ws.deepgramSession.send(chunk);
+                    } catch (err) {
+                        console.error('Error sending queued audio chunk:', err);
+                    }
+                });
+                ws.audioQueue = [];
             }
-        );
-    }
-    
-    // Forward audio chunk to Deepgram
-    try {
-        ws.deepgramSession.send(message);
-    } catch (err) {
-        console.error('Error sending audio to Deepgram:', err);
-        ws.send(JSON.stringify({
-            type: 'error',
-            message: 'Failed to send audio to transcription service'
-        }));
+            
+        } catch (error) {
+            console.error('[Audio] Failed to create Deepgram streaming session:', error);
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to initialize transcription service: ' + error.message
+            }));
+            ws.audioQueue = []; // Clear queue on error
+            return;
+        }
+    } else {
+        // Forward audio chunk to existing session
+        try {
+            console.log(`[Audio] Forwarding ${message.length} bytes to Deepgram`);
+            ws.deepgramSession.send(message);
+        } catch (err) {
+            console.error('Error sending audio to Deepgram:', err);
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to send audio to transcription service'
+            }));
+        }
     }
 }
 

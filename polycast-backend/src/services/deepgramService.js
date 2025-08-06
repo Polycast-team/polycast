@@ -140,42 +140,70 @@ function createStreamingSession(onTranscript, onError, options = {}) {
 
     try {
         const connection = client.listen.live(streamingOptions);
+        let isConnectionOpen = false;
 
-        connection.on(LiveTranscriptionEvents.Open, () => {
-            console.log('Deepgram streaming connection opened');
-        });
+        return new Promise((resolve, reject) => {
+            connection.on(LiveTranscriptionEvents.Open, () => {
+                console.log('Deepgram streaming connection opened');
+                isConnectionOpen = true;
 
-        connection.on(LiveTranscriptionEvents.Transcript, (data) => {
-            const transcript = data.channel?.alternatives?.[0]?.transcript;
-            if (transcript) {
-                const isInterim = !data.is_final;
-                onTranscript(transcript, isInterim);
-            }
-        });
+                // Register other event handlers after connection opens
+                connection.on(LiveTranscriptionEvents.Transcript, (data) => {
+                    const transcript = data.channel?.alternatives?.[0]?.transcript;
+                    if (transcript) {
+                        const isInterim = !data.is_final;
+                        onTranscript(transcript, isInterim);
+                    }
+                });
 
-        connection.on(LiveTranscriptionEvents.Error, (error) => {
-            console.error('Deepgram streaming error:', error);
-            onError(error);
-        });
+                connection.on(LiveTranscriptionEvents.Error, (error) => {
+                    console.error('Deepgram streaming error:', error);
+                    onError(error);
+                });
 
-        connection.on(LiveTranscriptionEvents.Metadata, (data) => {
-            // Metadata received - connection info
-        });
+                connection.on(LiveTranscriptionEvents.Metadata, (data) => {
+                    console.log('Deepgram metadata received:', data);
+                });
 
-        connection.on(LiveTranscriptionEvents.Close, () => {
-            console.log('Deepgram streaming connection closed');
-        });
+                connection.on(LiveTranscriptionEvents.Close, () => {
+                    console.log('Deepgram streaming connection closed');
+                    isConnectionOpen = false;
+                });
 
-        return {
-            send: (audioChunk) => {
-                if (connection.getReadyState() === 1) {
-                    connection.send(audioChunk);
+                // Resolve with session object after connection is established
+                resolve({
+                    send: (audioChunk) => {
+                        if (isConnectionOpen && connection.getReadyState() === 1) {
+                            connection.send(audioChunk);
+                        } else {
+                            console.warn('[Deepgram] Attempted to send audio to closed connection');
+                        }
+                    },
+                    close: () => {
+                        if (isConnectionOpen) {
+                            connection.finish();
+                        }
+                    },
+                    isOpen: () => isConnectionOpen
+                });
+            });
+
+            // Handle connection errors during establishment
+            connection.on(LiveTranscriptionEvents.Error, (error) => {
+                if (!isConnectionOpen) {
+                    console.error('Deepgram connection failed to open:', error);
+                    reject(new Error(`Connection failed: ${error.message}`));
                 }
-            },
-            close: () => {
-                connection.finish();
-            }
-        };
+            });
+
+            // Set a timeout for connection establishment
+            setTimeout(() => {
+                if (!isConnectionOpen) {
+                    console.error('Deepgram connection timeout');
+                    reject(new Error('Connection timeout'));
+                }
+            }, 10000); // 10 second timeout
+        });
 
     } catch (error) {
         console.error('Error creating Deepgram streaming session:', error);

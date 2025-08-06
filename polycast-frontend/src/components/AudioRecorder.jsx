@@ -70,6 +70,9 @@ function AudioRecorder({ sendMessage, isRecording }) {
           pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
         }
         
+        // Debug logging
+        console.log(`[Audio] Sending ${pcmData.buffer.byteLength} bytes of audio data`);
+        
         // Send raw PCM data to backend
         sendMessage(pcmData.buffer);
       };

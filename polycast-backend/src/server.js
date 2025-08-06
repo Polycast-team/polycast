@@ -17,6 +17,8 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ 
     server,
     clientTracking: true,
+    perMessageDeflate: false, // Disable compression for Cloud Run compatibility
+    maxPayload: 100 * 1024 * 1024, // 100MB max payload
 });
 
 const heartbeat = setupHeartbeat(wss);

@@ -3,6 +3,8 @@
  * Handles TTS generation and playback
  */
 
+import apiService from '../services/apiService.js';
+
 export async function playFlashcardAudio(word, currentAudio, setCurrentAudio, setAudioState) {
   setAudioState({ loading: true, error: null });
 
@@ -13,7 +15,7 @@ export async function playFlashcardAudio(word, currentAudio, setCurrentAudio, se
       currentAudio.currentTime = 0;
     }
 
-    const response = await fetch('https://polycast-server.onrender.com/api/tts', {
+    const response = await fetch(apiService.ttsUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: word })

@@ -8,6 +8,7 @@ import { playFlashcardAudio } from '../../utils/flashcardAudio';
 import FlashcardCalendarModal from '../../components/shared/FlashcardCalendarModal';
 import ErrorPopup from '../../components/ErrorPopup';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
+import apiService from '../../services/apiService.js';
 
 const MobileFlashcardMode = ({ 
   selectedProfile, 
@@ -204,7 +205,7 @@ const MobileFlashcardMode = ({
     
     try {
       // Always generate fresh audio - no database lookup
-      const generateResponse = await fetch('https://polycast-server.onrender.com/api/generate-audio', {
+      const generateResponse = await fetch(apiService.generateAudioUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
