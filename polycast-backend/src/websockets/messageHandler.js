@@ -110,6 +110,8 @@ async function handleAudioMessage(ws, message, clientData) {
     // Initialize Deepgram streaming session if not exists
     if (!ws.deepgramSession) {
         console.log('[Audio] Creating new Deepgram streaming session');
+        console.log('[Audio] Environment:', process.env.NODE_ENV || 'development');
+        console.log('[Audio] Deepgram API Key configured:', !!require('../config/config').deepgramApiKey);
         ws.deepgramSession = createStreamingSession(
             (transcript, isInterim) => {
                 // Send real-time updates to frontend
@@ -118,6 +120,7 @@ async function handleAudioMessage(ws, message, clientData) {
                     text: transcript,
                     isInterim: isInterim
                 };
+                console.log('[Transcript] Sending to client:', { text: transcript.substring(0, 50), isInterim });
                 ws.send(JSON.stringify(response));
                 
                 // Broadcast to students if host
@@ -152,7 +155,8 @@ async function handleAudioMessage(ws, message, clientData) {
                 // }
             },
             (error) => {
-                console.error('Deepgram streaming error:', error);
+                console.error('[Deepgram] Streaming error:', error.message || error);
+                console.error('[Deepgram] Error details:', JSON.stringify(error));
                 ws.send(JSON.stringify({
                     type: 'error',
                     message: 'Streaming transcription error: ' + error.message
@@ -163,9 +167,10 @@ async function handleAudioMessage(ws, message, clientData) {
     
     // Forward audio chunk to Deepgram
     try {
+        console.log('[Audio] Forwarding', message.length, 'bytes to Deepgram');
         ws.deepgramSession.send(message);
     } catch (err) {
-        console.error('Error sending audio to Deepgram:', err);
+        console.error('[Audio] Error sending to Deepgram:', err.message || err);
         ws.send(JSON.stringify({
             type: 'error',
             message: 'Failed to send audio to transcription service'

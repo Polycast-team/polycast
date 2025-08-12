@@ -320,6 +320,12 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
         // Check message type and update state accordingly
         if (parsedData.type === 'streaming_transcript') {
+          console.log('[Frontend] Received streaming_transcript:', {
+            text: parsedData.text?.substring(0, 50),
+            isInterim: parsedData.isInterim,
+            fullLength: parsedData.text?.length
+          });
+          
           if (parsedData.isInterim) {
             // Update partial transcript with interim results
             setCurrentPartial(parsedData.text);
@@ -327,6 +333,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             // Append finalized text and clear partial
             setFullTranscript(prev => {
               const newText = prev + (prev && !prev.endsWith(' ') ? ' ' : '') + parsedData.text;
+              console.log('[Frontend] Updated full transcript, new length:', newText.length);
               return newText;
             });
             setCurrentPartial('');
