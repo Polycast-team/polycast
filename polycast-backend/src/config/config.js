@@ -5,7 +5,7 @@ const config = {
     port: parseInt(process.env.PORT, 10) || 8080,
 
     // Google AI (Gemini) Configuration
-    googleApiKey: process.env.GOOGLE_API_KEY,
+    geminiApiKey: process.env.GEMINI_API_KEY,
 
     // Deepgram Configuration
     deepgramApiKey: process.env.DEEPGRAM_API_KEY,
@@ -19,13 +19,13 @@ const config = {
 
 // Debug log for API key status
 console.log('Config deepgramApiKey:', config.deepgramApiKey ? 'CONFIGURED' : 'NOT SET');
-console.log('Config googleApiKey:', config.googleApiKey ? 'CONFIGURED' : 'NOT SET');
+console.log('Config geminiApiKey:', config.geminiApiKey ? 'CONFIGURED' : 'NOT SET');
 console.log('Config openaiApiKey:', config.openaiApiKey ? 'CONFIGURED' : 'NOT SET');
 
 // Perform validation immediately when the module is loaded
 config.validateKeys = function() {
     console.log('Validating API keys...');
-    const requiredKeys = ['GOOGLE_API_KEY', 'DEEPGRAM_API_KEY'];
+    const requiredKeys = ['GEMINI_API_KEY', 'DEEPGRAM_API_KEY'];
     const optionalKeys = ['OPENAI_API_KEY']; // OpenAI now optional (only for TTS)
     const missingRequired = requiredKeys.filter(key => !process.env[key]);
     const missingOptional = optionalKeys.filter(key => !process.env[key]);

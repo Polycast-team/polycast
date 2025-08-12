@@ -6,15 +6,15 @@ let model;
 
 /**
  * Initializes the Google Generative AI client and model.
- * @throws {Error} If Google API key is missing.
+ * @throws {Error} If Gemini API key is missing.
  */
 function initializeLLM() {
-    if (!config.googleApiKey) {
-        throw new Error('Google API Key (GOOGLE_API_KEY) is not configured in .env');
+    if (!config.geminiApiKey) {
+        throw new Error('Gemini API Key (GEMINI_API_KEY) is not configured in .env');
     }
     if (!genAI) {
         console.log('[LLM Service] Initializing Google Generative AI...');
-        genAI = new GoogleGenerativeAI(config.googleApiKey);
+        genAI = new GoogleGenerativeAI(config.geminiApiKey);
         model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash-lite',
             // Safety settings can be adjusted if needed
