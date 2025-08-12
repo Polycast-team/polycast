@@ -27,7 +27,7 @@ wss.on('connection', (ws, req) => {
 
 app.use('/api', apiRoutes);
 
-const PORT = process.env.PORT || config.port || 3000;
+const PORT = process.env.PORT || config.port || 8080;
 
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
