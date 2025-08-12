@@ -28,9 +28,10 @@ wss.on('connection', (ws, req) => {
 app.use('/api', apiRoutes);
 
 const PORT = process.env.PORT || config.port || 8080;
+const HOST = '0.0.0.0';
 
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+server.listen(PORT, HOST, () => {
+    console.log(`Server is running on ${HOST}:${PORT}`);
 });
 
 module.exports = { app, server };
