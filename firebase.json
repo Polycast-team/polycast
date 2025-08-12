@@ -1,0 +1,13 @@
+{
+  "apphosting": {
+    "backendId": "polycast-backend",
+    "rootDir": "polycast-backend",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "functions"
+    ]
+  }
+}
