@@ -25,6 +25,14 @@ wss.on('connection', (ws, req) => {
     handleWebSocketConnection(ws, req, heartbeat);
 });
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
 app.use('/api', apiRoutes);
 
 const PORT = process.env.PORT || config.port || 8080;
