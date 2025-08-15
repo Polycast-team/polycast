@@ -104,3 +104,29 @@ export function createFlashcardEntry(wordLower, wordSenseId, contextSentence, de
 export function testModule() {
   return 'FlashcardDefinitions module loaded successfully';
 }
+
+/**
+ * Fetch example sentence pairs from backend Gemini route.
+ * @param {object} params
+ * @param {string} params.word
+ * @param {string} params.sentenceWithTilde
+ * @param {string} params.targetLanguage
+ * @param {string} params.nativeLanguage
+ * @returns {Promise<string>} exampleSentencesGenerated joined with ' // '
+ */
+export async function fetchExamplePairs({ word, sentenceWithTilde, targetLanguage, nativeLanguage }) {
+  // Lazy import config to avoid circular imports
+  const { default: config } = await import('../config/config.js');
+  const url = `${config.apiBaseUrl}/api/examples`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ word, sentenceWithTilde, targetLanguage, nativeLanguage })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Examples API failed: ${response.status} ${text}`);
+  }
+  const data = await response.json();
+  return data.exampleSentencesGenerated;
+}

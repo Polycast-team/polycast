@@ -336,9 +336,6 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
   const handleAddWord = async (e) => {
     e.preventDefault();
     
-    showTBA('Adding words is currently disabled. This feature will be available in a future update.');
-    return;
-
     const word = newWordInput.trim();
     
     if (!word) {

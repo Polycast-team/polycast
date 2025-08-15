@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { getHardcodedCards, getNewCards, getReviewCards } from '../../utils/hardcodedCards';
+// Removed hardcoded cards in non-saving mode
 import { categorizeCards, getDueSeenCards } from '../../utils/cardSorting';
 import { getSRSSettings } from '../../utils/srsSettings';
 
@@ -72,9 +72,8 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
   // Get available cards for profile selector (initial state)
   const getAvailableCards = () => {
     if (selectedProfile === 'non-saving') {
-      // For profile selector, show initial state (all cards as new)
-      // Filter out test cards that are already in learning state
-      return getHardcodedCards().filter(card => card.srsData.isNew);
+      // No hardcoded cards; show empty until user creates cards on desktop
+      return [];
     }
     
     const cards = [];
@@ -110,21 +109,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
   // Get categorized cards for display using separate arrays
   const getCategorizedCards = () => {
     if (selectedProfile === 'non-saving') {
-      // For non-saving mode, use the dedicated arrays
-      const newCards = getNewCards();
-      const reviewCards = getReviewCards();
-      
-      // Sort new cards by frequency (highest first) 
-      newCards.sort((a, b) => (b.frequency || 5) - (a.frequency || 5));
-      
-      // Sort review cards by due date (earliest first)
-      reviewCards.sort((a, b) => {
-        const dateA = new Date(a.srsData.dueDate || a.srsData.nextReviewDate);
-        const dateB = new Date(b.srsData.dueDate || b.srsData.nextReviewDate);
-        return dateA - dateB;
-      });
-      
-      return { newCards, dueCards: reviewCards, seenCards: reviewCards };
+      return { newCards: [], dueCards: [], seenCards: [] };
     } else {
       // For other profiles, use the existing logic
       const allCards = getAvailableCards();
@@ -190,32 +175,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
   };
 
   // Generate debug output for copying
-  const generateDebugOutput = () => {
-    if (selectedProfile !== 'non-saving') return 'Debug output only available for non-saving mode';
-    
-    const newCards = getNewCards();
-    const reviewCards = getReviewCards();
-    
-    let output = '=== FLASHCARD ARRAYS DEBUG OUTPUT ===\n\n';
-    
-    output += `NEW CARDS ARRAY (${newCards.length} cards):\n`;
-    output += '```json\n';
-    output += JSON.stringify(newCards, null, 2);
-    output += '\n```\n\n';
-    
-    output += `REVIEW CARDS ARRAY (${reviewCards.length} cards):\n`;
-    output += '```json\n';
-    output += JSON.stringify(reviewCards, null, 2);
-    output += '\n```\n\n';
-    
-    output += 'SUMMARY:\n';
-    output += `- Total cards: ${newCards.length + reviewCards.length}\n`;
-    output += `- New cards: ${newCards.length}\n`;
-    output += `- Review cards: ${reviewCards.length}\n`;
-    output += `- Cards per session limit: 5 new + all due review\n`;
-    
-    return output;
-  };
+  const generateDebugOutput = () => 'Debug output only available for non-saving mode';
 
   // Card list component
   const CardList = ({ cards, title, type }) => (
@@ -460,7 +420,6 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
               </div>
               <div className="mobile-flashcard-count">
                 {flashcardCount} flashcard{flashcardCount !== 1 ? 's' : ''} available
-                {selectedProfile === 'non-saving' && <span style={{color: 'red', fontSize: '10px'}}> (HC)</span>}
               </div>
             </div>
           </div>

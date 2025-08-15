@@ -71,7 +71,8 @@ const TranscriptionDisplay = ({
   setWordDefinitions,
   isStudentMode = false,
   studentHomeLanguage,
-  selectedProfile = 'non-saving'
+  selectedProfile = 'non-saving',
+  onAddWord
 }) => {
   const transcriptRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -173,7 +174,7 @@ const TranscriptionDisplay = ({
       const data = await apiService.fetchJson(apiService.getWordPopupUrl(word, contextSentence, targetLanguage));
       setWordDefinitions(prev => ({
         ...prev,
-        [word.toLowerCase()]: data.definition
+        [word.toLowerCase()]: data
       }));
     } catch (error) {
       console.error('Error fetching word definition:', error);
@@ -293,8 +294,8 @@ const TranscriptionDisplay = ({
           word={popupInfo.word}
           definition={wordDefinitions[popupInfo.word.toLowerCase()]}
           position={popupInfo.position}
-          isInDictionary={false}
-          onAddToDictionary={() => showTBA('Dictionary feature coming soon')}
+          isInDictionary={Object.values(wordDefinitions).some(e => e && e.inFlashcards && e.word === (popupInfo.word || '').toLowerCase())}
+          onAddToDictionary={() => onAddWord && onAddWord(popupInfo.word)}
           onRemoveFromDictionary={() => {}}
           loading={loadingDefinition}
           nativeLanguage={getLanguageForProfile(selectedProfile)}
@@ -425,7 +426,8 @@ TranscriptionDisplay.propTypes = {
   setWordDefinitions: PropTypes.func,
   isStudentMode: PropTypes.bool,
   studentHomeLanguage: PropTypes.string,
-  selectedProfile: PropTypes.string
+  selectedProfile: PropTypes.string,
+  onAddWord: PropTypes.func
 };
 
 export default TranscriptionDisplay;

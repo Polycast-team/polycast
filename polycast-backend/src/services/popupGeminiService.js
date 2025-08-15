@@ -104,6 +104,42 @@ Rules:
       };
     }
   }
+
+  /**
+   * Generate five example sentence pairs using the SAME SENSE as in the input sentence.
+   * Returns a single line string of 10 items separated by " // ":
+   * Target1 // Native1 // Target2 // Native2 // ... // Target5 // Native5
+   * The target word (or inflected form) must be wrapped with tildes in BOTH languages.
+   *
+   * @param {string} word
+   * @param {string} sentenceWithTilde - Original sentence in target language with ~word~ markup
+   * @param {string} targetLanguage
+   * @param {string} nativeLanguage
+   * @returns {Promise<string>}
+   */
+  async generateExamplePairs(word, sentenceWithTilde, targetLanguage = 'English', nativeLanguage = 'Spanish') {
+    try {
+      const prompt = `You are writing study flashcards.\n\nTask:\n- The learner is studying the word "${word}" as used in this sentence (target language with tildes around the word): ${sentenceWithTilde}\n- Determine the exact sense of "${word}" from this sentence and keep that SAME meaning in all outputs.\n\nProduce:\n- 5 example sentences in ${targetLanguage} using the SAME SENSE of "${word}" as in the given sentence.\n- For each, produce a corresponding translation in ${nativeLanguage}.\n- Alternate them and separate every item with ' // ' exactly like this:\n  Target1 // Native1 // Target2 // Native2 // Target3 // Native3 // Target4 // Native4 // Target5 // Native5\n- In BOTH languages, wrap the target word (or its inflected form) in tildes: ~like this~.\n- Keep grammar natural; vary contexts, but do not change the meaning/sense from the original sentence.\n- If the original uses a phrasal/multiword expression, preserve the same expression/sense.\n\nFormatting rules (strict):\n- Return exactly ONE line, no commentary, no code fences.\n- Use exactly ' // ' as the separator between the 10 items.\n- Include exactly 10 items (5 target, 5 native), alternating target/native.\n- Ensure the target word is wrapped with ~ in BOTH languages in every item.`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().trim();
+
+      const segments = text.split('//').map(s => s.trim()).filter(Boolean);
+      if (segments.length < 10) {
+        throw new Error('Gemini did not return the required 10 items.');
+      }
+      return segments.slice(0, 10).join(' // ');
+    } catch (error) {
+      console.error('[PopupGeminiService] Error generating example pairs:', error);
+      // Provide minimal fallback with the original sentence duplicated
+      const fallback = Array.from({ length: 5 }).flatMap(() => [
+        sentenceWithTilde || `~${word}~`,
+        sentenceWithTilde || `~${word}~`
+      ]).slice(0, 10).join(' // ');
+      return fallback;
+    }
+  }
 }
 
 // Export singleton instance

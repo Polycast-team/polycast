@@ -97,5 +97,27 @@ router.get('/dictionary/:word', async (req, res) => {
     }
 });
 
+// Generate example sentence pairs for flashcards
+router.post('/examples', async (req, res) => {
+    try {
+        const { word, sentenceWithTilde, targetLanguage, nativeLanguage } = req.body || {};
+        if (!word || !sentenceWithTilde || !targetLanguage || !nativeLanguage) {
+            return res.status(400).json({ error: 'Missing required fields: word, sentenceWithTilde, targetLanguage, nativeLanguage' });
+        }
+
+        const examples = await popupGeminiService.generateExamplePairs(
+            word,
+            sentenceWithTilde,
+            targetLanguage,
+            nativeLanguage
+        );
+
+        res.json({ exampleSentencesGenerated: examples });
+    } catch (error) {
+        console.error('[Examples API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 module.exports = router;

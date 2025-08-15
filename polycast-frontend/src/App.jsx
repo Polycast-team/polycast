@@ -17,6 +17,7 @@ import { getLanguageForProfile, getTranslationsForProfile } from './utils/profil
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
+import { createFlashcardEntry, fetchExamplePairs } from './components/FixedCardDefinitions';
 
 
 
@@ -40,10 +41,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Function to fetch profile data from backend
   const fetchProfileData = useCallback(async (profile) => {
     if (profile === 'non-saving') {
-      // Clear existing data for non-saving mode
-      setWordDefinitions({});
-      setSelectedWords([]);
-      console.log('Switched to non-saving mode. Cleared flashcards and highlighted words.');
+      // In non-saving mode, keep current (localStorage-backed) state as-is
+      console.log('Non-saving mode: using local state/localStorage for dictionary data.');
       return;
     }
     
@@ -130,8 +129,22 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     // Otherwise start in audio mode (hosts or students in rooms)
     return 'audio';
   }); // Options: 'audio', 'dictionary', 'flashcard'
-  const [selectedWords, setSelectedWords] = useState([]); // Selected words for dictionary
-  const [wordDefinitions, setWordDefinitions] = useState({}); // Cache for word definitions
+  const [selectedWords, setSelectedWords] = useState(() => {
+    try {
+      const stored = localStorage.getItem('pc_selectedWords');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }); // Selected words for dictionary
+  const [wordDefinitions, setWordDefinitions] = useState(() => {
+    try {
+      const stored = localStorage.getItem('pc_wordDefinitions');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  }); // Cache for word definitions
   const [showNotification, setShowNotification] = useState(false);
   const [notificationOpacity, setNotificationOpacity] = useState(1);
   // Auto-send functionality removed - using manual Record/Stop button instead
@@ -170,6 +183,81 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     window.addEventListener("keydown", handlePageKey);
     return () => window.removeEventListener("keydown", handlePageKey);
   }, [roomSetup]); // Reverted dependencies
+
+  // Persist dictionary state to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('pc_selectedWords', JSON.stringify(selectedWords)); } catch {}
+  }, [selectedWords]);
+  useEffect(() => {
+    try { localStorage.setItem('pc_wordDefinitions', JSON.stringify(wordDefinitions)); } catch {}
+  }, [wordDefinitions]);
+
+  // Local handler to add a word to dictionary (flashcard entry in local state)
+  const handleAddWord = useCallback((word) => {
+    const wordLower = (word || '').toLowerCase();
+
+    // Pull latest popup data if available for this word
+    const popupData = wordDefinitions[wordLower] || {};
+    const defText =
+      popupData.contextualExplanation ||
+      popupData.translation ||
+      popupData.definition ||
+      wordLower;
+    const partOfSpeech = popupData.partOfSpeech || '';
+    const contextSentence = (typeof popupData.sentence === 'string' && popupData.sentence) || fullTranscript || '';
+
+    // Count existing senses for this word to assign a definition number
+    const existingSenses = Object.values(wordDefinitions).filter(
+      (e) => e && e.inFlashcards && e.word === wordLower
+    );
+    const definitionNumber = existingSenses.length + 1;
+
+    // Unique ID for this word sense
+    const wordSenseId = `${wordLower}-${Date.now()}`;
+
+    const entry = createFlashcardEntry(
+      wordLower,
+      wordSenseId,
+      contextSentence,
+      defText,
+      partOfSpeech,
+      definitionNumber
+    );
+
+    // Build sentenceWithTilde from context sentence (wrap the word, case-insensitive, word boundary)
+    const safeWord = wordLower.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const wordRegex = new RegExp(`(\\b)(${safeWord})(\\b)`, 'i');
+    const sentenceWithTilde = contextSentence && wordRegex.test(contextSentence)
+      ? contextSentence.replace(wordRegex, '$1~$2~$3')
+      : `~${wordLower}~`;
+
+    // Determine languages
+    const nativeLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
+    const targetLanguage = 'English';
+
+    // Fetch Gemini-generated example pairs, then save entry
+    fetchExamplePairs({
+      word: wordLower,
+      sentenceWithTilde,
+      targetLanguage,
+      nativeLanguage
+    }).then((examples) => {
+      const enriched = { ...entry, exampleSentencesGenerated: examples };
+      setWordDefinitions((prev) => ({
+        ...prev,
+        [wordSenseId]: enriched,
+      }));
+      setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
+    }).catch((err) => {
+      console.error('Failed to generate example pairs:', err);
+      // Save entry without examples to avoid blocking (flashcards will require examples to display)
+      setWordDefinitions((prev) => ({
+        ...prev,
+        [wordSenseId]: entry,
+      }));
+      setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
+    });
+  }, [wordDefinitions, fullTranscript]);
 
   // Ensure recording stops if appMode changes from 'audio'
   useEffect(() => {
@@ -798,51 +886,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                 showError(`Failed to delete "${word}" from dictionary. Please try again.`);
               }
             }}
-            onAddWord={async (word) => {
-              console.log(`Adding word to dictionary: ${word}`);
-              try {
-                // Use the profile-specific add-word endpoint
-                const currentProfile = selectedProfile || internalSelectedProfile;
-                // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${currentProfile}/add-word`, {
-                //   method: 'POST',
-                //   headers: {
-                //     'Content-Type': 'application/json'
-                //   },
-                //   body: JSON.stringify({ word: word })
-                // });
-                
-                if (response.status === 409) {
-                  // Duplicate word
-                  const errorData = await response.json();
-                  throw new Error(errorData.message || `"${word}" is already in your dictionary!`);
-                }
-                
-                if (!response.ok) {
-                  const errorData = await response.json();
-                  throw new Error(errorData.details || `Failed to add "${word}"`);
-                }
-                
-                const data = await response.json();
-                console.log(`Successfully added "${word}" to profile ${currentProfile}:`, data);
-                
-                // Add to wordDefinitions
-                setWordDefinitions(prev => ({
-                  ...prev,
-                  [data.wordSenseId]: data
-                }));
-                
-                // Add to selectedWords
-                setSelectedWords(prev => {
-                  if (!prev.includes(word)) {
-                    return [...prev, word];
-                  }
-                  return prev;
-                });
-                
-              } catch (error) {
-                console.error(`Error adding word "${word}":`, error);
-                throw error; // Re-throw to let DictionaryTable handle the error display
-              }
+            onAddWord={(word) => {
+              console.log(`Adding word to dictionary (local): ${word}`);
+              handleAddWord(word);
             }}
           />
         ) : appMode === 'flashcard' ? (
@@ -870,6 +916,10 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             wordDefinitions={wordDefinitions}
             setWordDefinitions={setWordDefinitions}
             selectedProfile={selectedProfile}
+            onAddWord={(word) => {
+              console.log(`Add from popup (local): ${word}`);
+              handleAddWord(word);
+            }}
           />
         )}
       </div>
