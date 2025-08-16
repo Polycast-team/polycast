@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import AddWordPopup from './popups/AddWordPopup.jsx';
+import DictionarySearchPopup from './popups/DictionarySearchPopup.jsx';
 import PropTypes from 'prop-types';
 import './DictionaryTable.css';
 import TBAPopup from './popups/TBAPopup';
 import { useTBAHandler } from '../hooks/useTBAHandler';
 
+
+// Helper to render example text: highlight ~word~ in yellow, remove tildes
+const renderExampleHtml = (text = '') => {
+  return (text || '').replace(/~([^~]+)~/g, '<span class="dict-highlight">$1<\/span>');
+};
 
 // Component to display word frequency rating (1-5)
 const FrequencyIndicator = ({ word }) => {
@@ -146,8 +153,10 @@ const FrequencyLegend = () => {
   );
 };
 
-const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
+const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSenses, selectedProfile, isAddingWordBusy }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [expandedWords, setExpandedWords] = useState({});
   const [groupedEntries, setGroupedEntries] = useState({});
   const [sortMethod, setSortMethod] = useState('alphabetical'); // 'alphabetical', 'frequency-asc', 'frequency-desc'
@@ -179,14 +188,9 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
         grouped[word].push(entry);
       });
       
-    // Sort the entries within each word group
+    // Sort the entries within each word group by frequency (desc)
     Object.keys(grouped).forEach(word => {
-      grouped[word].sort((a, b) => {
-        // Sort by part of speech
-        const posA = (a.partOfSpeech || '').toLowerCase();
-        const posB = (b.partOfSpeech || '').toLowerCase();
-        return posA.localeCompare(posB);
-      });
+      grouped[word].sort((a, b) => (b.frequency || 0) - (a.frequency || 0));
     });
     
     setGroupedEntries(grouped);
@@ -366,58 +370,41 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
   if (filteredWords.length === 0) {
     return (
       <div className="dictionary-container">
-        <div className="dictionary-search">
-          <input
-            type="text"
-            placeholder="Search words..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            className="dictionary-search-input"
-          />
+        {/* Controls row: Search + Add Word buttons */}
+        <div className="dictionary-controls" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+          >
+            🔎 Search
+          </button>
+          <button
+            onClick={() => setIsAddOpen(true)}
+            style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+          >
+            ＋ Add Word
+          </button>
         </div>
         
-        {/* Add Word Form - Always visible */}
-        <div className="add-word-form" style={{ 
-          padding: '10px 16px', 
-          borderBottom: '1px solid #39394d',
-          backgroundColor: '#1e1e2e'
-        }}>
-          <form onSubmit={handleAddWord} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <input
-              type="text"
-              placeholder="Type English word to add to dictionary..."
-              value={newWordInput}
-              onChange={handleNewWordInputChange}
-              ref={addWordInputRef}
-              disabled={isAddingWord}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                backgroundColor: '#252533',
-                color: '#f5f5f5',
-                border: '1px solid #39394d',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-            />
-            <button
-              type="submit"
-              disabled={!newWordInput.trim() || isAddingWord}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: newWordInput.trim() ? '#5f72ff' : '#39394d',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '14px',
-                cursor: newWordInput.trim() && !isAddingWord ? 'pointer' : 'not-allowed',
-                opacity: isAddingWord ? 0.7 : 1
-              }}
-            >
-              {isAddingWord ? '...' : '+ Add Word'}
-            </button>
-          </form>
-        </div>
+        {/* Popups */}
+        <DictionarySearchPopup
+          isOpen={isSearchOpen}
+          initialValue={searchTerm}
+          onApply={(term) => setSearchTerm(term)}
+          onClose={() => setIsSearchOpen(false)}
+        />
+        <AddWordPopup
+          isOpen={isAddOpen}
+          onClose={() => setIsAddOpen(false)}
+          selectedProfile={selectedProfile || 'joshua'}
+          onSelectSenses={(word, senses) => {
+            if (onAddWordSenses && senses && senses.length) {
+              onAddWordSenses(word, senses);
+            } else if (onAddWord) {
+              onAddWord(word);
+            }
+          }}
+        />
         
         <div className="empty-dictionary-message">
           {searchTerm ? 
@@ -430,62 +417,26 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
 
   return (
     <div className="dictionary-container" style={{ width: '800px', maxWidth: '100%', margin: '0 auto' }}>
-      {/* Search bar */}
-      <div className="dictionary-search">
-        <input
-          type="text"
-          placeholder="Search words... (Press '/' to focus)"
-          value={searchTerm}
-          onChange={handleSearchChange}
-          className="dictionary-search-input"
-          ref={searchInputRef}
-        />
-        <div className="dictionary-count">
+      {/* Controls row: Search + Add Word buttons */}
+      <div className="dictionary-controls" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          onClick={() => setIsSearchOpen(true)}
+          style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+        >
+          🔎 Search
+        </button>
+        <button
+          onClick={() => setIsAddOpen(true)}
+          style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+        >
+          ＋ Add Word
+        </button>
+        {isAddingWordBusy && (
+          <div style={{ color: '#a0a0b8', fontSize: 13 }}>Adding word…</div>
+        )}
+        <div style={{ marginLeft: 'auto', color: '#aaa', fontSize: 13 }}>
           {sortedWords.length} {sortedWords.length === 1 ? 'word' : 'words'}
         </div>
-      </div>
-      
-      {/* Add Word Form */}
-      <div className="add-word-form" style={{ 
-        padding: '10px 16px', 
-        borderBottom: '1px solid #39394d',
-        backgroundColor: '#1e1e2e'
-      }}>
-        <form onSubmit={handleAddWord} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <input
-            type="text"
-            placeholder="Type English word to add to dictionary..."
-            value={newWordInput}
-            onChange={handleNewWordInputChange}
-            ref={addWordInputRef}
-            disabled={isAddingWord}
-            style={{
-              flex: 1,
-              padding: '8px 12px',
-              backgroundColor: '#252533',
-              color: '#f5f5f5',
-              border: '1px solid #39394d',
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
-          />
-          <button
-            type="submit"
-            disabled={!newWordInput.trim() || isAddingWord}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: newWordInput.trim() ? '#5f72ff' : '#39394d',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              cursor: newWordInput.trim() && !isAddingWord ? 'pointer' : 'not-allowed',
-              opacity: isAddingWord ? 0.7 : 1
-            }}
-          >
-            {isAddingWord ? '...' : '+ Add Word'}
-          </button>
-        </form>
       </div>
       
       {/* Controls */}
@@ -579,6 +530,26 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
           </div>
         </div>
       </div>
+
+      {/* Popups */}
+      <DictionarySearchPopup
+        isOpen={isSearchOpen}
+        initialValue={searchTerm}
+        onApply={(term) => setSearchTerm(term)}
+        onClose={() => setIsSearchOpen(false)}
+      />
+      <AddWordPopup
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        selectedProfile={selectedProfile || 'joshua'}
+        onSelectSenses={(word, senses) => {
+          if (onAddWordSenses && senses && senses.length) {
+            onAddWordSenses(word, senses);
+          } else if (onAddWord) {
+            onAddWord(word);
+          }
+        }}
+      />
       
       {/* Frequency legend (optional) */}
       {showFrequencyLegend && (
@@ -619,13 +590,6 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
                   </span>
                 </div>
                 <div className="word-metadata" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  {/* Frequency rating from 1-5 with color scale */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ color: '#a0a0b8', fontSize: '14px', marginRight: '5px' }}>
-                      Frequency:
-                    </span>
-                    <FrequencyDots frequency={wordFrequency} />
-                  </div>
                   <div className="expand-icon" style={{
                     transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
                     transition: 'transform 0.3s ease',
@@ -656,17 +620,9 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
                     const partOfSpeech = entry.partOfSpeech || 
                                       (entry.disambiguatedDefinition?.partOfSpeech) || 
                                       '';
-                    
-                    const definition = entry.translation || 
-                                      entry.disambiguatedDefinition?.translation || 
-                                      entry.disambiguatedDefinition?.definition || 
-                                      entry.definition ||
-                                      'N/A';
-                    
-                    const example = entry.contextSentence || 
-                                  entry.disambiguatedDefinition?.example || 
-                                  entry.example ||
-                                  'No example available';
+                    const translation = entry.translation || entry.disambiguatedDefinition?.translation || '';
+                    const conciseDef = entry.definition || entry.disambiguatedDefinition?.definition || '';
+                    const example = entry.contextSentence || entry.disambiguatedDefinition?.example || entry.example || 'No example available';
                     
                     const wordSenseId = entry.wordSenseId;
 
@@ -675,42 +631,15 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
                         <div className="definition-header">
                           <div className="definition-header-left">
                             <div className="part-of-speech">{partOfSpeech}</div>
-                            {/* Usage frequency for this specific definition */}
+                            {/* Per-definition frequency based on Gemini 1-10 mapped to 1-5 */}
                             {(() => {
-                              const usageFrequency = entry?.disambiguatedDefinition?.definitions?.[0]?.usageFrequency || 
-                                                   entry?.disambiguatedDefinition?.usageFrequency;
-                              
-                              if (usageFrequency) {
-                                // Get a text description of the frequency
-                                const frequencyText = {
-                                  1: 'Very Rare Usage',
-                                  2: 'Uncommon Usage',
-                                  3: 'Secondary Usage',
-                                  4: 'Common Usage',
-                                  5: 'Primary Usage'
-                                }[parseInt(usageFrequency, 10)] || '';
-                                
-                                return (
-                                  <div className="usage-frequency" style={{ 
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    marginLeft: '12px',
-                                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                                    padding: '4px 10px',
-                                    borderRadius: '12px',
-                                    gap: '8px'
-                                  }}>
-                                    <span style={{ color: '#f5f5f5', fontSize: '13px', fontWeight: 'bold' }}>
-                                      Definition Frequency: 
-                                    </span>
-                                    <FrequencyDots frequency={parseInt(usageFrequency, 10)} size={8} showValue={false} />
-                                    <span style={{ color: '#a0a0b8', fontSize: '13px' }}>
-                                      {frequencyText}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              return null;
+                              const toFive = (n = 5) => (n >= 9 ? 5 : n >= 7 ? 4 : n >= 5 ? 3 : n >= 3 ? 2 : 1);
+                              const freqDots = toFive(Number(entry?.frequency || 0));
+                              return (
+                                <div style={{ marginLeft: '12px' }}>
+                                  <FrequencyDots frequency={freqDots} size={8} />
+                                </div>
+                              );
                             })()}
                           </div>
                           {onRemoveWord && (
@@ -727,13 +656,11 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
                           )}
                         </div>
                         <div className="definition-text">
-                          <div className="definition-translation" style={{ 
-                            fontSize: '16px',
-                            lineHeight: '1.6',
-                            marginBottom: '10px',
-                            fontWeight: '500'
-                          }}>
-                            {definition}
+                          <div className="definition-translation" style={{ fontSize: '16px', lineHeight: '1.6', marginBottom: '2px', fontWeight: 700 }}>
+                            {translation || '—'}
+                          </div>
+                          <div className="definition-concise" style={{ fontSize: '14px', opacity: 0.9, marginBottom: '10px' }}>
+                            {conciseDef || '—'}
                           </div>
                           <div className="definition-example" style={{ 
                             fontStyle: 'italic',
@@ -744,9 +671,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord }) => {
                             fontSize: '14px',
                             lineHeight: '1.5',
                             color: '#c4c4d4'
-                          }}>
-                            <span style={{ fontWeight: 'bold', color: '#a0a0b8' }}>Example:</span> "{example}"
-                          </div>
+                          }} dangerouslySetInnerHTML={{ __html: `<span style='font-weight:700;color:#a0a0b8'>Example:</span> "${renderExampleHtml(example)}"` }} />
                         </div>
                       </div>
                     );

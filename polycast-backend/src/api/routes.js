@@ -71,6 +71,36 @@ router.get('/translate/:language/:text', async (req, res) => {
     }
 });
 
+// Sense Candidates API (for Add Word flow) - MUST be before /dictionary/:word
+router.get('/dictionary/senses', async (req, res) => {
+    try {
+        const { word, nativeLanguage = 'English', targetLanguage = 'English' } = req.query || {};
+        if (!word || !word.trim()) {
+            return res.status(400).json({ error: 'word is required' });
+        }
+        const senses = await popupGeminiService.getSenseCandidates(word.trim(), nativeLanguage, targetLanguage);
+        return res.json({ word: word.trim(), nativeLanguage, targetLanguage, senses });
+    } catch (error) {
+        console.error('[Senses API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Contextual single-sense API (for transcript add flow)
+router.get('/dictionary/contextual-sense', async (req, res) => {
+    try {
+        const { word, context = '', nativeLanguage = 'English', targetLanguage = 'English' } = req.query || {};
+        if (!word || !word.trim()) {
+            return res.status(400).json({ error: 'word is required' });
+        }
+        const sense = await popupGeminiService.getContextualSense(word.trim(), context, nativeLanguage, targetLanguage);
+        return res.json({ word: word.trim(), nativeLanguage, targetLanguage, sense });
+    } catch (error) {
+        console.error('[ContextualSense API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Dictionary API
 router.get('/dictionary/:word', async (req, res) => {
     try {

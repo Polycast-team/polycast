@@ -220,6 +220,12 @@
   line-height: 1.5;
 }
 
+/* Highlight for tilde-marked word in examples */
+.dict-highlight {
+  color: #ffde59; /* yellow */
+  font-weight: 700;
+}
+
 /* Empty dictionary message */
 .empty-dictionary-message {
   padding: 40px 20px;

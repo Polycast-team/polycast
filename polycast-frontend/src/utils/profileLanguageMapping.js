@@ -7,7 +7,7 @@ export const PROFILE_LANGUAGE_MAP = {
   'lizard': 'Portuguese',
   'shirley': 'Chinese',
   'joshua': 'Spanish',
-  'tyson': 'Spanish'
+  'tyson': 'English'
 };
 
 // Profile credentials (password for each profile)

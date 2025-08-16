@@ -140,13 +140,25 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [wordDefinitions, setWordDefinitions] = useState(() => {
     try {
       const stored = localStorage.getItem('pc_wordDefinitions');
-      return stored ? JSON.parse(stored) : {};
+      const parsed = stored ? JSON.parse(stored) : {};
+      // Synchronously purge any broken entries missing exampleSentencesGenerated to prevent crashes on first render
+      const cleaned = {};
+      Object.entries(parsed || {}).forEach(([key, entry]) => {
+        if (!entry || !entry.wordSenseId) return; // skip invalid
+        if (!entry.exampleSentencesGenerated) return; // drop broken
+        cleaned[key] = entry;
+      });
+      if (Object.keys(cleaned).length !== Object.keys(parsed || {}).length) {
+        try { localStorage.setItem('pc_wordDefinitions', JSON.stringify(cleaned)); } catch {}
+      }
+      return cleaned;
     } catch {
       return {};
     }
   }); // Cache for word definitions
   const [showNotification, setShowNotification] = useState(false);
   const [notificationOpacity, setNotificationOpacity] = useState(1);
+  const [isAddingWordBusy, setIsAddingWordBusy] = useState(false);
   // Auto-send functionality removed - using manual Record/Stop button instead
   const notificationTimeoutRef = useRef(null);
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
@@ -192,72 +204,135 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     try { localStorage.setItem('pc_wordDefinitions', JSON.stringify(wordDefinitions)); } catch {}
   }, [wordDefinitions]);
 
+  // One-time cleanup: remove any flashcard entries missing exampleSentencesGenerated
+  useEffect(() => {
+    try {
+      const entries = wordDefinitions || {};
+      const hasBroken = Object.values(entries).some(e => e && e.inFlashcards && !e.exampleSentencesGenerated);
+      if (!hasBroken) return;
+      const cleaned = {};
+      Object.entries(entries).forEach(([key, entry]) => {
+        if (entry && (!entry.inFlashcards || entry.exampleSentencesGenerated)) {
+          cleaned[key] = entry;
+        }
+      });
+      setWordDefinitions(cleaned);
+      const uniqueWords = Array.from(new Set(Object.values(cleaned).filter(e => e && e.inFlashcards).map(e => e.word)));
+      setSelectedWords(uniqueWords);
+    } catch {}
+  }, []);
+
   // Local handler to add a word to dictionary (flashcard entry in local state)
-  const handleAddWord = useCallback((word) => {
+  const handleAddWord = useCallback(async (word) => {
     const wordLower = (word || '').toLowerCase();
+    const nativeLanguage = 'English';
+    const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
+    const contextSentence = fullTranscript || '';
 
-    // Pull latest popup data if available for this word
-    const popupData = wordDefinitions[wordLower] || {};
-    const defText =
-      popupData.contextualExplanation ||
-      popupData.translation ||
-      popupData.definition ||
-      wordLower;
-    const partOfSpeech = popupData.partOfSpeech || '';
-    const contextSentence = (typeof popupData.sentence === 'string' && popupData.sentence) || fullTranscript || '';
+    try {
+      setIsAddingWordBusy(true);
+      // Fetch single best contextual sense in the new unified schema
+      const data = await apiService.fetchJson(
+        apiService.getContextualSenseUrl(wordLower, contextSentence, nativeLanguage, targetLanguage)
+      );
+      const sense = data?.sense;
 
-    // Count existing senses for this word to assign a definition number
-    const existingSenses = Object.values(wordDefinitions).filter(
+      // Count existing senses for numbering
+      const existingSenses = Object.values(wordDefinitions).filter(
+        (e) => e && e.inFlashcards && e.word === wordLower
+      );
+      const definitionNumber = existingSenses.length + 1;
+      const wordSenseId = `${wordLower}-${Date.now()}`;
+
+      const entry = createFlashcardEntry(
+        wordLower,
+        wordSenseId,
+        sense?.example || contextSentence,
+        sense?.definition || wordLower,
+        '',
+        definitionNumber
+      );
+
+      const sentenceWithTilde = sense?.example || `~${wordLower}~`;
+      const examples = await fetchExamplePairs({
+        word: wordLower,
+        sentenceWithTilde,
+        targetLanguage,
+        nativeLanguage
+      });
+
+      const enriched = {
+        ...entry,
+        translation: sense?.translation || '',
+        example: sense?.example || '',
+        contextSentence: sense?.example || contextSentence,
+        frequency: Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
+        exampleSentencesGenerated: examples
+      };
+
+      setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
+      setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
+    } catch (err) {
+      console.error('Transcript add failed; falling back to basic entry:', err);
+    } finally { setIsAddingWordBusy(false); }
+  }, [wordDefinitions, fullTranscript, selectedProfile, internalSelectedProfile]);
+
+  // New: add multiple senses at once (from AddWordPopup)
+  const handleAddWordSenses = useCallback((word, senses) => {
+    const wordLower = (word || '').toLowerCase();
+    const nativeLanguage = 'English';
+    const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
+    const contextSentence = fullTranscript || '';
+
+    const baseCount = Object.values(wordDefinitions).filter(
       (e) => e && e.inFlashcards && e.word === wordLower
-    );
-    const definitionNumber = existingSenses.length + 1;
+    ).length;
 
-    // Unique ID for this word sense
-    const wordSenseId = `${wordLower}-${Date.now()}`;
-
-    const entry = createFlashcardEntry(
-      wordLower,
-      wordSenseId,
-      contextSentence,
-      defText,
-      partOfSpeech,
-      definitionNumber
-    );
-
-    // Build sentenceWithTilde from context sentence (wrap the word, case-insensitive, word boundary)
-    const safeWord = wordLower.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const wordRegex = new RegExp(`(\\b)(${safeWord})(\\b)`, 'i');
-    const sentenceWithTilde = contextSentence && wordRegex.test(contextSentence)
-      ? contextSentence.replace(wordRegex, '$1~$2~$3')
-      : `~${wordLower}~`;
-
-    // Determine languages
-    const nativeLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
-    const targetLanguage = 'English';
-
-    // Fetch Gemini-generated example pairs, then save entry
-    fetchExamplePairs({
-      word: wordLower,
-      sentenceWithTilde,
-      targetLanguage,
-      nativeLanguage
-    }).then((examples) => {
-      const enriched = { ...entry, exampleSentencesGenerated: examples };
-      setWordDefinitions((prev) => ({
-        ...prev,
-        [wordSenseId]: enriched,
-      }));
-      setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
-    }).catch((err) => {
-      console.error('Failed to generate example pairs:', err);
-      // Save entry without examples to avoid blocking (flashcards will require examples to display)
-      setWordDefinitions((prev) => ({
-        ...prev,
-        [wordSenseId]: entry,
-      }));
-      setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
+    setIsAddingWordBusy(true);
+    const promises = senses.map((sense, idx) => {
+      const definitionNumber = baseCount + idx + 1;
+      const wordSenseId = `${wordLower}-${Date.now()}-${idx}`;
+      const entry = createFlashcardEntry(
+        wordLower,
+        wordSenseId,
+        contextSentence,
+        sense?.definition || wordLower,
+        '',
+        definitionNumber
+      );
+      // Generate example pairs for this sense using its example
+      const sentenceWithTilde = sense?.example || `~${wordLower}~`;
+      return fetchExamplePairs({
+        word: wordLower,
+        sentenceWithTilde,
+        targetLanguage,
+        nativeLanguage
+      }).then((examples) => {
+        const enriched = {
+          ...entry,
+          translation: sense?.translation || '',
+          example: sense?.example || '',
+          contextSentence: sense?.example || '',
+          frequency: Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
+          exampleSentencesGenerated: examples
+        };
+        setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
+      }).catch((err) => {
+        console.error('Failed to generate example pairs for sense:', err);
+        const enriched = {
+          ...entry,
+          translation: sense?.translation || '',
+          example: sense?.example || '',
+          contextSentence: sense?.example || '',
+          frequency: Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
+          exampleSentencesGenerated: ''
+        };
+        setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
+      });
     });
-  }, [wordDefinitions, fullTranscript]);
+    setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
+    Promise.allSettled(promises).finally(() => setIsAddingWordBusy(false));
+  }, [wordDefinitions, fullTranscript, selectedProfile, internalSelectedProfile]);
 
   // Ensure recording stops if appMode changes from 'audio'
   useEffect(() => {
@@ -787,6 +862,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         {appMode === 'dictionary' ? (
           <DictionaryTable 
             wordDefinitions={wordDefinitions}
+            selectedProfile={selectedProfile || internalSelectedProfile}
+            isAddingWordBusy={isAddingWordBusy}
+            onAddWordSenses={handleAddWordSenses}
             onRemoveWord={(wordSenseId, word) => {
               console.log(`Removing word from dictionary: ${word} (${wordSenseId})`);
               try {

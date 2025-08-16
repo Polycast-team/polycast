@@ -17,6 +17,81 @@ class PopupGeminiService {
   }
 
   /**
+   * Get the single best contextual sense for a headword within a sentence.
+   * Returns { definitionNumber, translation, definition, example, frequency } | null
+   */
+  async getContextualSense(word, context, nativeLanguage = 'English', targetLanguage = 'English') {
+    try {
+      const sentence = this.extractSentence(word, context);
+      const prompt = `You are selecting the SINGLE best meaning of a headword as used in a specific sentence.
+
+Inputs:
+- headword: "${word}"
+- sentence: "${sentence}"
+- nativeLanguage (for translation and definition): ${nativeLanguage}
+- targetLanguage (for example sentence): ${targetLanguage}
+
+Task:
+- Choose the ONE meaning that fits this sentence. Do NOT produce stylistic/register variants or minor nuance splits.
+- Only output ONE line, using this strict format:
+[1]//[NATIVE LANGUAGE TRANSLATION]//[CONCISE NATIVE LANGUAGE DEFINITION]//[TARGET LANGUAGE EXAMPLE SENTENCE WITH THE TARGET-LANGUAGE EQUIVALENT OF THE WORD WRAPPED IN TILDES ~like this~]//[FREQUENCY 1-10]
+
+Example output (format only; do not reuse text):
+[1]//water//a clear liquid essential for life//El ~agua~ es esencial para la vida.//8
+
+Rules:
+- Use ${nativeLanguage} for translation and concise definition.
+- Use ${targetLanguage} for the example sentence.
+- Ensure the example includes the target-language equivalent of the headword and that it is wrapped with tildes ~like this~.
+- Always include the frequency as the last field (1-10). If unsure, use 5.
+- No extra commentary, no code fences, exactly one line. Be conservative; pick the single best fit.`;
+
+      console.log('[ContextualSense] Full prompt sent to Gemini:');
+      console.log(prompt);
+
+      const result = await this.model.generateContent(prompt);
+      const text = (await result.response.text()).trim();
+
+      console.log('[ContextualSense] Full response from Gemini:');
+      console.log(text);
+
+      const parts = text.split('//').map(s => s.trim());
+      let translation = '', definition = '', example = '', freq = '5';
+      if (parts.length >= 5) {
+        // With leading definition number
+        translation = parts[1];
+        definition = parts[2];
+        example = parts[3];
+        freq = parts[4];
+      } else if (parts.length === 4) {
+        // Without leading number – be lenient
+        translation = parts[0];
+        definition = parts[1];
+        example = parts[2];
+        freq = parts[3];
+      } else if (parts.length === 3) {
+        // Very lenient: no number and no frequency
+        translation = parts[0];
+        definition = parts[1];
+        example = parts[2];
+        freq = '5';
+      } else {
+        throw new Error('Bad format from Gemini for contextual sense');
+      }
+      return {
+        definitionNumber: 1,
+        translation: translation || '',
+        definition: definition || '',
+        example: example || '',
+        frequency: Math.max(1, Math.min(10, parseInt(freq, 10) || 5))
+      };
+    } catch (err) {
+      console.error('[PopupGeminiService] Error getting contextual sense:', err);
+      return null;
+    }
+  }
+
+  /**
    * Extract the sentence containing the target word from the full context
    * @param {string} word - The target word
    * @param {string} context - The full transcript or paragraph
@@ -138,6 +213,74 @@ Rules:
         sentenceWithTilde || `~${word}~`
       ]).slice(0, 10).join(' // ');
       return fallback;
+    }
+  }
+
+  /**
+   * Get up to 5 sense candidates for a headword.
+   * Returns array of { definitionNumber, translation, definition, example, frequency }
+   */
+  async getSenseCandidates(word, nativeLanguage = 'English', targetLanguage = 'English') {
+    try {
+      const prompt = `You are helping a language learner choose the correct senses of a headword written in the TARGET LANGUAGE.\n\nInputs:\n- headword: "${word}"\n- nativeLanguage (for translation and definition text): ${nativeLanguage}\n- targetLanguage (the language of the headword AND the example sentences): ${targetLanguage}\n\nLanguage check (STRICT, but diacritics tolerant):\n- If the headword is a valid word in ${targetLanguage} even when typed WITHOUT its diacritics/accents, treat it as ${targetLanguage}.\n- Only if the headword clearly does NOT belong to ${targetLanguage}, return EXACTLY this text and nothing else: WRONG LANGUAGE\n\nTask:\n1) Decide how many COMPLETELY DIFFERENT senses "${word}" has in modern usage. A word like "bank" (financial institution vs river bank) has multiple senses. A word like "study" (school vs research vs memorize) has only ONE sense. Only create multiple entries if the word has entirely different meanings that would require separate dictionary entries — NOT for register or minor nuance differences. If in doubt, use only ONE sense. Do not return more than FIVE lines.\n\n2) For each sense, output EXACTLY ONE line using THIS FORMAT (mandatory):\n[DEFINITION NUMBER]//[NATIVE LANGUAGE TRANSLATION]//[CONCISE NATIVE LANGUAGE DEFINITION]//[TARGET LANGUAGE EXAMPLE SENTENCE WITH THE EXACT HEADWORD STRING WRAPPED IN TILDES ~like this~ (NO SYNONYMS OR VARIANTS)]//[FREQUENCY 1-10]\n\nExample outputs (format only; do not reuse text):\n1//goodbye//a farewell said when parting//~Adiós~, nos vemos mañana.//9\n2//farewell//a final goodbye in formal or emotional contexts//Le dimos un cálido ~adiós~ al equipo.//6\n\nFormat rules (must follow):\n- Return ONLY lines, no extra commentary, no bullets, no code fences.\n- Include ALL FIVE fields. If unsure about frequency, put 5.\n- The example sentence MUST contain the EXACT headword string "${word}" in ${targetLanguage}, wrapped with tildes. Do NOT substitute synonyms.\n- Use ${nativeLanguage} for translation and definition.`;
+
+      console.log('[Senses] Full prompt sent to Gemini:');
+      console.log(prompt);
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = (response.text() || '').trim();
+
+      console.log('[Senses] Full response from Gemini:');
+      console.log(text);
+
+      // Handle language mismatch sentinel
+      if (text.toUpperCase().trim() === 'WRONG LANGUAGE') {
+        return [{ wrongLanguage: true }];
+      }
+
+      // Extract only lines; cap to 5
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(0, 5);
+      const senses = [];
+      for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
+        const parts = raw.split('//').map(s => s.trim());
+        if (parts.length < 4) continue; // need at least number+3 fields OR 4 fields without number
+
+        // Attempt to parse with optional missing frequency and optional missing number
+        let numPart = parts[0];
+        let translation = '', definition = '', example = '', freqPart = undefined;
+
+        const parsedNum = parseInt(String(numPart).replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(parsedNum)) {
+          // Has leading number
+          translation = parts[1] || '';
+          definition = parts[2] || '';
+          example = parts[3] || '';
+          freqPart = parts[4]; // may be undefined
+        } else {
+          // No number; treat first as translation
+          translation = parts[0] || '';
+          definition = parts[1] || '';
+          example = parts[2] || '';
+          freqPart = parts[3];
+        }
+
+        const frequency = Math.max(1, Math.min(10, parseInt(freqPart, 10) || 5));
+        const definitionNumber = !isNaN(parsedNum) ? parsedNum : (i + 1);
+
+        senses.push({
+          definitionNumber,
+          translation,
+          definition,
+          example,
+          frequency,
+        });
+      }
+      return senses;
+    } catch (error) {
+      console.error('[PopupGeminiService] Error getting sense candidates:', error);
+      return [];
     }
   }
 }

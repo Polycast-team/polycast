@@ -27,6 +27,18 @@ class ApiService {
     return `${this.baseUrl}/api/dictionary/${encodeURIComponent(word)}?${params}`;
   }
 
+  // Sense candidates for Add Word flow
+  getSenseCandidatesUrl = (word, nativeLanguage, targetLanguage) => {
+    const params = new URLSearchParams({ word, nativeLanguage, targetLanguage });
+    return `${this.baseUrl}/api/dictionary/senses?${params}`;
+  }
+
+  // Single contextual sense for transcript add flow
+  getContextualSenseUrl = (word, context, nativeLanguage, targetLanguage) => {
+    const params = new URLSearchParams({ word, context, nativeLanguage, targetLanguage });
+    return `${this.baseUrl}/api/dictionary/contextual-sense?${params}`;
+  }
+
   // Helper methods for common API patterns
   async fetchJson(url, options = {}) {
     const response = await fetch(url, {

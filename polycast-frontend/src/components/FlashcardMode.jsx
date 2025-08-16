@@ -10,7 +10,7 @@ import { useFlashcardSession } from '../hooks/useFlashcardSession';
 import { useFlashcardSRS } from '../hooks/useFlashcardSRS';
 import { useFlashcardCalendar } from '../hooks/useFlashcardCalendar';
 import FlashcardCalendarModal from './shared/FlashcardCalendarModal';
-import { getTranslationsForProfile } from '../utils/profileLanguageMapping';
+import { getTranslationsForProfile, getLanguageForProfile } from '../utils/profileLanguageMapping';
 import '../mobile/styles/mobile-flashcards.css';
 import '../services/apiService.js';
 import apiService from '../services/apiService.js';
@@ -143,6 +143,38 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     return `${card.key}_sentence_${sentenceNumber}`;
   }, []);
 
+  // Map profile target language to Google TTS voice
+  const getTtsVoiceForLanguage = useCallback((profile) => {
+    const targetLang = (getLanguageForProfile(profile) || '').toLowerCase();
+    // Default English fallback
+    const fallback = { languageCode: 'en-US', name: 'en-US-Neural2-J' };
+
+    // Prefer Latin American Spanish for better pronunciation for learners
+    if (targetLang.startsWith('spanish') || targetLang === 'es' || targetLang === 'español') {
+      return { languageCode: 'es-US', name: 'es-US-Neural2-B' };
+    }
+    if (targetLang.startsWith('english') || targetLang === 'en') {
+      return { languageCode: 'en-US', name: 'en-US-Neural2-J' };
+    }
+    if (targetLang.startsWith('french') || targetLang === 'fr' || targetLang === 'français') {
+      return { languageCode: 'fr-FR', name: 'fr-FR-Neural2-C' };
+    }
+    if (targetLang.startsWith('german') || targetLang === 'de' || targetLang === 'deutsch') {
+      return { languageCode: 'de-DE', name: 'de-DE-Neural2-D' };
+    }
+    if (targetLang.startsWith('portuguese') || targetLang === 'pt' || targetLang.includes('português') || targetLang.includes('português (br)') || targetLang.includes('portuguese (brazil)')) {
+      return { languageCode: 'pt-BR', name: 'pt-BR-Neural2-B' };
+    }
+    if (targetLang.startsWith('japanese') || targetLang === 'ja' || targetLang.includes('日本語')) {
+      return { languageCode: 'ja-JP', name: 'ja-JP-Neural2-C' };
+    }
+    if (targetLang.startsWith('italian') || targetLang === 'it' || targetLang.includes('italiano')) {
+      return { languageCode: 'it-IT', name: 'it-IT-Neural2-C' };
+    }
+    // TODO: add more mappings as needed (cn/kr/ru/etc.)
+    return fallback;
+  }, []);
+
   // Generate audio for specific sentence (no database caching)
   const generateAudioForSentence = useCallback(async (text, cacheKey) => {
     if (!text || !cacheKey) return null;
@@ -157,7 +189,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       const audioData = await apiService.postJson(apiService.generateAudioUrl(), {
         text: text.replace(/<[^>]*>/g, ''), // Strip HTML tags
         cardKey: cacheKey, // Use sentence-specific key but don't expect backend caching
-        profile: selectedProfile
+        profile: selectedProfile,
+        voice: getTtsVoiceForLanguage(selectedProfile)
       });
       
       // Cache in memory for this session only
