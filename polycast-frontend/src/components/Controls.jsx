@@ -60,8 +60,8 @@ function Controls({
                 )}
                 <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Mode:</label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    {/* Show transcript button only when not in audio mode, when user is student, and when in a room */}
-                    {appMode !== 'audio' && userRole === 'student' && roomSetup && (
+                    {/* Show transcript button when not in audio mode */}
+                    {appMode !== 'audio' && (
                         <button
                             onClick={() => setAppMode && setAppMode('audio')}
                             disabled={isRecording}

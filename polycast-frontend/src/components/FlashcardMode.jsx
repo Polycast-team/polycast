@@ -86,6 +86,9 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   
   // Audio caching for current session only (no database storage)
   const audioCache = useRef(new Map());
+  const autoPlayTimeoutRef = useRef(null);
+  const autoPlayLockRef = useRef(false);
+  const audioGenerationLockRef = useRef(false);
 
   // Handle starting study session (only used on mobile)
   const handleStartStudying = useCallback((profile, flashcards) => {
@@ -170,13 +173,18 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
 
   // Generate and play audio for current sentence
   const generateAndPlayAudio = useCallback(async (text, card) => {
-    showTBA('Generate Audio Unavailable. Will be available in future updates.');
-    return null;
-
     if (!text || !card) return;
+    
+    // Prevent simultaneous audio generation
+    if (audioGenerationLockRef.current) {
+      console.log('[Audio] Skipping generation - already in progress');
+      return;
+    }
     
     const cacheKey = getSentenceCacheKey(card);
     if (!cacheKey) return;
+    
+    audioGenerationLockRef.current = true;
     
     setAudioState(prev => {
       if (prev.loading) return prev;
@@ -187,16 +195,21 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       const audioUrl = await generateAudioForSentence(text, cacheKey);
       
       setCurrentAudio(prevAudio => {
+        // Stop any currently playing audio immediately
         if (prevAudio) {
           prevAudio.pause();
           prevAudio.currentTime = 0;
+          prevAudio.src = ''; // Clear source to stop any loading
         }
         
         const audio = new Audio(audioUrl);
-        audio.onended = () => setAudioState({ loading: false, error: null });
+        audio.onended = () => {
+          setAudioState({ loading: false, error: null });
+          audioGenerationLockRef.current = false;
+        };
         audio.onerror = () => {
           setAudioState({ loading: false, error: null });
-          showError('Failed to play audio');
+          audioGenerationLockRef.current = false;
         };
         
         audio.play().then(() => {
@@ -204,9 +217,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         }).catch(err => {
           console.error('Audio play error:', err);
           setAudioState({ loading: false, error: null });
-          if (err.name !== 'AbortError' && !err.message.includes('interrupted')) {
-            showError(`Failed to play audio: ${err.message}`);
-          }
+          audioGenerationLockRef.current = false;
         });
         
         return audio;
@@ -215,6 +226,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     } catch (error) {
       console.error('Audio generation error:', error);
       setAudioState({ loading: false, error: null });
+      audioGenerationLockRef.current = false;
       showError(`Failed to generate audio: ${error.message}`);
     }
   }, [getSentenceCacheKey, generateAudioForSentence, showError]);
@@ -331,6 +343,13 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   useEffect(() => {
     if (!isFlipped) {
       setHasAutoPlayedThisFlip(false);
+      // Reset autoplay guards when card is not flipped
+      autoPlayLockRef.current = false;
+      audioGenerationLockRef.current = false;
+      if (autoPlayTimeoutRef.current) {
+        clearTimeout(autoPlayTimeoutRef.current);
+        autoPlayTimeoutRef.current = null;
+      }
     }
   }, [currentDueIndex, isFlipped]);
 
@@ -341,37 +360,43 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     }
   }, [currentMode, dueCards, preGenerateAudioForSession]);
 
-  // // Auto-play audio when card is flipped (with correct sentence)
-  // useEffect(() => {
-  //   if (isFlipped && currentCard && !hasAutoPlayedThisFlip) {
-  //     setHasAutoPlayedThisFlip(true);
+  // Auto-play audio when card is flipped (with correct sentence)
+  useEffect(() => {
+    if (isFlipped && currentCard && !hasAutoPlayedThisFlip && !autoPlayLockRef.current && !audioGenerationLockRef.current) {
+      // Prevent duplicate autoplay in React StrictMode/development
+      autoPlayLockRef.current = true;
+      setHasAutoPlayedThisFlip(true);
       
-  //     let textToPlay = '';
+      let textToPlay = '';
       
-  //     if (currentCard.exampleSentencesGenerated) {
-  //       // Use generated examples if available
-  //       const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
-  //       const srsInterval = currentCard?.srsData?.SRS_interval || 1;
-  //       const sentenceIndex = ((srsInterval - 1) % 5) * 2;
-  //       textToPlay = parts[sentenceIndex] || parts[0] || '';
-  //     } else if (currentCard.contextSentence) {
-  //       // Fallback to context sentence
-  //       textToPlay = currentCard.contextSentence;
-  //     } else if (currentCard.example) {
-  //       // Fallback to example
-  //       textToPlay = currentCard.example;
-  //     } else {
-  //       // Last resort: just the word
-  //       textToPlay = currentCard.word;
-  //     }
+      if (currentCard.exampleSentencesGenerated) {
+        // Use generated examples if available
+        const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+        const srsInterval = currentCard?.srsData?.SRS_interval || 1;
+        const sentenceIndex = ((srsInterval - 1) % 5) * 2;
+        textToPlay = parts[sentenceIndex] || parts[0] || '';
+      } else if (currentCard.contextSentence) {
+        // Fallback to context sentence
+        textToPlay = currentCard.contextSentence;
+      } else if (currentCard.example) {
+        // Fallback to example
+        textToPlay = currentCard.example;
+      } else {
+        // Last resort: just the word
+        textToPlay = currentCard.word;
+      }
       
-  //     if (textToPlay) {
-  //       setTimeout(() => {
-  //         generateAndPlayAudio(textToPlay, currentCard);
-  //       }, 300);
-  //     }
-  //   }
-  // }, [isFlipped, currentCard, hasAutoPlayedThisFlip, generateAndPlayAudio]);
+      if (textToPlay) {
+        if (autoPlayTimeoutRef.current) {
+          clearTimeout(autoPlayTimeoutRef.current);
+        }
+        autoPlayTimeoutRef.current = setTimeout(() => {
+          generateAndPlayAudio(textToPlay, currentCard);
+          autoPlayTimeoutRef.current = null;
+        }, 300);
+      }
+    }
+  }, [isFlipped, currentCard, hasAutoPlayedThisFlip, generateAndPlayAudio]);
 
   // Clear audio cache when switching profiles or modes
   useEffect(() => {

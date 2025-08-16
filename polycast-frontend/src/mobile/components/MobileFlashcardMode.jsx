@@ -80,6 +80,7 @@ const MobileFlashcardMode = ({
   
   // Audio caching for current session only (no database storage)
   const audioCache = useRef(new Map());
+  const audioGenerationLockRef = useRef(false);
 
   // Calculate button times based on current card
   const buttonTimes = useMemo(() => {
@@ -238,8 +239,16 @@ const MobileFlashcardMode = ({
   const generateAndPlayAudio = useCallback(async (text, card) => {
     if (!text || !card) return;
     
+    // Prevent simultaneous audio generation
+    if (audioGenerationLockRef.current) {
+      console.log('[Mobile Audio] Skipping generation - already in progress');
+      return;
+    }
+    
     const cacheKey = getSentenceCacheKey(card);
     if (!cacheKey) return;
+    
+    audioGenerationLockRef.current = true;
     
     setAudioState(prev => {
       if (prev.loading) return prev; // Already loading, skip
@@ -251,20 +260,23 @@ const MobileFlashcardMode = ({
       
       // Play the audio
       setCurrentAudio(prevAudio => {
+        // Stop any currently playing audio immediately
         if (prevAudio) {
           prevAudio.pause();
           prevAudio.currentTime = 0;
+          prevAudio.src = ''; // Clear source to stop any loading
         }
         
         const audio = new Audio(audioUrl);
         
         audio.onended = () => {
           setAudioState({ loading: false, error: null });
+          audioGenerationLockRef.current = false;
         };
         
         audio.onerror = () => {
           setAudioState({ loading: false, error: null });
-          showError('Failed to play audio');
+          audioGenerationLockRef.current = false;
         };
         
         audio.play().then(() => {
@@ -272,10 +284,7 @@ const MobileFlashcardMode = ({
         }).catch(err => {
           console.error('Audio play error:', err);
           setAudioState({ loading: false, error: null });
-          // Don't show error for AbortError (interrupted by pause) - this is expected when swiping
-          if (err.name !== 'AbortError' && !err.message.includes('interrupted')) {
-            showError(`Failed to play audio: ${err.message}`);
-          }
+          audioGenerationLockRef.current = false;
         });
         
         return audio;
@@ -284,6 +293,7 @@ const MobileFlashcardMode = ({
     } catch (error) {
       console.error('Audio generation error:', error);
       setAudioState({ loading: false, error: null });
+      audioGenerationLockRef.current = false;
       showError(`Failed to generate audio: ${error.message}`);
     }
   }, [getSentenceCacheKey, generateAudioForSentence, showError]);
@@ -339,6 +349,7 @@ const MobileFlashcardMode = ({
   useEffect(() => {
     if (!isFlipped) {
       setHasAutoPlayedThisFlip(false);
+      audioGenerationLockRef.current = false;
     }
   }, [currentDueIndex, isFlipped]);
 
@@ -351,7 +362,7 @@ const MobileFlashcardMode = ({
 
   // Auto-play audio when card is flipped (only once per flip)
   useEffect(() => {
-    if (isFlipped && currentCard && !hasAutoPlayedThisFlip) {
+    if (isFlipped && currentCard && !hasAutoPlayedThisFlip && !audioGenerationLockRef.current) {
       if (currentCard.exampleSentencesGenerated) {
         setHasAutoPlayedThisFlip(true); // Mark as played immediately to prevent duplicates
         

@@ -11,3 +11,6 @@ node_modules/
 .DS_Store
 .vscode/
 *.log
+
+# Google Cloud credentials
+polycast-backend/googleKeys.json

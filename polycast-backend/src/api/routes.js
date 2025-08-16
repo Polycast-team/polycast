@@ -4,6 +4,9 @@ const redisService = require('../services/redisService');
 const llmService = require('../services/llmService');
 const { generateTextWithGemini } = require('../services/llmService');
 const popupGeminiService = require('../services/popupGeminiService');
+const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+
+const ttsClient = new TextToSpeechClient();
 
 const router = express.Router();
 
@@ -115,6 +118,86 @@ router.post('/examples', async (req, res) => {
         res.json({ exampleSentencesGenerated: examples });
     } catch (error) {
         console.error('[Examples API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Text-to-Speech API using Google Cloud
+router.post('/generate-audio', async (req, res) => {
+    try {
+        const { text, voice, speakingRate, pitch } = req.body || {};
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: 'Missing text' });
+        }
+
+        // Strip tildes from text before synthesis
+        const cleanText = text.trim().replace(/~/g, '');
+        
+        // Randomly choose between natural male and female voices
+        const voices = ['en-US-Neural2-J', 'en-US-Neural2-F']; // J=male, F=female
+        const randomVoice = voices[Math.floor(Math.random() * voices.length)];
+
+        const request = {
+            input: { text: cleanText },
+            voice: {
+                languageCode: (voice && voice.languageCode) || 'en-US',
+                name: (voice && voice.name) || randomVoice
+            },
+            audioConfig: {
+                audioEncoding: 'MP3',
+                speakingRate: speakingRate ?? 1.0,
+                pitch: pitch ?? 0.0
+            }
+        };
+
+        const [response] = await ttsClient.synthesizeSpeech(request);
+        const base64 = Buffer.from(response.audioContent).toString('base64');
+        
+        res.json({ audioUrl: `data:audio/mp3;base64,${base64}` });
+    } catch (error) {
+        console.error('[TTS] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Legacy TTS API endpoint for backward compatibility
+router.post('/tts', async (req, res) => {
+    try {
+        const { text, voice, speakingRate, pitch } = req.body || {};
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: 'Missing text' });
+        }
+
+        // Strip tildes from text before synthesis
+        const cleanText = text.trim().replace(/~/g, '');
+        
+        // Randomly choose between natural male and female voices
+        const voices = ['en-US-Neural2-J', 'en-US-Neural2-F']; // J=male, F=female
+        const randomVoice = voices[Math.floor(Math.random() * voices.length)];
+
+        const request = {
+            input: { text: cleanText },
+            voice: {
+                languageCode: (voice && voice.languageCode) || 'en-US',
+                name: (voice && voice.name) || randomVoice
+            },
+            audioConfig: {
+                audioEncoding: 'MP3',
+                speakingRate: speakingRate ?? 1.0,
+                pitch: pitch ?? 0.0
+            }
+        };
+
+        const [response] = await ttsClient.synthesizeSpeech(request);
+        
+        // Return as blob for legacy compatibility
+        res.set({
+            'Content-Type': 'audio/mpeg',
+            'Content-Length': response.audioContent.length
+        });
+        res.send(response.audioContent);
+    } catch (error) {
+        console.error('[TTS Legacy] Error:', error);
         res.status(500).json({ error: error.message });
     }
 });

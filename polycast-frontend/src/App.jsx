@@ -50,7 +50,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     // TODO: Generate unique 5-digit room code and store in backend
     // TODO: Create room state management for tracking participants
     // TODO: Handle room persistence across server restarts with Redis
-    showTBA('Profile data is currently unavailable. See non-saving mode for example usage.');
+    // For now, all profiles use localStorage data
     return;
 
     try {
