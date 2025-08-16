@@ -48,13 +48,14 @@ function Controls({
                       style={{ minWidth: 110, fontSize: 15, padding: '2px 6px', borderRadius: 6, marginRight: 12 }}
                       aria-label="Profile Selection Dropdown"
                     >
-                      <option value="non-saving">non-saving</option>
                       <option value="cat">cat</option>
                       <option value="dog">dog</option>
                       <option value="mouse">mouse</option>
                       <option value="horse">horse</option>
                       <option value="lizard">lizard</option>
                       <option value="shirley">shirley</option>
+                      <option value="joshua">joshua</option>
+                      <option value="tyson">tyson</option>
                     </select>
                   </>
                 )}

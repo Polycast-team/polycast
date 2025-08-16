@@ -5,7 +5,7 @@ import { categorizeCards, getDueSeenCards } from '../../utils/cardSorting';
 import { getSRSSettings } from '../../utils/srsSettings';
 
 const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudying, onBack }) => {
-  const [selectedProfile, setSelectedProfile] = useState(initialProfile || 'non-saving');
+  const [selectedProfile, setSelectedProfile] = useState(initialProfile || 'joshua');
   const [wordDefinitions, setWordDefinitions] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,7 +15,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
 
   // Available profiles (same as desktop)
   const profiles = [
-    { value: 'non-saving', label: 'Non-saving Mode', icon: '🚫' },
+    
     { value: 'cat', label: 'Cat Profile', icon: '🐱' },
     { value: 'dog', label: 'Dog Profile', icon: '🐶' },
     { value: 'mouse', label: 'Mouse Profile', icon: '🐭' },
@@ -27,10 +27,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
   // Fetch profile data when profile changes
   useEffect(() => {
     const fetchProfileData = async () => {
-      if (selectedProfile === 'non-saving') {
-        setWordDefinitions({});
-        return;
-      }
+      // Non-saving mode removed; data loads only when connected to backend in future
 
       setIsLoading(true);
       setError('');
@@ -71,11 +68,6 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
 
   // Get available cards for profile selector (initial state)
   const getAvailableCards = () => {
-    if (selectedProfile === 'non-saving') {
-      // No hardcoded cards; show empty until user creates cards on desktop
-      return [];
-    }
-    
     const cards = [];
     Object.entries(wordDefinitions).forEach(([key, value]) => {
       if (value && value.wordSenseId && value.inFlashcards) {
@@ -108,18 +100,14 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
 
   // Get categorized cards for display using separate arrays
   const getCategorizedCards = () => {
-    if (selectedProfile === 'non-saving') {
-      return { newCards: [], dueCards: [], seenCards: [] };
-    } else {
-      // For other profiles, use the existing logic
-      const allCards = getAvailableCards();
-      const { seenCards, newCards } = categorizeCards(allCards);
-      
-      // For preview, show ALL seen cards (both due and future), not just currently due ones
-      const allSeenCardsSorted = seenCards; // Already sorted by due date in categorizeCards
-      
-      return { newCards, dueCards: allSeenCardsSorted, seenCards };
-    }
+    // Use the existing logic
+    const allCards = getAvailableCards();
+    const { seenCards, newCards } = categorizeCards(allCards);
+    
+    // For preview, show ALL seen cards (both due and future), not just currently due ones
+    const allSeenCardsSorted = seenCards; // Already sorted by due date in categorizeCards
+    
+    return { newCards, dueCards: allSeenCardsSorted, seenCards };
   };
 
   // Count available flashcards
@@ -130,9 +118,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
 
   const handleStartStudying = () => {
     if (flashcardCount > 0) {
-      // For non-saving mode, pass empty wordDefinitions since hardcoded cards are created in flashcard mode
-      const dataToPass = selectedProfile === 'non-saving' ? {} : wordDefinitions;
-      onStartStudying(selectedProfile, dataToPass);
+      onStartStudying(selectedProfile, wordDefinitions);
     }
   };
 
@@ -175,7 +161,7 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
   };
 
   // Generate debug output for copying
-  const generateDebugOutput = () => 'Debug output only available for non-saving mode';
+  const generateDebugOutput = () => '';
 
   // Card list component
   const CardList = ({ cards, title, type }) => (
@@ -511,48 +497,16 @@ const MobileProfileSelector = ({ selectedProfile: initialProfile, onStartStudyin
                 </button>
               </div>
               
-              {/* Debug Button - Only for non-saving mode */}
-              {selectedProfile === 'non-saving' && (
-                <div style={{ marginTop: '10px' }}>
-                  <button 
-                    onClick={() => setShowDebugOutput(true)}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      backgroundColor: '#f5f5f5',
-                      border: '1px solid #666',
-                      borderRadius: '8px',
-                      color: '#666',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <span>🔍</span>
-                    <span>Export Arrays (Debug)</span>
-                  </button>
-                </div>
-              )}
+              
             </div>
           ) : (
             <div className="mobile-empty-state">
               <div className="mobile-empty-icon">📖</div>
               <div className="mobile-empty-title">No Flashcards Available</div>
               <div className="mobile-empty-text">
-                {selectedProfile === 'non-saving' 
-                  ? 'Switch to the desktop version to create flashcards, then return here to study.'
-                  : `No flashcards found in the ${selectedProfile} profile. Use the desktop version to add words and create your study deck.`
-                }
+                {`No flashcards found in the ${selectedProfile} profile. Use the desktop version to add words and create your study deck.`}
               </div>
-              {selectedProfile !== 'non-saving' && (
-                <div className="mobile-empty-suggestion">
-                  💡 Try switching profiles or adding words on desktop first.
-                </div>
-              )}
+              
             </div>
           )}
         </div>

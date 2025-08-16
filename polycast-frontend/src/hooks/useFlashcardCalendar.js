@@ -32,36 +32,20 @@ export function useFlashcardCalendar(
       currentCards.push(card);
     });
     
-    // Add cards from wordDefinitions (for non-saving mode) or availableCards
-    if (selectedProfile === 'non-saving') {
-      // For non-saving mode, use availableCards but exclude those already in dueCards or processedCards
-      availableCards.forEach(card => {
+    // Add cards from updated wordDefinitions data
+    Object.entries(wordDefinitions).forEach(([key, value]) => {
+      if (value && value.wordSenseId && value.inFlashcards) {
         const alreadyInSession = dueCards.some(sessionCard => 
-          sessionCard.key === card.key || sessionCard.wordSenseId === card.wordSenseId
+          sessionCard.key === key || sessionCard.wordSenseId === value.wordSenseId
         );
         const alreadyProcessed = processedCards.some(processedCard => 
-          processedCard.key === card.key || processedCard.wordSenseId === card.wordSenseId
+          processedCard.key === key || processedCard.wordSenseId === value.wordSenseId
         );
         if (!alreadyInSession && !alreadyProcessed) {
-          currentCards.push(card);
+          currentCards.push({ ...value, key });
         }
-      });
-    } else {
-      // For other profiles, use updated wordDefinitions data
-      Object.entries(wordDefinitions).forEach(([key, value]) => {
-        if (value && value.wordSenseId && value.inFlashcards) {
-          const alreadyInSession = dueCards.some(sessionCard => 
-            sessionCard.key === key || sessionCard.wordSenseId === value.wordSenseId
-          );
-          const alreadyProcessed = processedCards.some(processedCard => 
-            processedCard.key === key || processedCard.wordSenseId === value.wordSenseId
-          );
-          if (!alreadyInSession && !alreadyProcessed) {
-            currentCards.push({ ...value, key });
-          }
-        }
-      });
-    }
+      }
+    });
     
     for (let i = 0; i < 8; i++) { // Extended to 8 days to catch more future cards
       const date = new Date(today);

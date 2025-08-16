@@ -86,7 +86,7 @@ const MobileRoleSelector = ({ onRoleSelected }) => {
 
 const MobileApp = () => {
   const [currentMode, setCurrentMode] = useState('role-selection'); // 'role-selection', 'profile', or 'flashcards'
-  const [selectedProfile, setSelectedProfile] = useState('non-saving');
+  const [selectedProfile, setSelectedProfile] = useState('joshua');
   const [wordDefinitions, setWordDefinitions] = useState({});
   const { error: popupError, showError, clearError } = useErrorHandler();
 
@@ -103,25 +103,7 @@ const MobileApp = () => {
   const handleSetWordDefinitions = useCallback((newDefinitions) => {
     setWordDefinitions(newDefinitions);
     
-    // Save to backend if not in non-saving mode
-    if (selectedProfile !== 'non-saving') {
-      setTimeout(async () => {
-        try {
-          await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              flashcards: newDefinitions,
-              selectedWords: Object.keys(newDefinitions)
-            })
-          });
-          console.log(`[MOBILE] Saved SRS updates for profile: ${selectedProfile}`);
-        } catch (error) {
-          console.error('Error saving SRS updates:', error);
-          showError(`Failed to save progress for profile "${selectedProfile}". Your study progress may be lost. Please check your connection.`);
-        }
-      }, 500);
-    }
+    // Backend persistence disabled; local-only for now. Re-enable for Firebase later.
   }, [selectedProfile, showError]);
 
   // Handle role selection (Host or Student)

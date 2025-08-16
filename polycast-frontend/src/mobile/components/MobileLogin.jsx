@@ -1,24 +1,23 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
+import { validateCredentials } from '../../utils/profileLanguageMapping.js';
 
 const MobileLogin = ({ onProfileSelect }) => {
-  const [selectedProfile, setSelectedProfile] = useState('non-saving');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
 
-  // Available profiles (same as desktop)
-  const profiles = [
-    { value: 'non-saving', label: 'Non-saving Mode', icon: '🚫' },
-    { value: 'cat', label: 'Cat Profile', icon: '🐱' },
-    { value: 'dog', label: 'Dog Profile', icon: '🐶' },
-    { value: 'mouse', label: 'Mouse Profile', icon: '🐭' },
-    { value: 'horse', label: 'Horse Profile', icon: '🐴' },
-    { value: 'lizard', label: 'Lizard Profile', icon: '🦎' }
-  ];
-
-  const handleLogin = () => {
-    onProfileSelect(selectedProfile);
+  const handleCredentialLogin = (event) => {
+    event.preventDefault();
+    setLoginError('');
+    
+    const result = validateCredentials(username, password);
+    if (result.ok) {
+      onProfileSelect(result.profileKey);
+    } else {
+      setLoginError(result.error);
+    }
   };
-
-  const selectedProfileData = profiles.find(p => p.value === selectedProfile);
 
   return (
     <div className="mobile-login">
@@ -26,50 +25,63 @@ const MobileLogin = ({ onProfileSelect }) => {
         <div className="mobile-login-header">
           <div className="mobile-login-icon">📚</div>
           <h1 className="mobile-login-title">Welcome to PolyCast</h1>
-          <p className="mobile-login-subtitle">Select your study profile to begin</p>
+          <p className="mobile-login-subtitle">Enter your credentials to begin</p>
           <div style={{color: 'red', fontSize: '12px', marginTop: '8px'}}>DEBUG: Version 2.0 - Hardcoded Cards</div>
         </div>
 
-        <div className="mobile-login-form">
+        {/* Login Form */}
+        <form onSubmit={handleCredentialLogin} className="mobile-login-form" style={{ marginBottom: '20px' }}>
           <label className="mobile-login-label">
-            Choose Your Profile:
+            Login:
           </label>
           
-          <div className="mobile-login-dropdown">
-            <select 
+          <div style={{ marginBottom: '12px' }}>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="mobile-login-select"
-              value={selectedProfile}
-              onChange={(e) => setSelectedProfile(e.target.value)}
-            >
-              {profiles.map(profile => (
-                <option key={profile.value} value={profile.value}>
-                  {profile.icon} {profile.label}
-                </option>
-              ))}
-            </select>
+              placeholder="Username"
+              required
+            />
           </div>
-
-          <div className="mobile-selected-profile">
-            <div className="mobile-selected-icon">{selectedProfileData?.icon}</div>
-            <div className="mobile-selected-info">
-              <div className="mobile-selected-name">{selectedProfileData?.label}</div>
-              <div className="mobile-selected-desc">
-                {selectedProfile === 'non-saving' 
-                  ? 'Practice mode - progress won\'t be saved'
-                  : 'Your personal study profile with saved progress'
-                }
-              </div>
+          
+          <div style={{ marginBottom: '12px' }}>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mobile-login-select"
+              placeholder="Password"
+              required
+            />
+          </div>
+          
+          {loginError && (
+            <div style={{ 
+              color: '#ef4444', 
+              fontSize: '12px', 
+              marginBottom: '12px',
+              padding: '8px',
+              backgroundColor: '#2d1b1b',
+              borderRadius: '6px',
+              border: '1px solid #444'
+            }}>
+              {loginError}
             </div>
-          </div>
-
+          )}
+          
           <button 
+            type="submit"
             className="mobile-login-button"
-            onClick={handleLogin}
+            style={{ marginBottom: '16px' }}
           >
-            <span className="mobile-login-button-icon">🚀</span>
-            <span className="mobile-login-button-text">Enter Study Mode</span>
+            <span className="mobile-login-button-icon">🔐</span>
+            <span className="mobile-login-button-text">Login</span>
           </button>
-        </div>
+        </form>
+
+
       </div>
     </div>
   );

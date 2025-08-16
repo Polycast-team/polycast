@@ -101,16 +101,9 @@ export function useFlashcardSession(selectedProfile, wordDefinitions) {
   useEffect(() => {
     const initializeDailyLimits = async () => {
       const today = new Date().toDateString();
-      
-      if (selectedProfile === 'non-saving') {
-        // Non-saving mode: don't persist daily limits at all
-        setTodaysNewCards(0);
-      } else {
-        // Profile mode: temporarily disable database calls until endpoints are deployed
-        // TODO: Re-enable when SRS daily endpoints are deployed to production
-        console.log('[SRS Daily] Database endpoints not deployed yet, using local storage fallback');
-        setTodaysNewCards(0);
-      }
+      // Persistence disabled for now; set local counters only.
+      // TODO: Integrate Firebase and re-enable per-profile daily limits.
+      setTodaysNewCards(0);
     };
     
     initializeDailyLimits();

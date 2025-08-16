@@ -73,7 +73,8 @@ function Main() {
       return <LanguageSelectorScreen 
         onLanguageSelected={(languages) => {
           setSelectedLanguages(languages);
-          setSelectedProfile('non-saving'); // Auto-assign default profile for hosts
+          // Disable non-saving mode: choose a default real profile for hosts
+          setSelectedProfile('joshua');
         }}
       />;
     } else {

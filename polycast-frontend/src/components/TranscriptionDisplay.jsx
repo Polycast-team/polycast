@@ -71,7 +71,7 @@ const TranscriptionDisplay = ({
   setWordDefinitions,
   isStudentMode = false,
   studentHomeLanguage,
-  selectedProfile = 'non-saving',
+  selectedProfile = 'joshua',
   onAddWord
 }) => {
   const transcriptRef = useRef(null);

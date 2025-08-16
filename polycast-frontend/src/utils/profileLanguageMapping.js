@@ -1,12 +1,25 @@
 // Profile to language mapping
 export const PROFILE_LANGUAGE_MAP = {
-  'non-saving': 'English',
   'cat': 'Spanish',
   'dog': 'French', 
   'mouse': 'German',
   'horse': 'Italian',
   'lizard': 'Portuguese',
-  'shirley': 'Chinese'
+  'shirley': 'Chinese',
+  'joshua': 'Spanish',
+  'tyson': 'Spanish'
+};
+
+// Profile credentials (password for each profile)
+export const PROFILE_CREDENTIALS = {
+  'cat': 'password',
+  'dog': 'password',
+  'mouse': 'password',
+  'horse': 'password',
+  'lizard': 'password',
+  'shirley': 'password',
+  'joshua': 'password',
+  'tyson': 'password'
 };
 
 // Get language for a profile
@@ -256,4 +269,19 @@ export const FLASHCARD_TRANSLATIONS = {
 export const getTranslationsForProfile = (profile) => {
   const language = getLanguageForProfile(profile);
   return FLASHCARD_TRANSLATIONS[language] || FLASHCARD_TRANSLATIONS['English'];
+};
+
+// Validate user credentials
+export const validateCredentials = (username, password) => {
+  const profileKey = username.toLowerCase();
+  
+  if (!PROFILE_LANGUAGE_MAP[profileKey]) {
+    return { ok: false, error: 'Invalid username' };
+  }
+  
+  if (PROFILE_CREDENTIALS[profileKey] !== password) {
+    return { ok: false, error: 'Invalid password' };
+  }
+  
+  return { ok: true, profileKey };
 };
