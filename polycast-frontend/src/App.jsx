@@ -11,6 +11,9 @@ import Controls from './components/Controls';
 import TranscriptionDisplay from './components/TranscriptionDisplay';
 import DictionaryTable from './components/DictionaryTable';
 import FlashcardMode from './components/FlashcardMode';
+import FlashcardCalendarModal from './components/shared/FlashcardCalendarModal';
+import { useFlashcardCalendar } from './hooks/useFlashcardCalendar';
+import VideoMode from './components/VideoMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
 import { getLanguageForProfile, getTranslationsForProfile } from './utils/profileLanguageMapping.js';
@@ -109,7 +112,10 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // TODO: Add room-specific WebSocket routing: ws://localhost:8080/ws/room/:roomCode with room parameters
   // TODO: Parse room code from roomSetup and validate room exists before connecting
   // TODO: Include targetLangs, roomCode, and isHost parameters in WebSocket URL for room management
-  const socketUrl = roomSetup ? apiService.roomWebSocketUrl(languagesQueryParam, roomSetup.roomCode, roomSetup.isHost) : null;
+  // Always provide a websocket endpoint so students can stream without a room
+  const socketUrl = roomSetup
+    ? apiService.roomWebSocketUrl(languagesQueryParam, roomSetup.roomCode, roomSetup.isHost)
+    : `${apiService.wsBaseUrl}/ws`;
   console.log("Constructed WebSocket URL:", socketUrl);
 
   const [messageHistory, setMessageHistory] = useState([]);
@@ -159,6 +165,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [showNotification, setShowNotification] = useState(false);
   const [notificationOpacity, setNotificationOpacity] = useState(1);
   const [isAddingWordBusy, setIsAddingWordBusy] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [toolbarStats, setToolbarStats] = useState({ newCards: 0, learningCards: 0, reviewCards: 0 });
   // Auto-send functionality removed - using manual Record/Stop button instead
   const notificationTimeoutRef = useRef(null);
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
@@ -203,6 +211,30 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   useEffect(() => {
     try { localStorage.setItem('pc_wordDefinitions', JSON.stringify(wordDefinitions)); } catch {}
   }, [wordDefinitions]);
+
+  // Global listener to open/close the flashcard calendar from any mode
+  useEffect(() => {
+    const handler = (e) => {
+      const detail = e && e.detail;
+      if (detail === true) setShowCalendar(true);
+      else if (detail === false) setShowCalendar(false);
+      else setShowCalendar(prev => !prev);
+    };
+    window.addEventListener('toggleFlashcardCalendar', handler);
+    return () => window.removeEventListener('toggleFlashcardCalendar', handler);
+  }, []);
+
+  // Listen for live toolbar stats from FlashcardMode
+  useEffect(() => {
+    const onStats = (e) => {
+      if (e && e.detail) {
+        const { newCards = 0, learningCards = 0, reviewCards = 0 } = e.detail;
+        setToolbarStats({ newCards, learningCards, reviewCards });
+      }
+    };
+    window.addEventListener('updateToolbarStats', onStats);
+    return () => window.removeEventListener('updateToolbarStats', onStats);
+  }, []);
 
   // One-time cleanup: remove any flashcard entries missing exampleSentencesGenerated
   useEffect(() => {
@@ -334,12 +366,21 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     Promise.allSettled(promises).finally(() => setIsAddingWordBusy(false));
   }, [wordDefinitions, fullTranscript, selectedProfile, internalSelectedProfile]);
 
-  // Ensure recording stops if appMode changes from 'audio'
+  // Ensure recording stops when leaving modes that support streaming
   useEffect(() => {
-    if (appMode !== 'audio' && isRecording) {
+    if (appMode !== 'audio' && appMode !== 'video' && isRecording) {
       setIsRecording(false);
     }
   }, [appMode, isRecording]);
+
+  // Auto-unmute when entering Video mode
+  useEffect(() => {
+    if (appMode === 'video') {
+      // Delay a tick to allow AudioRecorder to acquire mic stream first
+      const id = setTimeout(() => setIsRecording(true), 50);
+      return () => clearTimeout(id);
+    }
+  }, [appMode]);
 
   // Auto-switch modes for students based on room status
   useEffect(() => {
@@ -623,6 +664,10 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       // Just update local state for audio mode
       console.log('Setting mode to audio (local only)');
       setAppMode('audio');
+    } else if (newMode === 'video') {
+      // Update to video mode
+      console.log('Setting mode to video (local only)');
+      setAppMode('video');
     }
   }, [appMode]);
 
@@ -643,6 +688,16 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       }
     };
   }, []);
+
+  // Calendar queue (available globally so it works in both dictionary and flashcard modes)
+  const { queue, reorderQueue } = useFlashcardCalendar(
+    [],
+    wordDefinitions,
+    [],
+    selectedProfile || internalSelectedProfile,
+    [],
+    0
+  );
 
   return (
     <div className="App">
@@ -737,16 +792,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             onStopRecording={roomSetup && roomSetup.isHost ? handleStopRecording : null}
             appMode={appMode}
             setAppMode={handleAppModeChange}
-            showLiveTranscript={showLiveTranscript}
-            setShowLiveTranscript={(checked) => {
-              setShowLiveTranscript(checked);
-              if (!checked && !showTranslation) setShowTranslation(true);
-            }}
-            showTranslation={showTranslation}
-            setShowTranslation={(checked) => {
-              setShowTranslation(checked);
-              if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
-            }}
+            toolbarStats={toolbarStats}
+            showLiveTranscript={true}
+            setShowLiveTranscript={() => {}}
+            showTranslation={false}
+            setShowTranslation={() => {}}
             roomSetup={roomSetup}
             selectedProfile={selectedProfile || internalSelectedProfile}
             setSelectedProfile={profile => {
@@ -939,6 +989,39 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             targetLanguages={effectiveLanguages}
             selectedProfile={selectedProfile || internalSelectedProfile}
           />
+        ) : appMode === 'video' ? (
+          <VideoMode
+            sendMessage={sendMessage}
+            isRecording={isRecording}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+            roomSetup={roomSetup}
+            fullTranscript={fullTranscript}
+            currentPartial={currentPartial}
+            translations={translations}
+            targetLanguages={effectiveLanguages}
+            showLiveTranscript={showLiveTranscript}
+            setShowLiveTranscript={(checked) => {
+              setShowLiveTranscript(checked);
+              if (!checked && !showTranslation) setShowTranslation(true);
+            }}
+            showTranslation={showTranslation}
+            setShowTranslation={(checked) => {
+              setShowTranslation(checked);
+              if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
+            }}
+            selectedProfile={selectedProfile || internalSelectedProfile}
+            studentHomeLanguage={studentHomeLanguage}
+            selectedWords={selectedWords}
+            setSelectedWords={setSelectedWords}
+            wordDefinitions={wordDefinitions}
+            setWordDefinitions={setWordDefinitions}
+            onAddWord={(word) => {
+              console.log(`Add from popup (video mode): ${word}`);
+              handleAddWord(word);
+            }}
+            showTBA={showTBA}
+          />
         ) : (
           <TranscriptionDisplay 
             showTBA={showTBA}
@@ -1058,6 +1141,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
       {/* Error Popup */}
       <ErrorPopup error={popupError} onClose={clearError} />
+      {/* Flashcard Calendar Modal (global) */}
+      <FlashcardCalendarModal
+        showCalendar={showCalendar}
+        setShowCalendar={setShowCalendar}
+        queue={queue}
+        onReorder={reorderQueue}
+      />
       <TBAPopup tba={popupTBA} onClose={clearTBA} />
 
     </div>

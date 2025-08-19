@@ -7,6 +7,7 @@ function AudioRecorder({ sendMessage, isRecording }) {
   const processorRef = useRef(null);
   const sourceRef = useRef(null);
   const [micError, setMicError] = useState(null);
+  const [hasStream, setHasStream] = useState(false);
   
   // Get microphone access on mount
   useEffect(() => {
@@ -22,6 +23,7 @@ function AudioRecorder({ sendMessage, isRecording }) {
           }
         });
         setMicError(null);
+        setHasStream(true);
       } catch (err) {
         setMicError('Microphone access denied or unavailable');
         console.error('Mic error:', err);
@@ -38,6 +40,7 @@ function AudioRecorder({ sendMessage, isRecording }) {
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
+      setHasStream(false);
     };
   }, []);
   
@@ -100,7 +103,7 @@ function AudioRecorder({ sendMessage, isRecording }) {
       // Send signal to close Deepgram streaming session
       sendMessage('STOP_STREAM');
     }
-  }, [isRecording, sendMessage, micError]);
+  }, [isRecording, sendMessage, micError, hasStream]);
   
   return (
     <div className="audio-recorder">

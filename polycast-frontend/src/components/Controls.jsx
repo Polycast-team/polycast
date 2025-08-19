@@ -25,6 +25,7 @@ function Controls({
     setSelectedProfile,
     userRole,
     roomSetup,
+    toolbarStats,
 }) {
     // Check if we're in host mode (all control functions available) or student mode (view-only)
     const isHostMode = setIsTextMode !== null && onStartRecording !== null;
@@ -84,6 +85,29 @@ function Controls({
                         </button>
                     )}
                     
+                    {/* Show video button only when not in video mode */}
+                    {appMode !== 'video' && (
+                        <button
+                            onClick={() => setAppMode && setAppMode('video')}
+                            disabled={isRecording}
+                            style={{
+                                background: '#3f3969',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '6px 12px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                            title="Video Mode"
+                        >
+                            🎥 Video
+                        </button>
+                    )}
+
                     {/* Show dictionary button only when not in dictionary mode */}
                     {appMode !== 'dictionary' && (
                         <button
@@ -190,7 +214,7 @@ function Controls({
             </div>
             
             {/* Flashcard controls - only show in flashcard mode */}
-            {appMode === 'flashcard' && (
+            {(appMode === 'flashcard' || appMode === 'dictionary') && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 20 }}>
                 <button 
                   onClick={() => window.location.reload()}
@@ -203,11 +227,7 @@ function Controls({
                 </button>
                 
                 <button 
-                  onClick={() => {
-                    showTBA('Flashcard calendar is not yet implemented. This will be available in a future update.');
-                    // We'll need to pass this function down from App.jsx
-                    // window.dispatchEvent(new CustomEvent('showFlashcardCalendar'));
-                  }}
+                  onClick={() => window.dispatchEvent(new CustomEvent('toggleFlashcardCalendar', { detail: true }))}
                   style={{
                     background: 'none', border: '1px solid #2196f3', borderRadius: '6px',
                     padding: '6px 10px', fontSize: '13px', color: '#2196f3', cursor: 'pointer'
@@ -217,9 +237,9 @@ function Controls({
                 </button>
                 
                 <div style={{ color: '#ccc', fontSize: '12px' }}>
-                  <span style={{color: '#5f72ff'}}>{t.new}: 5</span> • 
-                  <span style={{color: '#ef4444', marginLeft: '4px'}}>{t.learning}: 0</span> • 
-                  <span style={{color: '#10b981', marginLeft: '4px'}}>{t.review}: 1</span>
+                  <span style={{color: '#5f72ff'}}>{t.new}: {toolbarStats?.newCards ?? 0}</span> • 
+                  <span style={{color: '#ef4444', marginLeft: '4px'}}>{t.learning}: {toolbarStats?.learningCards ?? 0}</span> • 
+                  <span style={{color: '#10b981', marginLeft: '4px'}}>{t.review}: {toolbarStats?.reviewCards ?? 0}</span>
                 </div>
               </div>
             )}
@@ -290,6 +310,11 @@ Controls.propTypes = {
     setSelectedProfile: PropTypes.func.isRequired,
     userRole: PropTypes.string,
     roomSetup: PropTypes.object,
+    toolbarStats: PropTypes.shape({
+        newCards: PropTypes.number,
+        learningCards: PropTypes.number,
+        reviewCards: PropTypes.number,
+    }),
 };
 
 export default Controls;

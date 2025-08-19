@@ -9,14 +9,12 @@ import { calculateNextReview, formatNextReviewTime } from '../utils/srsAlgorithm
 import { useFlashcardSession } from '../hooks/useFlashcardSession';
 import { useFlashcardSRS } from '../hooks/useFlashcardSRS';
 import { useFlashcardCalendar } from '../hooks/useFlashcardCalendar';
-import FlashcardCalendarModal from './shared/FlashcardCalendarModal';
 import { getTranslationsForProfile, getLanguageForProfile } from '../utils/profileLanguageMapping';
 import '../mobile/styles/mobile-flashcards.css';
 import '../services/apiService.js';
 import apiService from '../services/apiService.js';
 import { use } from 'react';
-import TBAPopup from './popups/TBAPopup';
-import { useTBAHandler } from '../hooks/useTBAHandler';
+// Removed TBA popup usage for cleaner UI
 
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
@@ -27,7 +25,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   const [currentMode, setCurrentMode] = useState(() => {
     return shouldUseMobileApp() ? 'profile' : 'flashcards';
   });
-  const [showCalendar, setShowCalendar] = useState(false);
+  // Calendar modal is now controlled globally in App.jsx
   const [dragState, setDragState] = useState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
   const [cardEntryAnimation, setCardEntryAnimation] = useState('');
   const [answerFeedback, setAnswerFeedback] = useState({ show: false, type: '', text: '' });
@@ -35,7 +33,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   const [currentAudio, setCurrentAudio] = useState(null);
   const [hasAutoPlayedThisFlip, setHasAutoPlayedThisFlip] = useState(false);
   const { error: popupError, showError, clearError } = useErrorHandler();
-  const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
+  // TBA popup removed
   const isActuallyMobile = shouldUseMobileApp();
 
   // Use shared session hook
@@ -53,6 +51,13 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     calendarUpdateTrigger,
     progressPercentage
   } = sessionData;
+
+  // Emit live header stats so Controls toolbar can reflect accurate counts
+  useEffect(() => {
+    if (headerStats) {
+      window.dispatchEvent(new CustomEvent('updateToolbarStats', { detail: headerStats }));
+    }
+  }, [headerStats]);
   
   // Use shared SRS hook
   const { markCard: markCardBase } = useFlashcardSRS(
@@ -65,7 +70,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   );
   
   // Use shared calendar hook
-  const { calendarData } = useFlashcardCalendar(
+  const { queue, reorderQueue } = useFlashcardCalendar(
     dueCards,
     wordDefinitions,
     sessionData.availableCards,
@@ -438,6 +443,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     };
   }, [selectedProfile, currentMode]);
 
+  // Calendar modal moved to App level so it can open from any mode
+
   // Show completion screen
   if (currentMode === 'flashcards' && isSessionComplete) {
     return (
@@ -640,19 +647,11 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         </div>
       )}
 
-      {/* Calendar Modal */}
-      <FlashcardCalendarModal 
-        calendarData={calendarData}
-        showCalendar={showCalendar}
-        setShowCalendar={setShowCalendar}
-        processedCards={processedCards}
-        dueCards={dueCards}
-        calendarUpdateTrigger={calendarUpdateTrigger}
-      />
+      {/* Calendar Modal moved to App.jsx */}
 
       {/* Error Popup */}
       <ErrorPopup error={popupError} onClose={clearError} />
-      <TBAPopup tba={popupTBA} onClose={clearTBA} />
+      {/* TBA popup removed */}
     </div>
   );
 };

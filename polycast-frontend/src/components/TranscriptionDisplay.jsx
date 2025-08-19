@@ -65,6 +65,8 @@ const TranscriptionDisplay = ({
   translations = {}, 
   showLiveTranscript = true, 
   showTranslation = true, 
+  defaultFontSize,
+  compactLines = false,
   selectedWords = [],
   setSelectedWords,
   wordDefinitions = {},
@@ -76,7 +78,7 @@ const TranscriptionDisplay = ({
 }) => {
   const transcriptRef = useRef(null);
   const scrollContainerRef = useRef(null);
-  const [fontSize, setFontSize] = useState(30);
+  const [fontSize, setFontSize] = useState(() => defaultFontSize || 30);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const [popupInfo, setPopupInfo] = useState({
     visible: false,
@@ -207,6 +209,26 @@ const TranscriptionDisplay = ({
 
   const renderTranscript = () => {
     const sentences = splitIntoSentences(fullTranscript);
+    // Decide if currentPartial should render on a NEW line immediately,
+    // based on whether the last committed line is "closed" (contains a long
+    // sentence >3 words or already grouped 3 short sentences).
+    const shouldPartialStartNewLine = (() => {
+      if (!currentPartial) return false;
+      if (sentences.length === 0) return false; // handled separately below
+      const lastLine = sentences[sentences.length - 1] || '';
+      // Split lastLine back into simple sentences using punctuation pairs
+      const parts = lastLine.split(/([.!?])/);
+      const simple = [];
+      for (let i = 0; i < parts.length; i += 2) {
+        const textPart = (parts[i] || '').trim();
+        const punct = parts[i + 1] || '';
+        const full = (textPart + punct).trim();
+        if (full) simple.push(textPart);
+      }
+      const numSimple = simple.length;
+      const hasLong = simple.some(s => (s.trim().split(/\s+/).filter(Boolean).length) > 3);
+      return hasLong || numSimple >= 3;
+    })();
     
     return (
       <div style={{ fontSize, lineHeight: 1.6, padding: '20px', minHeight: '100%' }}>
@@ -221,7 +243,7 @@ const TranscriptionDisplay = ({
                   renderClickableWord(token, `${sentIdx}-${tokenIdx}`)
                 )}
                 {/* Append currentPartial to the last sentence line to avoid jumping */}
-                {isLastSentence && currentPartial && (
+                {isLastSentence && currentPartial && !shouldPartialStartNewLine && (
                   <>
                     {' '}
                     {tokenizeText(currentPartial).map((token, idx) => 
@@ -230,7 +252,7 @@ const TranscriptionDisplay = ({
                   </>
                 )}
               </div>
-              {sentIdx < sentences.length - 1 && (
+              {sentIdx < sentences.length - 1 && !compactLines && (
                 <div style={{
                   display: 'flex',
                   justifyContent: 'center',
@@ -256,6 +278,14 @@ const TranscriptionDisplay = ({
             borderRadius: '4px',
             color: '#22c55e' // Green text
           }}>
+            {tokenizeText(currentPartial).map((token, idx) => 
+              renderClickableWord(token, `partial-${idx}`, true)
+            )}
+          </div>
+        )}
+        {/* Or render currentPartial as its own new line if the last line is closed */}
+        {sentences.length > 0 && currentPartial && shouldPartialStartNewLine && (
+          <div style={{ marginBottom: '10px' }}>
             {tokenizeText(currentPartial).map((token, idx) => 
               renderClickableWord(token, `partial-${idx}`, true)
             )}
@@ -420,6 +450,8 @@ TranscriptionDisplay.propTypes = {
   translations: PropTypes.object,
   showLiveTranscript: PropTypes.bool,
   showTranslation: PropTypes.bool,
+  defaultFontSize: PropTypes.number,
+  compactLines: PropTypes.bool,
   selectedWords: PropTypes.array,
   setSelectedWords: PropTypes.func,
   wordDefinitions: PropTypes.object,

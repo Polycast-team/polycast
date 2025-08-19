@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 
 /**
  * Shared hook for flashcard calendar functionality
@@ -12,77 +12,53 @@ export function useFlashcardCalendar(
   processedCards,
   calendarUpdateTrigger
 ) {
-  // Calculate future due dates for calendar - using useMemo for proper reactivity
-  const calendarData = useMemo(() => {
-    const today = new Date();
-    const nextWeekDays = [];
-    
-    // Building calendar for next 8 days
-    
-    // Get all cards with current session updates
-    const currentCards = [];
-    
-    // Add cards from current session (dueCards) with their updated state
-    dueCards.forEach(card => {
-      currentCards.push(card);
-    });
-    
-    // Add processed cards (cards that were answered and removed from session)
-    processedCards.forEach(card => {
-      currentCards.push(card);
-    });
-    
-    // Add cards from updated wordDefinitions data
-    Object.entries(wordDefinitions).forEach(([key, value]) => {
-      if (value && value.wordSenseId && value.inFlashcards) {
-        const alreadyInSession = dueCards.some(sessionCard => 
-          sessionCard.key === key || sessionCard.wordSenseId === value.wordSenseId
-        );
-        const alreadyProcessed = processedCards.some(processedCard => 
-          processedCard.key === key || processedCard.wordSenseId === value.wordSenseId
-        );
-        if (!alreadyInSession && !alreadyProcessed) {
-          currentCards.push({ ...value, key });
-        }
-      }
-    });
-    
-    for (let i = 0; i < 8; i++) { // Extended to 8 days to catch more future cards
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      date.setHours(0, 0, 0, 0);
-      
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
-      
-      // Find cards due on this day using current session data
-      const cardsForDay = currentCards.filter(card => {
-        if (!card.srsData) return false;
-        
-        const dueDate = new Date(card.srsData.dueDate || card.srsData.nextReviewDate);
-        
-        // Compare just the date parts, ignoring time
-        const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-        const dayDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        const isInRange = dueDateOnly.getTime() === dayDateOnly.getTime();
-        
-        // Check if card is due on this specific day
-        
-        return isInRange;
+  // Local version counter to reflect manual reorders immediately
+  const [orderVersion, setOrderVersion] = useState(0);
+  // Build the unseen senses queue sorted by frequency (desc)
+  const queue = useMemo(() => {
+    if (!wordDefinitions) return [];
+    const items = [];
+    Object.entries(wordDefinitions).forEach(([key, entry]) => {
+      if (!entry || !entry.inFlashcards || !entry.wordSenseId) return;
+      // Treat "new" as unseen
+      const isNew = entry?.srsData?.isNew === true || (!entry?.srsData || ((entry?.srsData?.correctCount || 0) + (entry?.srsData?.incorrectCount || 0)) === 0);
+      if (!isNew) return;
+      items.push({
+        wordSenseId: entry.wordSenseId,
+        word: entry.word,
+        translation: entry.translation || entry.disambiguatedDefinition?.translation || '',
+        definition: entry.definition || entry.disambiguatedDefinition?.definition || '',
+        example: entry.contextSentence || entry.example || '',
+        frequency: Number(entry.frequency || 5)
       });
-      
-      nextWeekDays.push({
-        date,
-        cards: cardsForDay,
-        dayName: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short' }),
-        dateStr: date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
-      });
-    }
-    
-    return nextWeekDays;
-  }, [dueCards, wordDefinitions, availableCards, selectedProfile, processedCards, calendarUpdateTrigger]);
+    });
+    // Sort by frequency desc, stable
+    items.sort((a, b) => (b.frequency || 0) - (a.frequency || 0));
 
-  return {
-    calendarData
-  };
+    // Apply saved order override per profile
+    try {
+      const saved = JSON.parse(localStorage.getItem(`pc_calendarQueueOrder_${selectedProfile}`) || '[]');
+      if (Array.isArray(saved) && saved.length) {
+        const map = new Map(items.map((it) => [it.wordSenseId, it]));
+        const ordered = [];
+        saved.forEach((id) => { if (map.has(id)) { ordered.push(map.get(id)); map.delete(id); } });
+        // Append any new items (keep frequency order among the remaining)
+        const rest = Array.from(map.values());
+        ordered.push(...rest);
+        return ordered;
+      }
+    } catch {}
+    return items;
+  }, [wordDefinitions, selectedProfile, calendarUpdateTrigger, orderVersion]);
+
+  // Reorder and persist
+  const reorderQueue = useCallback((newOrderIds) => {
+    try {
+      localStorage.setItem(`pc_calendarQueueOrder_${selectedProfile}`, JSON.stringify(newOrderIds));
+    } catch {}
+    // Trigger a re-computation immediately
+    setOrderVersion((v) => v + 1);
+  }, [selectedProfile]);
+
+  return { queue, reorderQueue };
 }

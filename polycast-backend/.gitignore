@@ -13,4 +13,4 @@ node_modules/
 *.log
 
 # Google Cloud credentials
-polycast-backend/googleKeys.json
+googleKeys.json
