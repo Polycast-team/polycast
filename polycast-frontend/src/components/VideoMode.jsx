@@ -114,7 +114,7 @@ function VideoMode({
   };
 
   return (
-    <div style={{ position: 'relative', display: 'flex', gap: 16, padding: 16, alignItems: 'flex-start', minHeight: 'calc(100vh - 140px)' }}>
+    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', padding: '16px', minHeight: '100vh', boxSizing: 'border-box' }}>
       {/* Full-screen loading overlay while camera initializes */}
       {!videoReady && !videoError && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -125,117 +125,129 @@ function VideoMode({
           <style>{`@keyframes pc_spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
         </div>
       )}
-      {/* Left: mirrored webcam */}
-      <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ position: 'relative', background: '#0f1020', borderRadius: 12, overflow: 'hidden' }}>
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            style={{ width: '100%', height: 'auto', transform: 'scaleX(-1)', display: 'block' }}
-          />
-          {videoError && (
-            <div style={{ position: 'absolute', inset: 0, color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
-              {videoError}
-            </div>
-          )}
-        </div>
+      
+      {/* Top section: video, controls, and transcript header (red box area) */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center',
+        marginBottom: '0'
+      }}>
+        {/* Centered video */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: '700px', width: '100%' }}>
+          <div style={{ position: 'relative', background: '#0f1020', borderRadius: 12, overflow: 'hidden' }}>
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              style={{ width: '100%', height: 'auto', transform: 'scaleX(-1)', display: 'block' }}
+            />
+            {videoError && (
+              <div style={{ position: 'absolute', inset: 0, color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
+                {videoError}
+              </div>
+            )}
+          </div>
 
-        {/* Mute/Unmute control available to all users */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          {isRecording ? (
-            <button
-              onClick={onStopRecording || (() => {})}
-              style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
-            >
-              Mute
-            </button>
-          ) : (
-            <button
-              onClick={onStartRecording || (() => {})}
-              style={{ background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
-            >
-              Unmute
-            </button>
-          )}
-        </div>
+          {/* Mute/Unmute control */}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: '16px' }}>
+            {isRecording ? (
+              <button
+                onClick={onStopRecording || (() => {})}
+                style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+              >
+                Mute
+              </button>
+            ) : (
+              <button
+                onClick={onStartRecording || (() => {})}
+                style={{ background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+              >
+                Unmute
+              </button>
+            )}
+          </div>
 
-        {/* Hidden audio pipeline to drive transcript */}
-        <div style={{ display: 'none' }}>
-          <AudioRecorder sendMessage={sendMessage} isRecording={isRecording} />
+          {/* Hidden audio pipeline to drive transcript */}
+          <div style={{ display: 'none' }}>
+            <AudioRecorder sendMessage={sendMessage} isRecording={isRecording} />
+          </div>
+        </div>
+        
+        {/* Transcript header with font controls - full width */}
+        <div style={{
+          width: '100%',
+          background: '#181b2f',
+          borderTop: '6px solid #7c62ff',
+          borderRadius: '10px 10px 0 0',
+          boxShadow: '0 2px 12px 0 rgba(124, 98, 255, 0.14)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '18px 20px 10px 20px',
+        }}>
+          <span style={{ 
+            letterSpacing: 0.5, 
+            fontWeight: 800, 
+            fontSize: 20, 
+            color: '#b3b3e7', 
+            textTransform: 'uppercase', 
+            opacity: 0.92 
+          }}>
+            {ui.transcriptHeader}
+          </span>
+          
+          {/* Font size controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('changeFontSize', { detail: -2 }))}
+              style={{
+                background: '#23233a', color: '#fff', border: 'none', borderRadius: 6, width: 28, height: 28,
+                fontSize: 18, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              –
+            </button>
+            <span style={{ color: '#aaa', fontSize: 14, fontWeight: 500, minWidth: 30, textAlign: 'center' }}>
+              {fontSize}px
+            </span>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('changeFontSize', { detail: 2 }))}
+              style={{
+                background: '#23233a', color: '#fff', border: 'none', borderRadius: 6, width: 28, height: 28,
+                fontSize: 18, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              +
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Right: custom transcript with font controls */}
-      <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column' }}>
-        <div style={{
-          width: '100%',
-          height: 'calc(100vh - 200px)',
-          minHeight: '400px',
-          background: '#181b2f',
-          color: '#fff',
-          borderTop: '6px solid #7c62ff',
-          borderRadius: 10,
-          boxShadow: '0 2px 12px 0 rgba(124, 98, 255, 0.14)',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
+      {/* Bottom: transcript content area (pink box area) */}
+      <div style={{
+        width: '100%',
+        flex: 1,
+        background: '#181b2f',
+        color: '#fff',
+        borderRadius: '0 0 10px 10px',
+        boxShadow: '0 2px 12px 0 rgba(124, 98, 255, 0.14)',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        marginBottom: '120px', // Space for bottom toolbar
+        minHeight: '200px'
+      }}>
+        {/* Transcript content */}
+        <div style={{ 
+          flex: 1, 
+          overflowY: 'auto', 
+          padding: '20px',
+          fontSize: `${fontSize}px`,
+          lineHeight: 1.6
         }}>
-          {/* Header with font controls */}
-          <div style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '18px 20px 10px 20px',
-            borderBottom: '1px solid #333'
-          }}>
-            <span style={{ 
-              letterSpacing: 0.5, 
-              fontWeight: 800, 
-              fontSize: 20, 
-              color: '#b3b3e7', 
-              textTransform: 'uppercase', 
-              opacity: 0.92 
-            }}>
-              {ui.transcriptHeader}
-            </span>
-            
-            {/* Font size controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent('changeFontSize', { detail: -2 }))}
-                style={{
-                  background: '#23233a', color: '#fff', border: 'none', borderRadius: 6, width: 28, height: 28,
-                  fontSize: 18, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                –
-              </button>
-              <span style={{ color: '#aaa', fontSize: 14, fontWeight: 500, minWidth: 30, textAlign: 'center' }}>
-                {fontSize}px
-              </span>
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent('changeFontSize', { detail: 2 }))}
-                style={{
-                  background: '#23233a', color: '#fff', border: 'none', borderRadius: 6, width: 28, height: 28,
-                  fontSize: 18, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                +
-              </button>
-            </div>
-          </div>
-          
-          {/* Transcript content */}
-          <div style={{ 
-            flex: 1, 
-            overflowY: 'auto', 
-            padding: '15px 20px',
-            fontSize: `${fontSize}px`,
-            lineHeight: 1.6
-          }}>
             {fullTranscript ? (
               <div>
                 {fullTranscript.split(/(\s+)/).map((token, index) => {
@@ -269,7 +281,6 @@ function VideoMode({
                 {isHost ? 'Click "Unmute" to start recording...' : 'Waiting for host to start...'}
               </div>
             )}
-          </div>
         </div>
       </div>
       
