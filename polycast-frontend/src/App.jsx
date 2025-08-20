@@ -16,7 +16,7 @@ import { useFlashcardCalendar } from './hooks/useFlashcardCalendar';
 import VideoMode from './components/VideoMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
-import { getLanguageForProfile, getTranslationsForProfile } from './utils/profileLanguageMapping.js';
+import { getLanguageForProfile, getTranslationsForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from './utils/profileLanguageMapping.js';
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
@@ -31,6 +31,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   
   // Get translations for this profile's language
   const t = getTranslationsForProfile(selectedProfile);
+  const ui = getUITranslationsForProfile(selectedProfile);
   
   // Step 1: Use selectedProfile from props, with fallback to non-saving
   const [internalSelectedProfile, setSelectedProfile] = React.useState(selectedProfile || 'non-saving');
@@ -125,7 +126,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   const [errorMessages, setErrorMessages] = useState([]); 
   const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
-  const [showTranslation, setShowTranslation] = useState(targetLanguages && targetLanguages.length > 0); 
+  const [showTranslation, setShowTranslation] = useState(false); 
   // Students start in flashcard mode, hosts start in audio mode
   const [appMode, setAppMode] = useState(() => {
     // If student not in a room, start in flashcard mode
@@ -135,33 +136,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     // Otherwise start in audio mode (hosts or students in rooms)
     return 'audio';
   }); // Options: 'audio', 'dictionary', 'flashcard'
-  const [selectedWords, setSelectedWords] = useState(() => {
-    try {
-      const stored = localStorage.getItem('pc_selectedWords');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  }); // Selected words for dictionary
-  const [wordDefinitions, setWordDefinitions] = useState(() => {
-    try {
-      const stored = localStorage.getItem('pc_wordDefinitions');
-      const parsed = stored ? JSON.parse(stored) : {};
-      // Synchronously purge any broken entries missing exampleSentencesGenerated to prevent crashes on first render
-      const cleaned = {};
-      Object.entries(parsed || {}).forEach(([key, entry]) => {
-        if (!entry || !entry.wordSenseId) return; // skip invalid
-        if (!entry.exampleSentencesGenerated) return; // drop broken
-        cleaned[key] = entry;
-      });
-      if (Object.keys(cleaned).length !== Object.keys(parsed || {}).length) {
-        try { localStorage.setItem('pc_wordDefinitions', JSON.stringify(cleaned)); } catch {}
-      }
-      return cleaned;
-    } catch {
-      return {};
-    }
-  }); // Cache for word definitions
+  const [selectedWords, setSelectedWords] = useState([]); // Profile-scoped selected words
+  const [wordDefinitions, setWordDefinitions] = useState({}); // Profile-scoped word definitions
   const [showNotification, setShowNotification] = useState(false);
   const [notificationOpacity, setNotificationOpacity] = useState(1);
   const [isAddingWordBusy, setIsAddingWordBusy] = useState(false);
@@ -174,12 +150,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
 
 
-  // Ensure mutual exclusivity between transcript and translation checkboxes
-  useEffect(() => {
-    if (!showLiveTranscript && !showTranslation) {
-      setShowTranslation(true);
-    }
-  }, [showLiveTranscript, showTranslation]);
+  // Toggle behavior disabled while translation UI is hidden
 
   // Update refs when state changes
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
@@ -204,13 +175,65 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     return () => window.removeEventListener("keydown", handlePageKey);
   }, [roomSetup]); // Reverted dependencies
 
-  // Persist dictionary state to localStorage
+  // Load and migrate profile-scoped dictionary/flashcards when profile changes
   useEffect(() => {
-    try { localStorage.setItem('pc_selectedWords', JSON.stringify(selectedWords)); } catch {}
-  }, [selectedWords]);
+    const profile = selectedProfile || internalSelectedProfile;
+    if (!profile) return;
+    try {
+      const swKey = `pc_selectedWords_${profile}`;
+      const wdKey = `pc_wordDefinitions_${profile}`;
+
+      // Migrate from legacy global keys if present
+      const legacySW = localStorage.getItem('pc_selectedWords');
+      const legacyWD = localStorage.getItem('pc_wordDefinitions');
+
+      if (!localStorage.getItem(swKey) && legacySW) {
+        localStorage.setItem(swKey, legacySW);
+        try { localStorage.removeItem('pc_selectedWords'); } catch {}
+      }
+      if (!localStorage.getItem(wdKey) && legacyWD) {
+        localStorage.setItem(wdKey, legacyWD);
+        try { localStorage.removeItem('pc_wordDefinitions'); } catch {}
+      }
+
+      // Read scoped values
+      const storedSW = localStorage.getItem(swKey);
+      const storedWD = localStorage.getItem(wdKey);
+
+      const parsedSW = storedSW ? JSON.parse(storedSW) : [];
+      const parsedWD = storedWD ? JSON.parse(storedWD) : {};
+
+      // Clean broken entries for safety
+      const cleanedWD = {};
+      Object.entries(parsedWD || {}).forEach(([key, entry]) => {
+        if (!entry || !entry.wordSenseId) return;
+        if (!entry.exampleSentencesGenerated) return;
+        cleanedWD[key] = entry;
+      });
+
+      setSelectedWords(Array.isArray(parsedSW) ? parsedSW : []);
+      setWordDefinitions(cleanedWD);
+
+      // Persist cleaned snapshot back to scoped storage if changed
+      try { localStorage.setItem(wdKey, JSON.stringify(cleanedWD)); } catch {}
+    } catch (e) {
+      console.warn('Failed to load/migrate profile-scoped dictionary data:', e);
+      setSelectedWords([]);
+      setWordDefinitions({});
+    }
+  }, [selectedProfile, internalSelectedProfile]);
+
+  // Persist dictionary state to profile-scoped localStorage
   useEffect(() => {
-    try { localStorage.setItem('pc_wordDefinitions', JSON.stringify(wordDefinitions)); } catch {}
-  }, [wordDefinitions]);
+    const profile = selectedProfile || internalSelectedProfile;
+    if (!profile) return;
+    try { localStorage.setItem(`pc_selectedWords_${profile}`, JSON.stringify(selectedWords)); } catch {}
+  }, [selectedWords, selectedProfile, internalSelectedProfile]);
+  useEffect(() => {
+    const profile = selectedProfile || internalSelectedProfile;
+    if (!profile) return;
+    try { localStorage.setItem(`pc_wordDefinitions_${profile}`, JSON.stringify(wordDefinitions)); } catch {}
+  }, [wordDefinitions, selectedProfile, internalSelectedProfile]);
 
   // Global listener to open/close the flashcard calendar from any mode
   useEffect(() => {
@@ -257,7 +280,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Local handler to add a word to dictionary (flashcard entry in local state)
   const handleAddWord = useCallback(async (word) => {
     const wordLower = (word || '').toLowerCase();
-    const nativeLanguage = 'English';
+    const nativeLanguage = getNativeLanguageForProfile(selectedProfile || internalSelectedProfile);
     const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
     const contextSentence = fullTranscript || '';
 
@@ -312,7 +335,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // New: add multiple senses at once (from AddWordPopup)
   const handleAddWordSenses = useCallback((word, senses) => {
     const wordLower = (word || '').toLowerCase();
-    const nativeLanguage = 'English';
+    const nativeLanguage = getNativeLanguageForProfile(selectedProfile || internalSelectedProfile);
     const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
     const contextSentence = fullTranscript || '';
 
@@ -747,7 +770,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                 background: roomSetup.isHost ? 'rgba(59, 130, 246, 0.6)' : 'rgba(16, 185, 129, 0.6)',
               }}
             >
-              {roomSetup?.isHost ? `Room: ${roomSetup?.roomCode || 'Not Connected'}` : `Student • Room: ${roomSetup?.roomCode || 'Not Connected'}`}
+              {roomSetup?.isHost ? `${ui.room}: ${roomSetup?.roomCode || '—'}` : `${ui.student} • ${ui.room}: ${roomSetup?.roomCode || '—'}`}
             </div>
           )}
         </div>
@@ -771,7 +794,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               opacity: 0.98,
               zIndex: 2,
             }}>
-              Recording...
+              {ui.recording}
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -852,7 +875,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             padding: '8px 12px',
             borderRadius: 4
           }}>
-            <span>Student</span>
+            <span>{ui.student}</span>
           </div>
         )}
         
@@ -870,7 +893,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               cursor: 'pointer'
             }}
           >
-            {t.joinRoom}
+            {ui.joinRoom}
           </button>
         )}
         
@@ -888,7 +911,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               cursor: 'pointer'
             }}
           >
-            Exit Room
+            {ui.exitRoom}
           </button>
         )}
       </div>
@@ -1000,16 +1023,10 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             currentPartial={currentPartial}
             translations={translations}
             targetLanguages={effectiveLanguages}
-            showLiveTranscript={showLiveTranscript}
-            setShowLiveTranscript={(checked) => {
-              setShowLiveTranscript(checked);
-              if (!checked && !showTranslation) setShowTranslation(true);
-            }}
-            showTranslation={showTranslation}
-            setShowTranslation={(checked) => {
-              setShowTranslation(checked);
-              if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
-            }}
+            showLiveTranscript={true}
+            setShowLiveTranscript={() => {}}
+            showTranslation={false}
+            setShowTranslation={() => {}}
             selectedProfile={selectedProfile || internalSelectedProfile}
             studentHomeLanguage={studentHomeLanguage}
             selectedWords={selectedWords}
@@ -1029,8 +1046,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             currentPartial={currentPartial}
             translations={translations} 
             targetLanguages={effectiveLanguages} 
-            showLiveTranscript={showLiveTranscript}
-            showTranslation={showTranslation}
+            showLiveTranscript={true}
+            showTranslation={false}
             isStudentMode={roomSetup && !roomSetup.isHost}
             studentHomeLanguage={studentHomeLanguage}
             selectedWords={selectedWords}
@@ -1068,16 +1085,16 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             textAlign: 'center',
             boxShadow: '0 4px 18px 0 rgba(60, 60, 90, 0.2)'
           }}>
-            <h2 style={{ color: '#fff', marginBottom: 24 }}>{t.joinRoom}</h2>
+            <h2 style={{ color: '#fff', marginBottom: 24 }}>{ui.joinRoom}</h2>
             <p style={{ color: '#b3b3e7', marginBottom: 24, fontSize: 14 }}>
-              {t.enterRoomCode}
+              {ui.enterRoomCode}
             </p>
             
             <input
               type="text"
               value={joinRoomCode}
               onChange={(e) => setJoinRoomCode(e.target.value)}
-              placeholder={t.roomCode}
+              placeholder={ui.roomCode}
               maxLength={5}
               style={{
                 width: '100%',
@@ -1117,7 +1134,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                   cursor: 'pointer'
                 }}
               >
-                Cancel
+                {ui.cancel}
               </button>
               <button
                 onClick={handleJoinRoom}
@@ -1132,7 +1149,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                   cursor: 'pointer'
                 }}
               >
-                {isJoiningRoom ? t.joinButton + '...' : t.joinButton}
+                {isJoiningRoom ? ui.joinButton + '...' : ui.joinButton}
               </button>
             </div>
           </div>

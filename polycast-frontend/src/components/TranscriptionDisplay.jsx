@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
-import { getLanguageForProfile } from '../utils/profileLanguageMapping';
+import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import apiService from '../services/apiService.js';
 import config from '../config/config.js';
 
@@ -86,6 +86,7 @@ const TranscriptionDisplay = ({
     position: { x: 0, y: 0 }
   });
   const [loadingDefinition, setLoadingDefinition] = useState(false);
+  const ui = getUITranslationsForProfile(selectedProfile);
 
   // Check if user is at bottom of scroll container
   const isAtBottom = () => {
@@ -171,7 +172,7 @@ const TranscriptionDisplay = ({
     // Fetch definition from API
     setLoadingDefinition(true);
     try {
-      const targetLanguage = getLanguageForProfile(selectedProfile);
+      const targetLanguage = getNativeLanguageForProfile(selectedProfile);
       const contextSentence = fullTranscript; // Use full transcript as context
       const data = await apiService.fetchJson(apiService.getWordPopupUrl(word, contextSentence, targetLanguage));
       setWordDefinitions(prev => ({
@@ -328,7 +329,7 @@ const TranscriptionDisplay = ({
           onAddToDictionary={() => onAddWord && onAddWord(popupInfo.word)}
           onRemoveFromDictionary={() => {}}
           loading={loadingDefinition}
-          nativeLanguage={getLanguageForProfile(selectedProfile)}
+          nativeLanguage={getNativeLanguageForProfile(selectedProfile)}
           onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
         />
       )}
@@ -364,7 +365,7 @@ const TranscriptionDisplay = ({
               textTransform: 'uppercase', 
               opacity: 0.92 
             }}>
-              Transcript
+              {ui.transcriptHeader}
             </span>
             <div 
               ref={scrollContainerRef}
@@ -428,10 +429,10 @@ const TranscriptionDisplay = ({
                   opacity: 0.92,
                   marginBottom: 20,
                 }}>
-                  {isStudentMode ? (studentHomeLanguage || 'Student Language') : lang}
+                  {isStudentMode ? (studentHomeLanguage || ui.studentLanguage) : lang}
                 </span>
                 <p style={{ fontSize: 16, opacity: 0.7, textAlign: 'center' }}>
-                  Translation temporarily disabled for streaming mode
+                  {ui.translationDisabled}
                 </p>
               </div>
             );

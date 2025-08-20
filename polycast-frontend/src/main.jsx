@@ -30,14 +30,16 @@ function Main() {
     return <MobileApp />;
   }
 
-  // Host flow: clicking Host should immediately create a room and advance to language selection
+  // Host flow: clicking Host should immediately create a room and jump straight into transcript
   const handleHostClick = async () => {
     setIsLoading(true);
     setError('');
     try {
       const data = await apiService.postJson(apiService.createRoomUrl(), {});
+      // Directly enter App with host room setup and default language/profile
       setRoomSetup({ isHost: true, roomCode: data.roomCode });
-        
+      setSelectedLanguages(['English']);
+      setSelectedProfile('joshua');
     } catch (err) {
       console.error('Error creating room:', err);
       setError(`Failed to create room: ${err.message}`);
@@ -66,18 +68,9 @@ function Main() {
     );
   }
 
-  // Step 2: Language/Profile selection
+  // Step 2: Language/Profile selection (students only)
   if (roomSetup && !selectedLanguages) {
-    if (roomSetup.isHost) {
-      // Hosts see language selection screen
-      return <LanguageSelectorScreen 
-        onLanguageSelected={(languages) => {
-          setSelectedLanguages(languages);
-          // Disable non-saving mode: choose a default real profile for hosts
-          setSelectedProfile('joshua');
-        }}
-      />;
-    } else {
+    if (!roomSetup.isHost) {
       // Students still see profile selection screen
       return <ProfileSelectorScreen 
         onProfileSelected={(languages, profile) => {
@@ -86,6 +79,9 @@ function Main() {
         }}
         userRole="student"
       />;
+    } else {
+      // Host path now skips setup; languages/profile already set
+      // Fall through to main app render
     }
   }
 

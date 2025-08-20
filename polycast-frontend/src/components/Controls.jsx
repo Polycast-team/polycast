@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { ReadyState } from 'react-use-websocket';
-import { getTranslationsForProfile } from '../utils/profileLanguageMapping';
+import { getTranslationsForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 
 
 /**
@@ -31,6 +31,7 @@ function Controls({
     const isHostMode = setIsTextMode !== null && onStartRecording !== null;
     const isConnected = readyState === ReadyState.OPEN;
     const t = getTranslationsForProfile(selectedProfile);
+    const ui = getUITranslationsForProfile(selectedProfile);
 
     return (
         <div className="controls">
@@ -39,7 +40,7 @@ function Controls({
                 {/* Profile Dropdown - only show for hosts */}
                 {userRole === 'host' && (
                   <>
-                    <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Profile:</label>
+                    <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>{ui.profile}:</label>
                     <select
                       value={selectedProfile}
                       onChange={e => {
@@ -60,7 +61,7 @@ function Controls({
                     </select>
                   </>
                 )}
-                <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>Mode:</label>
+                <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>{ui.mode}:</label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     {/* Show transcript button when not in audio mode */}
                     {appMode !== 'audio' && (
@@ -79,9 +80,9 @@ function Controls({
                                 alignItems: 'center',
                                 gap: '6px'
                             }}
-                            title="View Transcript"
+                            title={ui.transcript}
                         >
-                            📝 Transcript
+                            📝 {ui.transcript}
                         </button>
                     )}
                     
@@ -102,9 +103,9 @@ function Controls({
                                 alignItems: 'center',
                                 gap: '6px'
                             }}
-                            title="Video Mode"
+                            title={ui.video}
                         >
-                            🎥 Video
+                            🎥 {ui.video}
                         </button>
                     )}
 
@@ -125,9 +126,9 @@ function Controls({
                                 alignItems: 'center',
                                 gap: '6px'
                             }}
-                            title="Dictionary Mode"
+                            title={ui.dictionaryMode}
                         >
-                            📚 {t.dictionaryMode}
+                            📚 {ui.dictionaryMode}
                         </button>
                     )}
                     
@@ -148,39 +149,13 @@ function Controls({
                                 alignItems: 'center',
                                 gap: '6px'
                             }}
-                            title="Flashcard Mode"
+                            title={ui.flashcardMode}
                         >
-                            🔄 {t.flashcardMode}
+                            🔄 {ui.flashcardMode}
                         </button>
                     )}
                 </div>
-                {/* Only show the live transcript and translation checkboxes in audio mode */}
-                {appMode === 'audio' && (
-                  <>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
-                      <input
-                        type="checkbox"
-                        checked={showLiveTranscript}
-                        onChange={e => {
-                          setShowLiveTranscript && setShowLiveTranscript(e.target.checked);
-                        }}
-                        disabled={isRecording}
-                      />
-                      Show Transcript
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 14, fontSize: 15, fontWeight: 500, color: '#ccc' }}>
-                      <input
-                        type="checkbox"
-                        checked={showTranslation}
-                        onChange={e => {
-                          setShowTranslation && setShowTranslation(e.target.checked);
-                        }}
-                        disabled={isRecording}
-                      />
-                      Show Translation
-                    </label>
-                  </>
-                )}
+                {/* Transcript/Translation toggles hidden for now */}
                 {/* Add Record/Stop button in audio mode - host only */}
                 {appMode === 'audio' && isHostMode && (
                   <button
@@ -208,7 +183,7 @@ function Controls({
                     }}
                   >
                     <span style={{ fontSize: '16px' }}>{isRecording ? '⏹️' : '🎙️'}</span>
-                    {isRecording ? 'Stop Recording' : 'Record'}
+                    {isRecording ? ui.stopRecording : ui.record}
                   </button>
                 )}
             </div>
@@ -223,7 +198,7 @@ function Controls({
                     borderRadius: '6px', cursor: 'pointer', fontSize: '13px'
                   }}
                 >
-                  {t.backToMain}
+                  {ui.backToMain}
                 </button>
                 
                 <button 
@@ -233,13 +208,13 @@ function Controls({
                     padding: '6px 10px', fontSize: '13px', color: '#2196f3', cursor: 'pointer'
                   }}
                 >
-                  {t.calendar}
+                  {ui.calendar}
                 </button>
                 
                 <div style={{ color: '#ccc', fontSize: '12px' }}>
-                  <span style={{color: '#5f72ff'}}>{t.new}: {toolbarStats?.newCards ?? 0}</span> • 
-                  <span style={{color: '#ef4444', marginLeft: '4px'}}>{t.learning}: {toolbarStats?.learningCards ?? 0}</span> • 
-                  <span style={{color: '#10b981', marginLeft: '4px'}}>{t.review}: {toolbarStats?.reviewCards ?? 0}</span>
+                  <span style={{color: '#5f72ff'}}>{ui.new}: {toolbarStats?.newCards ?? 0}</span> • 
+                  <span style={{color: '#ef4444', marginLeft: '4px'}}>{ui.learning}: {toolbarStats?.learningCards ?? 0}</span> • 
+                  <span style={{color: '#10b981', marginLeft: '4px'}}>{ui.review}: {toolbarStats?.reviewCards ?? 0}</span>
                 </div>
               </div>
             )}

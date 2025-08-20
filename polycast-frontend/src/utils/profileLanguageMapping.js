@@ -6,7 +6,8 @@ export const PROFILE_LANGUAGE_MAP = {
   'horse': 'Italian',
   'lizard': 'Portuguese',
   'shirley': 'Chinese',
-  'joshua': 'Spanish',
+  // Target language per profile (what they are learning)
+  'joshua': 'English',
   'tyson': 'English'
 };
 
@@ -22,9 +23,27 @@ export const PROFILE_CREDENTIALS = {
   'tyson': 'password'
 };
 
+// Native language per profile (their L1)
+export const PROFILE_NATIVE_LANGUAGE_MAP = {
+  // Native languages per profile (controls overall UI language)
+  'cat': 'Spanish',
+  'dog': 'French',
+  'mouse': 'German',
+  'horse': 'Italian',
+  'lizard': 'Portuguese',
+  'shirley': 'Chinese',
+  'joshua': 'Spanish', // Joshua is a native Spanish speaker
+  'tyson': 'English'
+};
+
 // Get language for a profile
 export const getLanguageForProfile = (profile) => {
   return PROFILE_LANGUAGE_MAP[profile] || 'English';
+};
+
+// Get native language for a profile
+export const getNativeLanguageForProfile = (profile) => {
+  return PROFILE_NATIVE_LANGUAGE_MAP[profile] || 'English';
 };
 
 // Get all available profiles
@@ -38,6 +57,141 @@ export const isValidProfile = (profile) => {
 };
 
 // Translations for flashcard interface
+// UI strings for general interface (native language)
+export const UI_STRINGS = {
+  'English': {
+    profile: 'Profile',
+    mode: 'Mode',
+    transcript: 'Transcript',
+    video: 'Video',
+    dictionaryMode: 'Dictionary Mode',
+    flashcardMode: 'Flashcard Mode',
+    record: 'Record',
+    stopRecording: 'Stop Recording',
+    recording: 'Recording...',
+    backToMain: '← Back to Main',
+    calendar: '📅 Calendar',
+    room: 'Room',
+    student: 'Student',
+    joinRoom: 'Join Room',
+    exitRoom: 'Exit Room',
+    roomCode: 'Room Code',
+    enterRoomCode: 'Enter room code',
+    joinButton: 'Join',
+    cancel: 'Cancel',
+    transcriptHeader: 'Transcript',
+    translationDisabled: 'Translation temporarily disabled for streaming mode',
+    studentLanguage: 'Student Language',
+    new: 'New', learning: 'Learning', review: 'Review',
+  },
+  'Spanish': {
+    profile: 'Perfil',
+    mode: 'Modo',
+    transcript: 'Transcripción',
+    video: 'Video',
+    dictionaryMode: 'Modo Diccionario',
+    flashcardMode: 'Modo Tarjetas',
+    record: 'Grabar',
+    stopRecording: 'Detener',
+    recording: 'Grabando...',
+    backToMain: '← Regresar al Inicio',
+    calendar: '📅 Calendario',
+    room: 'Sala',
+    student: 'Estudiante',
+    joinRoom: 'Unirse al Aula',
+    exitRoom: 'Salir',
+    roomCode: 'Código del Aula',
+    enterRoomCode: 'Introduce el código del aula',
+    joinButton: 'Unirse',
+    cancel: 'Cancelar',
+    transcriptHeader: 'Transcripción',
+    translationDisabled: 'Traducción temporalmente desactivada en modo streaming',
+    studentLanguage: 'Idioma del estudiante',
+    new: 'Nuevas', learning: 'Aprendiendo', review: 'Repasar',
+  },
+  'Chinese': {
+    profile: '配置文件',
+    mode: '模式',
+    transcript: '转录',
+    video: '视频',
+    dictionaryMode: '词典模式',
+    flashcardMode: '卡片模式',
+    record: '开始录音',
+    stopRecording: '停止录音',
+    recording: '录音中...',
+    backToMain: '← 返回主页',
+    calendar: '📅 日历',
+    room: '教室',
+    student: '学生',
+    joinRoom: '加入教室',
+    exitRoom: '退出',
+    roomCode: '教室代码',
+    enterRoomCode: '输入教室代码',
+    joinButton: '加入',
+    cancel: '取消',
+    transcriptHeader: '转录',
+    translationDisabled: '流式模式下暂时禁用翻译',
+    studentLanguage: '学生语言',
+    new: '新卡片', learning: '学习中', review: '复习',
+  },
+  'French': {
+    profile: 'Profil',
+    mode: 'Mode',
+    transcript: 'Transcription',
+    video: 'Vidéo',
+    dictionaryMode: 'Mode Dictionnaire',
+    flashcardMode: 'Mode Cartes',
+    record: 'Enregistrer',
+    stopRecording: 'Arrêter',
+    recording: 'Enregistrement...',
+    backToMain: '← Retour au Menu',
+    calendar: '📅 Calendrier',
+    room: 'Salle',
+    student: 'Élève',
+    joinRoom: 'Rejoindre la Salle',
+    exitRoom: 'Quitter',
+    roomCode: 'Code de Salle',
+    enterRoomCode: 'Entrez le code de la salle',
+    joinButton: 'Rejoindre',
+    cancel: 'Annuler',
+    transcriptHeader: 'Transcription',
+    translationDisabled: 'Traduction temporairement désactivée en mode diffusion',
+    studentLanguage: "Langue de l'élève",
+    new: 'Nouvelles', learning: 'Apprentissage', review: 'Révision',
+  },
+  'German': {
+    profile: 'Profil', mode: 'Modus', transcript: 'Transkript', video: 'Video',
+    dictionaryMode: 'Wörterbuch-Modus', flashcardMode: 'Karten-Modus',
+    record: 'Aufnehmen', stopRecording: 'Stopp', recording: 'Aufnahme...',
+    backToMain: '← Zurück zum Hauptmenü', calendar: '📅 Kalender',
+    room: 'Raum', student: 'Schüler', joinRoom: 'Raum Beitreten', exitRoom: 'Verlassen',
+    roomCode: 'Raumcode', enterRoomCode: 'Raumcode eingeben', joinButton: 'Beitreten', cancel: 'Abbrechen',
+    transcriptHeader: 'Transkript', translationDisabled: 'Übersetzung im Streaming-Modus vorübergehend deaktiviert', studentLanguage: 'Schülersprache',
+    new: 'Neu', learning: 'Lernen', review: 'Wiederholen',
+  },
+  'Italian': {
+    profile: 'Profilo', mode: 'Modalità', transcript: 'Trascrizione', video: 'Video',
+    dictionaryMode: 'Modalità Dizionario', flashcardMode: 'Modalità Carte',
+    record: 'Registra', stopRecording: 'Ferma', recording: 'Registrazione...',
+    backToMain: '← Torna al Menu', calendar: '📅 Calendario',
+    room: 'Stanza', student: 'Studente', joinRoom: 'Unisciti alla Stanza', exitRoom: 'Esci',
+    roomCode: 'Codice Stanza', enterRoomCode: 'Inserisci il codice della stanza', joinButton: 'Unisciti', cancel: 'Annulla',
+    transcriptHeader: 'Trascrizione', translationDisabled: 'Traduzione temporaneamente disabilitata in modalità streaming', studentLanguage: 'Lingua dello studente',
+    new: 'Nuove', learning: 'Apprendimento', review: 'Ripasso',
+  },
+  'Portuguese': {
+    profile: 'Perfil', mode: 'Modo', transcript: 'Transcrição', video: 'Vídeo',
+    dictionaryMode: 'Modo Dicionário', flashcardMode: 'Modo Cartões',
+    record: 'Gravar', stopRecording: 'Parar', recording: 'Gravando...',
+    backToMain: '← Voltar ao Menu', calendar: '📅 Calendário',
+    room: 'Sala', student: 'Aluno', joinRoom: 'Entrar na Sala', exitRoom: 'Sair',
+    roomCode: 'Código da Sala', enterRoomCode: 'Digite o código da sala', joinButton: 'Entrar', cancel: 'Cancelar',
+    transcriptHeader: 'Transcrição', translationDisabled: 'Tradução temporariamente desativada no modo streaming', studentLanguage: 'Idioma do aluno',
+    new: 'Novos', learning: 'Aprendendo', review: 'Revisar',
+  }
+};
+
+// Flashcard-specific instructional strings (kept for compatibility; keyed by target language)
 export const FLASHCARD_TRANSLATIONS = {
   'English': {
     noFlashcardsTitle: 'No Flashcards Available',
@@ -269,6 +423,12 @@ export const FLASHCARD_TRANSLATIONS = {
 export const getTranslationsForProfile = (profile) => {
   const language = getLanguageForProfile(profile);
   return FLASHCARD_TRANSLATIONS[language] || FLASHCARD_TRANSLATIONS['English'];
+};
+
+// General UI strings in native language
+export const getUITranslationsForProfile = (profile) => {
+  const native = getNativeLanguageForProfile(profile);
+  return UI_STRINGS[native] || UI_STRINGS['English'];
 };
 
 // Validate user credentials

@@ -23,6 +23,10 @@ class PopupGeminiService {
   async getContextualSense(word, context, nativeLanguage = 'English', targetLanguage = 'English') {
     try {
       const sentence = this.extractSentence(word, context);
+      const exampleLine = nativeLanguage === 'Spanish' && targetLanguage === 'English'
+        ? '[1]//agua//un líquido claro esencial para la vida//~Water~ is essential for life.//8'
+        : '[1]//TRANSLATION in ' + nativeLanguage + '//CONCISE DEFINITION in ' + nativeLanguage + '//Example in ' + targetLanguage + ' with ~word~//8';
+
       const prompt = `You are selecting the SINGLE best meaning of a headword as used in a specific sentence.
 
 Inputs:
@@ -37,13 +41,21 @@ Task:
 [1]//[NATIVE LANGUAGE TRANSLATION]//[CONCISE NATIVE LANGUAGE DEFINITION]//[TARGET LANGUAGE EXAMPLE SENTENCE WITH THE TARGET-LANGUAGE EQUIVALENT OF THE WORD WRAPPED IN TILDES ~like this~]//[FREQUENCY 1-10]
 
 Example output (format only; do not reuse text):
-[1]//water//a clear liquid essential for life//El ~agua~ es esencial para la vida.//8
+${exampleLine}
 
 Rules:
 - Use ${nativeLanguage} for translation and concise definition.
 - Use ${targetLanguage} for the example sentence.
 - Ensure the example includes the target-language equivalent of the headword and that it is wrapped with tildes ~like this~.
-- Always include the frequency as the last field (1-10). If unsure, use 5.
+- The target word must appear EXACTLY ONCE in the example sentence (i.e., the ~word~ markup appears once and only once).
+- Frequency (1-10) should reflect contemporary general usage for THIS SENSE:
+  • 9-10: basic function words or senses used constantly in everyday speech
+  • 7-8: very common everyday vocabulary/senses
+  • 5-6: moderately common; general but not everyday
+  • 3-4: uncommon/academic/less frequent
+  • 1-2: rare/technical/literary (e.g., "soliloquy" ≈ 2/10)
+  When uncertain, err slightly LOWER rather than higher.
+- Always include the frequency as the last field. If you truly cannot estimate, use 5.
 - No extra commentary, no code fences, exactly one line. Be conservative; pick the single best fit.`;
 
       console.log('[ContextualSense] Full prompt sent to Gemini:');
@@ -194,7 +206,7 @@ Rules:
    */
   async generateExamplePairs(word, sentenceWithTilde, targetLanguage = 'English', nativeLanguage = 'Spanish') {
     try {
-      const prompt = `You are writing study flashcards.\n\nTask:\n- The learner is studying the word "${word}" as used in this sentence (target language with tildes around the word): ${sentenceWithTilde}\n- Determine the exact sense of "${word}" from this sentence and keep that SAME meaning in all outputs.\n\nProduce:\n- 5 example sentences in ${targetLanguage} using the SAME SENSE of "${word}" as in the given sentence.\n- For each, produce a corresponding translation in ${nativeLanguage}.\n- Alternate them and separate every item with ' // ' exactly like this:\n  Target1 // Native1 // Target2 // Native2 // Target3 // Native3 // Target4 // Native4 // Target5 // Native5\n- In BOTH languages, wrap the target word (or its inflected form) in tildes: ~like this~.\n- Keep grammar natural; vary contexts, but do not change the meaning/sense from the original sentence.\n- If the original uses a phrasal/multiword expression, preserve the same expression/sense.\n\nFormatting rules (strict):\n- Return exactly ONE line, no commentary, no code fences.\n- Use exactly ' // ' as the separator between the 10 items.\n- Include exactly 10 items (5 target, 5 native), alternating target/native.\n- Ensure the target word is wrapped with ~ in BOTH languages in every item.`;
+      const prompt = `You are writing study flashcards.\n\nTask:\n- The learner is studying the word "${word}" as used in this sentence (target language with tildes around the word): ${sentenceWithTilde}\n- Determine the exact sense of "${word}" from this sentence and keep that SAME meaning in all outputs.\n\nProduce:\n- 5 example sentences in ${targetLanguage} using the SAME SENSE of "${word}" as in the given sentence.\n- For each, produce a corresponding translation in ${nativeLanguage}.\n- Alternate them and separate every item with ' // ' exactly like this:\n  Target1 // Native1 // Target2 // Native2 // Target3 // Native3 // Target4 // Native4 // Target5 // Native5\n- In BOTH languages, wrap the target word (or its inflected form) in tildes: ~like this~.\n- Each sentence in BOTH languages must contain the target word (or its inflected form) EXACTLY ONCE (one and only one ~...~ per sentence).\n- Keep grammar natural; vary contexts, but do not change the meaning/sense from the original sentence.\n- If the original uses a phrasal/multiword expression, preserve the same expression/sense.\n\nFormatting rules (strict):\n- Return exactly ONE line, no commentary, no code fences.\n- Use exactly ' // ' as the separator between the 10 items.\n- Include exactly 10 items (5 target, 5 native), alternating target/native.\n- Ensure the target word is wrapped with ~ in BOTH languages in every item.`;
 
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
@@ -222,7 +234,11 @@ Rules:
    */
   async getSenseCandidates(word, nativeLanguage = 'English', targetLanguage = 'English') {
     try {
-      const prompt = `You are helping a language learner choose the correct senses of a headword written in the TARGET LANGUAGE.\n\nInputs:\n- headword: "${word}"\n- nativeLanguage (for translation and definition text): ${nativeLanguage}\n- targetLanguage (the language of the headword AND the example sentences): ${targetLanguage}\n\nLanguage check (STRICT, but diacritics tolerant):\n- If the headword is a valid word in ${targetLanguage} even when typed WITHOUT its diacritics/accents, treat it as ${targetLanguage}.\n- Only if the headword clearly does NOT belong to ${targetLanguage}, return EXACTLY this text and nothing else: WRONG LANGUAGE\n\nTask:\n1) Decide how many COMPLETELY DIFFERENT senses "${word}" has in modern usage. A word like "bank" (financial institution vs river bank) has multiple senses. A word like "study" (school vs research vs memorize) has only ONE sense. Only create multiple entries if the word has entirely different meanings that would require separate dictionary entries — NOT for register or minor nuance differences. If in doubt, use only ONE sense. Do not return more than FIVE lines.\n\n2) For each sense, output EXACTLY ONE line using THIS FORMAT (mandatory):\n[DEFINITION NUMBER]//[NATIVE LANGUAGE TRANSLATION]//[CONCISE NATIVE LANGUAGE DEFINITION]//[TARGET LANGUAGE EXAMPLE SENTENCE WITH THE EXACT HEADWORD STRING WRAPPED IN TILDES ~like this~ (NO SYNONYMS OR VARIANTS)]//[FREQUENCY 1-10]\n\nExample outputs (format only; do not reuse text):\n1//goodbye//a farewell said when parting//~Adiós~, nos vemos mañana.//9\n2//farewell//a final goodbye in formal or emotional contexts//Le dimos un cálido ~adiós~ al equipo.//6\n\nFormat rules (must follow):\n- Return ONLY lines, no extra commentary, no bullets, no code fences.\n- Include ALL FIVE fields. If unsure about frequency, put 5.\n- The example sentence MUST contain the EXACT headword string "${word}" in ${targetLanguage}, wrapped with tildes. Do NOT substitute synonyms.\n- Use ${nativeLanguage} for translation and definition.`;
+      const exampleBlock = nativeLanguage === 'Spanish' && targetLanguage === 'English'
+        ? '1//adiós//expresión usada al despedirse//~Goodbye~, see you tomorrow.//9\n2//cobrar//pedir o recibir dinero por un servicio//They will ~charge~ a fee.//7'
+        : '1//TRANSLATION in ' + nativeLanguage + '//CONCISE DEFINITION in ' + nativeLanguage + '//Example in ' + targetLanguage + ' with ~word~//9';
+
+      const prompt = `You are helping a language learner choose the correct senses of a headword written in the TARGET LANGUAGE.\n\nInputs:\n- headword: "${word}"\n- nativeLanguage (for translation and definition text): ${nativeLanguage}\n- targetLanguage (the language of the headword AND the example sentences): ${targetLanguage}\n\nLanguage check (STRICT, but diacritics tolerant):\n- If the headword is a valid word in ${targetLanguage} even when typed WITHOUT its diacritics/accents, treat it as ${targetLanguage}.\n- Only if the headword clearly does NOT belong to ${targetLanguage}, return EXACTLY this text and nothing else: WRONG LANGUAGE\n\nTask:\n1) Decide how many COMPLETELY DIFFERENT senses "${word}" has in modern usage. A word like "bank" (financial institution vs river bank) has multiple senses. A word like "study" (school vs research vs memorize) has only ONE sense. Only create multiple entries if the word has entirely different meanings that would require separate dictionary entries — NOT for register or minor nuance differences. If in doubt, use only ONE sense. Do not return more than FIVE lines.\n\n2) For each sense, output EXACTLY ONE line using THIS FORMAT (mandatory):\n[DEFINITION NUMBER]//[NATIVE LANGUAGE TRANSLATION]//[CONCISE NATIVE LANGUAGE DEFINITION]//[TARGET LANGUAGE EXAMPLE SENTENCE WITH THE EXACT HEADWORD STRING WRAPPED IN TILDES ~like this~ (NO SYNONYMS OR VARIANTS)]//[FREQUENCY 1-10]\n\nExample outputs (format only; do not reuse text):\n${exampleBlock}\n\nFrequency guidance (for THIS SENSE, in contemporary general usage):\n- 9-10: basic function words or senses used constantly in everyday speech\n- 7-8: very common everyday vocabulary/senses\n- 5-6: moderately common; general but not everyday\n- 3-4: uncommon/academic/less frequent\n- 1-2: rare/technical/literary (e.g., "soliloquy" ≈ 2/10)\nWhen uncertain, err slightly LOWER rather than higher.\n\nExample sentence constraint:\n- The target-language headword must appear EXACTLY ONCE in each example (the ~word~ markup appears one time and only one time).\n\nFormat rules (must follow):\n- Return ONLY lines, no extra commentary, no bullets, no code fences.\n- Include ALL FIVE fields. If unsure about frequency, put 5.\n- The example sentence MUST contain the EXACT headword string "${word}" in ${targetLanguage}, wrapped with tildes. Do NOT substitute synonyms.\n- Use ${nativeLanguage} for translation and definition.`;
 
       console.log('[Senses] Full prompt sent to Gemini:');
       console.log(prompt);

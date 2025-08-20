@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import apiService from '../../services/apiService.js';
-import { getLanguageForProfile } from '../../utils/profileLanguageMapping.js';
+import { getLanguageForProfile, getNativeLanguageForProfile } from '../../utils/profileLanguageMapping.js';
 
 const AddWordPopup = ({ isOpen, onClose, onSelectSenses, selectedProfile }) => {
   const [word, setWord] = useState('');
@@ -22,7 +22,7 @@ const AddWordPopup = ({ isOpen, onClose, onSelectSenses, selectedProfile }) => {
       setLoading(true);
       setCandidates([]);
       setSelected({});
-      const nativeLanguage = 'English';
+      const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
       const targetLanguage = getLanguageForProfile(selectedProfile);
       const url = apiService.getSenseCandidatesUrl(term, nativeLanguage, targetLanguage);
       const data = await apiService.fetchJson(url);
