@@ -4,6 +4,7 @@ import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import apiService from '../services/apiService.js';
 import config from '../config/config.js';
+import { extractSentenceWithWord } from '../utils/wordClickUtils';
 
 // Helper function to tokenize text into words and punctuation
 const tokenizeText = (text) => {
@@ -149,7 +150,7 @@ const TranscriptionDisplay = ({
     return () => window.removeEventListener('changeFontSize', handler);
   }, [fontSize]);
 
-  const handleWordClick = async (word, event) => {
+  const handleWordClick = async (word, event, wordInstanceIndex = 0) => {
     if (!event) return;
     
     const rect = event.currentTarget.getBoundingClientRect();
@@ -169,31 +170,95 @@ const TranscriptionDisplay = ({
       }
     });
     
-    // Fetch definition from API
+    // Use UNIFIED API for fetching definition
     setLoadingDefinition(true);
     try {
-      const targetLanguage = getNativeLanguageForProfile(selectedProfile);
-      const contextSentence = fullTranscript; // Use full transcript as context
-      const data = await apiService.fetchJson(apiService.getWordPopupUrl(word, contextSentence, targetLanguage));
+      const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
+      const targetLanguage = getLanguageForProfile(selectedProfile);
+      
+      // Extract sentence and mark the clicked instance
+      const sentence = extractSentenceWithWord(fullTranscript, word);
+      
+      // Mark the specific clicked instance of the word
+      let currentIndex = 0;
+      const sentenceWithMarkedWord = sentence.replace(
+        new RegExp(`\\b(${word})\\b`, 'gi'),
+        (match) => {
+          if (currentIndex === wordInstanceIndex) {
+            currentIndex++;
+            return `~${match}~`;
+          }
+          currentIndex++;
+          return match;
+        }
+      );
+      
+      console.log(`[TranscriptionDisplay] Using unified API for word: "${word}", instance: ${wordInstanceIndex}`);
+      console.log(`[TranscriptionDisplay] Sentence with marked word:`, sentenceWithMarkedWord);
+      
+      const url = apiService.getUnifiedWordDataUrl(
+        word,
+        sentenceWithMarkedWord,
+        nativeLanguage,
+        targetLanguage
+      );
+      
+      const unifiedData = await apiService.fetchJson(url);
+      
+      // Store unified data in wordDefinitions for popup display
       setWordDefinitions(prev => ({
         ...prev,
-        [word.toLowerCase()]: data
+        [word.toLowerCase()]: {
+          ...unifiedData,
+          // Ensure compatibility with popup expectations
+          word: word,
+          translation: unifiedData.translation || word,
+          contextualExplanation: unifiedData.definition || 'Definition unavailable',
+          definition: unifiedData.definition || 'Definition unavailable',
+          example: unifiedData.exampleForDictionary || unifiedData.example || '',
+          frequency: unifiedData.frequency || 5
+        }
       }));
     } catch (error) {
-      console.error('Error fetching word definition:', error);
+      console.error('Error fetching word definition with unified API:', error);
+      // Fallback data
+      setWordDefinitions(prev => ({
+        ...prev,
+        [word.toLowerCase()]: {
+          word: word,
+          translation: word,
+          contextualExplanation: 'Definition unavailable',
+          definition: 'Definition unavailable',
+          example: `~${word}~`
+        }
+      }));
     } finally {
       setLoadingDefinition(false);
     }
   };
 
+  // Track word instance counts for proper marking
+  const wordInstanceCounts = useRef({});
+  
   const renderClickableWord = (word, index, isPartial = false) => {
     const isWord = /^[\p{L}\p{M}\d']+$/u.test(word);
     const isSelected = selectedWords.some(w => w.toLowerCase() === word.toLowerCase());
     
+    // Track which instance of this word we're rendering
+    let wordInstanceIndex = 0;
+    if (isWord && !isPartial) {
+      const wordLower = word.toLowerCase();
+      if (!wordInstanceCounts.current[wordLower]) {
+        wordInstanceCounts.current[wordLower] = 0;
+      }
+      wordInstanceIndex = wordInstanceCounts.current[wordLower];
+      wordInstanceCounts.current[wordLower]++;
+    }
+    
     return (
       <span
         key={`${index}-${word}`}
-        onClick={isWord && !isPartial ? (e) => handleWordClick(word, e) : undefined}
+        onClick={isWord && !isPartial ? (e) => handleWordClick(word, e, wordInstanceIndex) : undefined}
         style={{
           cursor: isWord && !isPartial ? 'pointer' : 'default',
           color: isPartial ? '#22c55e' : (isWord && isSelected ? '#1976d2' : undefined),
@@ -209,6 +274,9 @@ const TranscriptionDisplay = ({
   };
 
   const renderTranscript = () => {
+    // Reset word instance counter for each render
+    wordInstanceCounts.current = {};
+    
     const sentences = splitIntoSentences(fullTranscript);
     // Decide if currentPartial should render on a NEW line immediately,
     // based on whether the last committed line is "closed" (contains a long

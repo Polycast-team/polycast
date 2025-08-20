@@ -28,7 +28,7 @@ export function useFlashcardCalendar(
         word: entry.word,
         translation: entry.translation || entry.disambiguatedDefinition?.translation || '',
         definition: entry.definition || entry.disambiguatedDefinition?.definition || '',
-        example: entry.contextSentence || entry.example || '',
+        example: entry.example || '',
         frequency: Number(entry.frequency || 5)
       });
     });

@@ -5,6 +5,7 @@ import AudioRecorder from './AudioRecorder';
 import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import apiService from '../services/apiService.js';
+import { extractSentenceWithWord } from '../utils/wordClickUtils';
 
 function VideoMode({
   sendMessage,
@@ -37,7 +38,6 @@ function VideoMode({
   const [videoReady, setVideoReady] = useState(false);
   const [fontSize, setFontSize] = useState(20);
   const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
-  const [wordDefinitionsPopup, setWordDefinitionsPopup] = useState({});
   
   const ui = getUITranslationsForProfile(selectedProfile);
 
@@ -91,16 +91,45 @@ function VideoMode({
 
   const isHost = !!(roomSetup && roomSetup.isHost);
   
-  // Word click handler
+  // Word click handler using UNIFIED API
   const handleWordClick = async (word, event) => {
     try {
-      const targetLanguage = getNativeLanguageForProfile(selectedProfile);
-      const contextSentence = fullTranscript;
-      const data = await apiService.fetchJson(apiService.getWordPopupUrl(word, contextSentence, targetLanguage));
+      const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
+      const targetLanguage = getLanguageForProfile(selectedProfile);
       
-      setWordDefinitionsPopup(prev => ({
+      // Extract sentence and mark the clicked word
+      const sentence = extractSentenceWithWord(fullTranscript, word);
+      // For video mode clicks, mark first occurrence (simpler than tracking instances)
+      const sentenceWithMarkedWord = sentence.replace(
+        new RegExp(`\\b(${word})\\b`, 'i'),
+        '~$1~'
+      );
+      
+      console.log(`[VideoMode] Using unified API for word: "${word}"`);
+      console.log(`[VideoMode] Sentence with marked word:`, sentenceWithMarkedWord);
+      
+      const url = apiService.getUnifiedWordDataUrl(
+        word,
+        sentenceWithMarkedWord,
+        nativeLanguage,
+        targetLanguage
+      );
+      
+      const unifiedData = await apiService.fetchJson(url);
+      
+      // Store unified data for popup display
+      setWordDefinitions(prev => ({
         ...prev,
-        [word.toLowerCase()]: data
+        [word.toLowerCase()]: {
+          ...unifiedData,
+          // Ensure compatibility with popup
+          word: word,
+          translation: unifiedData.translation || word,
+          contextualExplanation: unifiedData.definition || 'Definition unavailable',
+          definition: unifiedData.definition || 'Definition unavailable',
+          example: unifiedData.exampleForDictionary || unifiedData.example || '',
+          frequency: unifiedData.frequency || 5
+        }
       }));
       
       setPopupInfo({
@@ -109,7 +138,23 @@ function VideoMode({
         position: { x: event.clientX, y: event.clientY }
       });
     } catch (err) {
-      console.error('Error fetching word definitions:', err);
+      console.error('Error fetching word definitions with unified API:', err);
+      // Fallback data
+      setWordDefinitions(prev => ({
+        ...prev,
+        [word.toLowerCase()]: {
+          word: word,
+          translation: word,
+          contextualExplanation: 'Definition unavailable',
+          definition: 'Definition unavailable',
+          example: `~${word}~`
+        }
+      }));
+      setPopupInfo({
+        visible: true,
+        word: word,
+        position: { x: event.clientX, y: event.clientY }
+      });
     }
   };
 
@@ -288,7 +333,7 @@ function VideoMode({
       {popupInfo.visible && (
         <WordDefinitionPopup
           word={popupInfo.word}
-          definition={wordDefinitionsPopup[popupInfo.word.toLowerCase()]}
+          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
           position={popupInfo.position}
           isInDictionary={Object.values(wordDefinitions).some(e => e && e.inFlashcards && e.word === (popupInfo.word || '').toLowerCase())}
           onAddToDictionary={() => onAddWord && onAddWord(popupInfo.word)}

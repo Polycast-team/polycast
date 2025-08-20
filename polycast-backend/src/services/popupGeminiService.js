@@ -17,6 +17,143 @@ class PopupGeminiService {
   }
 
   /**
+   * UNIFIED API: Get complete word data including definition, translation, frequency, and 5 example pairs
+   * @param {string} word - The headword to define
+   * @param {string} sentenceWithMarkedWord - Sentence with the clicked instance marked with tildes
+   * @param {string} nativeLanguage - Language for translation and definition
+   * @param {string} targetLanguage - Language for example sentences
+   * @returns {Promise<Object>} Complete word data for both popup and flashcards
+   */
+  async getUnifiedWordData(word, sentenceWithMarkedWord, nativeLanguage = 'English', targetLanguage = 'English') {
+    try {
+      const prompt = `You are helping a language learner understand a word in context and create flashcard study materials.
+
+Inputs:
+- headword: "${word}"
+- sentence with the clicked instance marked: "${sentenceWithMarkedWord}"
+- nativeLanguage (for translation and definition): ${nativeLanguage}
+- targetLanguage (for all example sentences): ${targetLanguage}
+
+The sentence has tildes ~around~ the specific instance of the word that was clicked. This indicates which usage to define if the word appears multiple times or in different forms.
+
+Task: Analyze the ~marked~ instance of the headword in the given sentence and produce study materials for THIS SPECIFIC SENSE only.
+
+Output EXACTLY 7 lines in this format:
+TRANSLATION: [translation in ${nativeLanguage}]
+DEFINITION: [concise definition in ${nativeLanguage}, max 15 words]
+FREQUENCY: [1-10 rating]
+EXAMPLE1: [${targetLanguage} sentence with ~word~] // [${nativeLanguage} translation with ~palabra~]
+EXAMPLE2: [${targetLanguage} sentence with ~word~] // [${nativeLanguage} translation with ~palabra~]
+EXAMPLE3: [${targetLanguage} sentence with ~word~] // [${nativeLanguage} translation with ~palabra~]
+EXAMPLE4: [${targetLanguage} sentence with ~word~] // [${nativeLanguage} translation with ~palabra~]
+EXAMPLE5: [${targetLanguage} sentence with ~word~] // [${nativeLanguage} translation with ~palabra~]
+
+Rules:
+1. Focus on the EXACT sense/meaning of the ~marked~ instance in the given sentence
+2. Frequency scale (1-10) for THIS SPECIFIC SENSE in contemporary general usage:
+   • 10: Most basic function words (the, be, have, do, say, get, make, go, know, take)
+   • 9: Essential everyday words (want, see, come, think, look, give, use, find, tell, ask)
+   • 8: Very common daily words (work, try, need, feel, become, leave, put, mean, keep, let)
+   • 7: Common general words (run, bring, happen, write, provide, sit, stand, lose, pay, meet)
+   • 6: Moderately common (decide, develop, carry, break, receive, agree, support, hit, produce, eat)
+   • 5: General but less frequent (contain, establish, define, benefit, combine, announce, examine, confirm, deny, emerge)
+   • 4: Uncommon/formal (comprise, undertake, constitute, render, cease, endeavor, facilitate, adhere, allocate, ascertain)
+   • 3: Academic/specialized (delineate, substantiate, reconcile, circumvent, corroborate, disseminate, extrapolate, mitigate, perpetuate, scrutinize)
+   • 2: Rare/technical/literary (adjudicate, ameliorate, epitomize, ubiquitous, sanguine, penultimate, antediluvian, perspicacious, pusillanimous, verisimilitude)
+   • 1: Extremely rare/archaic (tergiversate, callipygian, defenestration, sesquipedalian, hippopotomonstrosesquippedaliophobia, floccinaucinihilipilification, honorificabilitudinitatibus, antidisestablishmentarianism, pneumonoultramicroscopicsilicovolcanoconiosis, supercalifragilisticexpialidocious)
+   When uncertain, err slightly LOWER rather than higher.
+3. Each example sentence must:
+   - Use the SAME sense/meaning as the ~marked~ instance in the original sentence
+   - Include the word EXACTLY ONCE wrapped in tildes ~like this~
+   - Be different contexts but same meaning
+   - Be natural and idiomatic in both languages
+4. The word may be inflected (conjugated/declined) but preserve the same sense
+5. Wrap the translated word with tildes in the ${nativeLanguage} translations too
+6. If the ~marked~ word is part of a phrasal verb or idiom (e.g., "give ~up~"), treat the entire phrase as the unit to define
+
+No extra text, no commentary, no code fences, exactly 7 lines starting with the labels shown.`;
+
+      console.log('[UnifiedWordData] Full prompt sent to Gemini:');
+      console.log(prompt);
+
+      const result = await this.model.generateContent(prompt);
+      const text = (await result.response.text()).trim();
+
+      console.log('[UnifiedWordData] Full response from Gemini:');
+      console.log(text);
+
+      // Parse the structured response
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+      
+      if (lines.length < 7) {
+        throw new Error(`Gemini returned insufficient data: expected 7 lines, got ${lines.length}`);
+      }
+
+      // Extract basic fields
+      const translation = lines[0].replace(/^TRANSLATION:\s*/i, '').trim();
+      const definition = lines[1].replace(/^DEFINITION:\s*/i, '').trim();
+      const frequency = parseInt(lines[2].replace(/^FREQUENCY:\s*/i, '').trim()) || 5;
+
+      // Parse example sentences
+      const examples = [];
+      for (let i = 3; i < 8 && i < lines.length; i++) {
+        const line = lines[i].replace(/^EXAMPLE\d:\s*/i, '').trim();
+        const parts = line.split('//').map(s => s.trim());
+        if (parts.length >= 2) {
+          examples.push({
+            target: parts[0],
+            native: parts[1]
+          });
+        }
+      }
+
+      // Ensure we have 5 examples (fill with defaults if needed)
+      while (examples.length < 5) {
+        examples.push({
+          target: `~${word}~`,
+          native: `~${word}~`
+        });
+      }
+
+      // Format for different uses
+      const exampleSentencesGenerated = examples
+        .map(ex => `${ex.target} // ${ex.native}`)
+        .join(' // ');
+
+      return {
+        word: word,
+        translation: translation,
+        definition: definition,
+        frequency: Math.max(1, Math.min(10, frequency)),
+        examples: examples,
+        exampleSentencesGenerated: exampleSentencesGenerated,
+        exampleForDictionary: examples[0]?.target || `~${word}~`,
+        // Additional fields for compatibility
+        contextualExplanation: definition,
+        example: examples[0]?.target || `~${word}~`
+      };
+
+    } catch (error) {
+      console.error('[PopupGeminiService] Error in getUnifiedWordData:', error);
+      
+      // Return fallback data
+      return {
+        word: word,
+        translation: word,
+        definition: 'Definition unavailable',
+        frequency: 5,
+        examples: Array(5).fill({ target: `~${word}~`, native: `~${word}~` }),
+        exampleSentencesGenerated: Array(5).fill(`~${word}~ // ~${word}~`).join(' // '),
+        exampleForDictionary: `~${word}~`,
+        contextualExplanation: 'Definition unavailable',
+        example: `~${word}~`,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * DEPRECATED - Use getUnifiedWordData instead
    * Get the single best contextual sense for a headword within a sentence.
    * Returns { definitionNumber, translation, definition, example, frequency } | null
    */
@@ -125,6 +262,7 @@ Rules:
   }
 
   /**
+   * DEPRECATED - Use getUnifiedWordData instead
    * Get contextual definition for a word using Gemini
    * @param {string} word - The word to define
    * @param {string} context - The full context/transcript
@@ -193,6 +331,7 @@ Rules:
   }
 
   /**
+   * DEPRECATED - Use getUnifiedWordData instead (it includes all example pairs)
    * Generate five example sentence pairs using the SAME SENSE as in the input sentence.
    * Returns a single line string of 10 items separated by " // ":
    * Target1 // Native1 // Target2 // Native2 // ... // Target5 // Native5

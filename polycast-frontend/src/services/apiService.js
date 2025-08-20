@@ -22,6 +22,7 @@ class ApiService {
   checkRoomUrl = roomCode => `${this.baseUrl}/api/check-room/${roomCode}`;
   generateAudioUrl = () => `${this.baseUrl}/api/generate-audio`;
   getTranslationUrl = (language, text) => `${this.baseUrl}/api/translate/${encodeURIComponent(language)}/${encodeURIComponent(text)}`;
+  // DEPRECATED - Use getUnifiedWordDataUrl instead
   getWordPopupUrl = (word, context, targetLanguage) => {
     const params = new URLSearchParams({context, targetLanguage});
     return `${this.baseUrl}/api/dictionary/${encodeURIComponent(word)}?${params}`;
@@ -33,10 +34,16 @@ class ApiService {
     return `${this.baseUrl}/api/dictionary/senses?${params}`;
   }
 
-  // Single contextual sense for transcript add flow
+  // Single contextual sense for transcript add flow - DEPRECATED
   getContextualSenseUrl = (word, context, nativeLanguage, targetLanguage) => {
     const params = new URLSearchParams({ word, context, nativeLanguage, targetLanguage });
     return `${this.baseUrl}/api/dictionary/contextual-sense?${params}`;
+  }
+
+  // UNIFIED API - Single endpoint for all word data needs
+  getUnifiedWordDataUrl = (word, sentenceWithMarkedWord, nativeLanguage, targetLanguage) => {
+    const params = new URLSearchParams({ word, sentenceWithMarkedWord, nativeLanguage, targetLanguage });
+    return `${this.baseUrl}/api/dictionary/unified?${params}`;
   }
 
   // Helper methods for common API patterns

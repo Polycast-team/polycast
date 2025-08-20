@@ -86,7 +86,34 @@ router.get('/dictionary/senses', async (req, res) => {
     }
 });
 
-// Contextual single-sense API (for transcript add flow)
+// UNIFIED API - Single endpoint for all word data needs (popup & flashcards)
+router.get('/dictionary/unified', async (req, res) => {
+    try {
+        const { word, sentenceWithMarkedWord, nativeLanguage = 'English', targetLanguage = 'English' } = req.query || {};
+        if (!word || !word.trim()) {
+            return res.status(400).json({ error: 'word is required' });
+        }
+        if (!sentenceWithMarkedWord || !sentenceWithMarkedWord.trim()) {
+            return res.status(400).json({ error: 'sentenceWithMarkedWord is required' });
+        }
+        
+        console.log(`[Unified API] Processing: word="${word}", sentence="${sentenceWithMarkedWord}", native="${nativeLanguage}", target="${targetLanguage}"`);
+        
+        const unifiedData = await popupGeminiService.getUnifiedWordData(
+            word.trim(),
+            sentenceWithMarkedWord.trim(),
+            nativeLanguage,
+            targetLanguage
+        );
+        
+        return res.json(unifiedData);
+    } catch (error) {
+        console.error('[Unified API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Contextual single-sense API (for transcript add flow) - DEPRECATED, kept for backward compatibility
 router.get('/dictionary/contextual-sense', async (req, res) => {
     try {
         const { word, context = '', nativeLanguage = 'English', targetLanguage = 'English' } = req.query || {};

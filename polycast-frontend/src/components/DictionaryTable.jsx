@@ -366,8 +366,11 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
     setNewWordInput(e.target.value);
   };
 
-  // Show a message if dictionary is empty
+  // Show debug info if dictionary has entries but none pass filtering
   if (filteredWords.length === 0) {
+    const totalEntries = Object.keys(wordDefinitions).length;
+    const hasEntries = totalEntries > 0;
+    
     return (
       <div className="dictionary-container">
         {/* Controls row: Search + Add Word buttons */}
@@ -406,11 +409,69 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
           }}
         />
         
-        <div className="empty-dictionary-message">
-          {searchTerm ? 
-            `No words matching "${searchTerm}" found in your dictionary.` : 
-            'Your dictionary is empty. Add words from the transcript by clicking on them!'}
-        </div>
+        {hasEntries ? (
+          <div style={{ 
+            padding: '20px', 
+            backgroundColor: '#2a1f3d', 
+            borderRadius: '8px', 
+            margin: '16px',
+            border: '1px solid #ff6b6b'
+          }}>
+            <h3 style={{ color: '#ff6b6b', marginBottom: '16px' }}>
+              🐛 Dictionary Failure - Debug Information
+            </h3>
+            <div style={{ color: '#f5f5f5', fontSize: '14px', lineHeight: 1.6 }}>
+              <p><strong>Issue:</strong> Found {totalEntries} entries in wordDefinitions, but none passed filtering.</p>
+              
+              <h4 style={{ color: '#ffd93d', marginTop: '20px', marginBottom: '10px' }}>
+                Required Fields for Dictionary Display:
+              </h4>
+              <ul style={{ color: '#b3b3e7', marginLeft: '20px' }}>
+                <li><code>entry.inFlashcards</code> must be <code>true</code></li>
+                <li><code>entry.wordSenseId</code> must exist</li>
+                <li><code>entry.word</code> must exist</li>
+              </ul>
+
+              <h4 style={{ color: '#ffd93d', marginTop: '20px', marginBottom: '10px' }}>
+                Current wordDefinitions Entries:
+              </h4>
+              <div style={{ 
+                backgroundColor: '#1a1a2e', 
+                padding: '12px', 
+                borderRadius: '4px', 
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                overflowX: 'auto',
+                maxHeight: '300px',
+                overflowY: 'auto'
+              }}>
+                {Object.entries(wordDefinitions).map(([key, entry]) => (
+                  <div key={key} style={{ marginBottom: '12px', borderBottom: '1px solid #333', paddingBottom: '8px' }}>
+                    <div style={{ color: '#4ade80' }}>Key: {key}</div>
+                    <div style={{ color: '#fbbf24' }}>
+                      ✓ inFlashcards: {entry?.inFlashcards ? 'true' : 'false/missing'}
+                    </div>
+                    <div style={{ color: '#fbbf24' }}>
+                      ✓ wordSenseId: {entry?.wordSenseId ? entry.wordSenseId : 'missing'}
+                    </div>
+                    <div style={{ color: '#fbbf24' }}>
+                      ✓ word: {entry?.word ? entry.word : 'missing'}
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>
+                      Full entry: {JSON.stringify(entry, null, 2)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="empty-dictionary-message">
+            {searchTerm ? 
+              `No words matching "${searchTerm}" found in your dictionary.` : 
+              'Your dictionary is empty. Add words from the transcript by clicking on them!'}
+          </div>
+        )}
       </div>
     );
   }
@@ -622,7 +683,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
                                       '';
                     const translation = entry.translation || entry.disambiguatedDefinition?.translation || '';
                     const conciseDef = entry.definition || entry.disambiguatedDefinition?.definition || '';
-                    const example = entry.contextSentence || entry.disambiguatedDefinition?.example || entry.example || 'No example available';
+                    const example = entry.example || entry.disambiguatedDefinition?.example || 'No example available';
                     
                     const wordSenseId = entry.wordSenseId;
 

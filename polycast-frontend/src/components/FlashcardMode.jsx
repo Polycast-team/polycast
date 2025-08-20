@@ -313,11 +313,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       const srsInterval = currentCard?.srsData?.SRS_interval || 1;
       const sentenceIndex = ((srsInterval - 1) % 5) * 2;
       textToPlay = parts[sentenceIndex] || parts[0] || '';
-    } else if (currentCard.contextSentence) {
-      // Fallback to context sentence
-      textToPlay = currentCard.contextSentence;
     } else if (currentCard.example) {
-      // Fallback to example
+      // Use Gemini example
       textToPlay = currentCard.example;
     } else {
       // Last resort: just the word
@@ -413,11 +410,8 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         const srsInterval = currentCard?.srsData?.SRS_interval || 1;
         const sentenceIndex = ((srsInterval - 1) % 5) * 2;
         textToPlay = parts[sentenceIndex] || parts[0] || '';
-      } else if (currentCard.contextSentence) {
-        // Fallback to context sentence
-        textToPlay = currentCard.contextSentence;
       } else if (currentCard.example) {
-        // Fallback to example
+        // Use Gemini example
         textToPlay = currentCard.example;
       } else {
         // Last resort: just the word

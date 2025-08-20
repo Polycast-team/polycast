@@ -21,6 +21,7 @@ import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
 import { createFlashcardEntry, fetchExamplePairs } from './components/FixedCardDefinitions';
+import { extractSentenceWithWord, markClickedWordInSentence } from './utils/wordClickUtils';
 import ModeSelector from './components/ModeSelector';
 
 
@@ -283,15 +284,32 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     const wordLower = (word || '').toLowerCase();
     const nativeLanguage = getNativeLanguageForProfile(selectedProfile || internalSelectedProfile);
     const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
-    const contextSentence = fullTranscript || '';
+    
+    // Extract sentence and mark the word with tildes
+    const sentence = extractSentenceWithWord(fullTranscript || '', wordLower);
+    // For Add Word flow, we mark the first occurrence since user is adding from menu
+    const sentenceWithMarkedWord = sentence.replace(
+      new RegExp(`\\b(${wordLower})\\b`, 'i'),
+      '~$1~'
+    );
+
+    console.log(`🎯 [handleAddWord] Using UNIFIED API for word: "${wordLower}"`);
+    console.log(`🎯 [handleAddWord] Sentence with marked word:`, sentenceWithMarkedWord);
+
+    const requestUrl = apiService.getUnifiedWordDataUrl(
+      wordLower,
+      sentenceWithMarkedWord,
+      nativeLanguage,
+      targetLanguage
+    );
+    console.log(`🌐 [handleAddWord] Unified API Request URL:`, requestUrl);
 
     try {
       setIsAddingWordBusy(true);
-      // Fetch single best contextual sense in the new unified schema
-      const data = await apiService.fetchJson(
-        apiService.getContextualSenseUrl(wordLower, contextSentence, nativeLanguage, targetLanguage)
-      );
-      const sense = data?.sense;
+      
+      // Single unified API call for all word data
+      const unifiedData = await apiService.fetchJson(requestUrl);
+      console.log(`🌐 [handleAddWord] Unified API Response:`, unifiedData);
 
       // Count existing senses for numbering
       const existingSenses = Object.values(wordDefinitions).filter(
@@ -300,38 +318,46 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       const definitionNumber = existingSenses.length + 1;
       const wordSenseId = `${wordLower}-${Date.now()}`;
 
+      // Create flashcard entry using unified data
       const entry = createFlashcardEntry(
         wordLower,
         wordSenseId,
-        sense?.example || contextSentence,
-        sense?.definition || wordLower,
+        unifiedData.exampleForDictionary || unifiedData.example || '',
+        unifiedData.definition || wordLower,
         '',
         definitionNumber
       );
 
-      const sentenceWithTilde = sense?.example || `~${wordLower}~`;
-      const examples = await fetchExamplePairs({
-        word: wordLower,
-        sentenceWithTilde,
-        targetLanguage,
-        nativeLanguage
-      });
-
+      // Enrich with all unified data
       const enriched = {
         ...entry,
-        translation: sense?.translation || '',
-        example: sense?.example || '',
-        contextSentence: sense?.example || contextSentence,
-        frequency: Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
-        exampleSentencesGenerated: examples
+        translation: unifiedData.translation || '',
+        example: unifiedData.exampleForDictionary || unifiedData.example || '',
+        contextSentence: unifiedData.exampleForDictionary || unifiedData.example || '', // For compatibility
+        frequency: unifiedData.frequency || 5,
+        exampleSentencesGenerated: unifiedData.exampleSentencesGenerated || ''
       };
+
+      console.log(`📝 [handleAddWord] Final entry structure from unified API:`, enriched);
+      console.log(`📝 [handleAddWord] Entry has required fields:`, {
+        inFlashcards: !!enriched.inFlashcards,
+        wordSenseId: !!enriched.wordSenseId,
+        word: !!enriched.word
+      });
 
       setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
       setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
+      
+      console.log(`✅ [handleAddWord] Successfully added word using unified API: ${wordLower}`);
+      return enriched;
     } catch (err) {
-      console.error('Transcript add failed; falling back to basic entry:', err);
-    } finally { setIsAddingWordBusy(false); }
-  }, [wordDefinitions, fullTranscript, selectedProfile, internalSelectedProfile]);
+      console.error('Unified API failed:', err);
+      showError(`Failed to add word: ${err.message}`);
+      return null;
+    } finally { 
+      setIsAddingWordBusy(false); 
+    }
+  }, [wordDefinitions, fullTranscript, selectedProfile, internalSelectedProfile, showError]);
 
   // New: add multiple senses at once (from AddWordPopup)
   const handleAddWordSenses = useCallback((word, senses) => {
@@ -351,7 +377,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       const entry = createFlashcardEntry(
         wordLower,
         wordSenseId,
-        contextSentence,
+        sense?.example || '',
         sense?.definition || wordLower,
         '',
         definitionNumber
