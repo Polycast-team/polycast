@@ -3,6 +3,22 @@ import PropTypes from 'prop-types';
 import { ReadyState } from 'react-use-websocket';
 import { getTranslationsForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 
+// Minimalist line icons (SVG) with transparent background
+const iconColor = '#a0a0b8';
+
+
+
+function CalendarIcon() {
+    return (
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="3" y="5" width="18" height="16" rx="2"/>
+            <line x1="8" y1="3" x2="8" y2="7"/>
+            <line x1="16" y1="3" x2="16" y2="7"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+        </svg>
+    );
+}
+
 
 /**
  * Component for mode controls, language selection, font size, and recording indicator.
@@ -63,97 +79,6 @@ function Controls({
                 )}
                 <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>{ui.mode}:</label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    {/* Show transcript button when not in audio mode */}
-                    {appMode !== 'audio' && (
-                        <button
-                            onClick={() => setAppMode && setAppMode('audio')}
-                            disabled={isRecording}
-                            style={{
-                                background: '#3f3969',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '6px 12px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                            }}
-                            title={ui.transcript}
-                        >
-                            📝 {ui.transcript}
-                        </button>
-                    )}
-                    
-                    {/* Show video button only when not in video mode */}
-                    {appMode !== 'video' && (
-                        <button
-                            onClick={() => setAppMode && setAppMode('video')}
-                            disabled={isRecording}
-                            style={{
-                                background: '#3f3969',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '6px 12px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                            }}
-                            title={ui.video}
-                        >
-                            🎥 {ui.video}
-                        </button>
-                    )}
-
-                    {/* Show dictionary button only when not in dictionary mode */}
-                    {appMode !== 'dictionary' && (
-                        <button
-                            onClick={() => setAppMode && setAppMode('dictionary')}
-                            disabled={isRecording}
-                            style={{
-                                background: '#3f3969',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '6px 12px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                            }}
-                            title={ui.dictionaryMode}
-                        >
-                            📚 {ui.dictionaryMode}
-                        </button>
-                    )}
-                    
-                    {/* Show flashcard button only when not in flashcard mode */}
-                    {appMode !== 'flashcard' && (
-                        <button
-                            onClick={() => setAppMode && setAppMode('flashcard')}
-                            disabled={isRecording}
-                            style={{
-                                background: '#3f3969',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '6px 12px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                            }}
-                            title={ui.flashcardMode}
-                        >
-                            🔄 {ui.flashcardMode}
-                        </button>
-                    )}
                 </div>
                 {/* Transcript/Translation toggles hidden for now */}
                 {/* Add Record/Stop button in audio mode - host only */}
@@ -205,10 +130,11 @@ function Controls({
                   onClick={() => window.dispatchEvent(new CustomEvent('toggleFlashcardCalendar', { detail: true }))}
                   style={{
                     background: 'none', border: '1px solid #2196f3', borderRadius: '6px',
-                    padding: '6px 10px', fontSize: '13px', color: '#2196f3', cursor: 'pointer'
+                    padding: '8px 12px', fontSize: '13px', color: '#2196f3', cursor: 'pointer'
                   }}
+                aria-label={ui.calendar}
                 >
-                  {ui.calendar}
+                  <CalendarIcon />
                 </button>
                 
                 <div style={{ color: '#ccc', fontSize: '12px' }}>
@@ -243,25 +169,6 @@ function Controls({
                     aria-label="Increase font size"
                 >
                     <span style={{ position: 'relative', top: -2 }}>+</span>
-                </button>
-                {/* Full Screen Button */}
-                <button
-                    onClick={() => {
-                        if (!document.fullscreenElement) {
-                            document.documentElement.requestFullscreen();
-                        } else {
-                            document.exitFullscreen();
-                        }
-                    }}
-                    style={{
-                        background: '#23233a', color: '#fff', border: 'none', borderRadius: 6, width: 40, height: 34,
-                        fontSize: 22, fontWeight: 700, boxShadow: '0 2px 8px #0002', cursor: 'pointer', transition: 'background 0.2s',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 18
-                    }}
-                    aria-label="Toggle Full Screen"
-                    title="Full Screen (F11)"
-                >
-                    <span style={{ fontSize: 18 }}>⛶</span>
                 </button>
             </div>
         </div>

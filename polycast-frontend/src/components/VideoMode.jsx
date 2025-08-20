@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import TranscriptionDisplay from './TranscriptionDisplay';
 import AudioRecorder from './AudioRecorder';
+import WordDefinitionPopup from './WordDefinitionPopup';
+import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
+import apiService from '../services/apiService.js';
 
 function VideoMode({
   sendMessage,
@@ -32,6 +35,11 @@ function VideoMode({
   const streamRef = useRef(null);
   const [videoError, setVideoError] = useState('');
   const [videoReady, setVideoReady] = useState(false);
+  const [fontSize, setFontSize] = useState(20);
+  const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
+  const [wordDefinitionsPopup, setWordDefinitionsPopup] = useState({});
+  
+  const ui = getUITranslationsForProfile(selectedProfile);
 
   useEffect(() => {
     async function initCamera() {
@@ -72,10 +80,41 @@ function VideoMode({
     };
   }, []);
 
+  // Font size controls
+  useEffect(() => {
+    const handleFontSizeChange = (e) => {
+      setFontSize(prev => Math.max(12, Math.min(60, prev + e.detail)));
+    };
+    window.addEventListener('changeFontSize', handleFontSizeChange);
+    return () => window.removeEventListener('changeFontSize', handleFontSizeChange);
+  }, []);
+
   const isHost = !!(roomSetup && roomSetup.isHost);
+  
+  // Word click handler
+  const handleWordClick = async (word, event) => {
+    try {
+      const targetLanguage = getNativeLanguageForProfile(selectedProfile);
+      const contextSentence = fullTranscript;
+      const data = await apiService.fetchJson(apiService.getWordPopupUrl(word, contextSentence, targetLanguage));
+      
+      setWordDefinitionsPopup(prev => ({
+        ...prev,
+        [word.toLowerCase()]: data
+      }));
+      
+      setPopupInfo({
+        visible: true,
+        word: word,
+        position: { x: event.clientX, y: event.clientY }
+      });
+    } catch (err) {
+      console.error('Error fetching word definitions:', err);
+    }
+  };
 
   return (
-    <div style={{ position: 'relative', display: 'flex', gap: 16, padding: 16, alignItems: 'flex-start' }}>
+    <div style={{ position: 'relative', display: 'flex', gap: 16, padding: 16, alignItems: 'flex-start', minHeight: 'calc(100vh - 140px)' }}>
       {/* Full-screen loading overlay while camera initializes */}
       {!videoReady && !videoError && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -127,28 +166,127 @@ function VideoMode({
         </div>
       </div>
 
-      {/* Right: transcript (reused) */}
-      <div style={{ flex: '1 1 50%' }}>
-        <TranscriptionDisplay
-          fullTranscript={fullTranscript}
-          currentPartial={currentPartial}
-          translations={translations}
-          targetLanguages={targetLanguages}
-          showLiveTranscript={true}
-          showTranslation={false}
-          defaultFontSize={20}
-          compactLines
-          isStudentMode={roomSetup && !roomSetup.isHost}
-          studentHomeLanguage={studentHomeLanguage}
-          selectedWords={selectedWords}
-          setSelectedWords={setSelectedWords}
-          wordDefinitions={wordDefinitions}
-          setWordDefinitions={setWordDefinitions}
-          selectedProfile={selectedProfile}
-          showTBA={showTBA}
-          onAddWord={onAddWord}
-        />
+      {/* Right: custom transcript with font controls */}
+      <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{
+          width: '100%',
+          height: 'calc(100vh - 200px)',
+          minHeight: '400px',
+          background: '#181b2f',
+          color: '#fff',
+          borderTop: '6px solid #7c62ff',
+          borderRadius: 10,
+          boxShadow: '0 2px 12px 0 rgba(124, 98, 255, 0.14)',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+        }}>
+          {/* Header with font controls */}
+          <div style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '18px 20px 10px 20px',
+            borderBottom: '1px solid #333'
+          }}>
+            <span style={{ 
+              letterSpacing: 0.5, 
+              fontWeight: 800, 
+              fontSize: 20, 
+              color: '#b3b3e7', 
+              textTransform: 'uppercase', 
+              opacity: 0.92 
+            }}>
+              {ui.transcriptHeader}
+            </span>
+            
+            {/* Font size controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('changeFontSize', { detail: -2 }))}
+                style={{
+                  background: '#23233a', color: '#fff', border: 'none', borderRadius: 6, width: 28, height: 28,
+                  fontSize: 18, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                –
+              </button>
+              <span style={{ color: '#aaa', fontSize: 14, fontWeight: 500, minWidth: 30, textAlign: 'center' }}>
+                {fontSize}px
+              </span>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('changeFontSize', { detail: 2 }))}
+                style={{
+                  background: '#23233a', color: '#fff', border: 'none', borderRadius: 6, width: 28, height: 28,
+                  fontSize: 18, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          
+          {/* Transcript content */}
+          <div style={{ 
+            flex: 1, 
+            overflowY: 'auto', 
+            padding: '15px 20px',
+            fontSize: `${fontSize}px`,
+            lineHeight: 1.6
+          }}>
+            {fullTranscript ? (
+              <div>
+                {fullTranscript.split(/(\s+)/).map((token, index) => {
+                  const word = token.trim().toLowerCase().replace(/[^\w]/g, '');
+                  if (!word || token.match(/^\s+$/)) {
+                    return <span key={index}>{token}</span>;
+                  }
+                  return (
+                    <span
+                      key={index}
+                      onClick={(e) => handleWordClick(word, e)}
+                      style={{
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#333'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    >
+                      {token}
+                    </span>
+                  );
+                })}
+                {currentPartial && (
+                  <span style={{ color: '#777', fontStyle: 'italic' }}>
+                    {' ' + currentPartial}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: '#777', fontStyle: 'italic' }}>
+                {isHost ? 'Click "Unmute" to start recording...' : 'Waiting for host to start...'}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+      
+      {/* Word definition popup */}
+      {popupInfo.visible && (
+        <WordDefinitionPopup
+          word={popupInfo.word}
+          definition={wordDefinitionsPopup[popupInfo.word.toLowerCase()]}
+          position={popupInfo.position}
+          isInDictionary={Object.values(wordDefinitions).some(e => e && e.inFlashcards && e.word === (popupInfo.word || '').toLowerCase())}
+          onAddToDictionary={() => onAddWord && onAddWord(popupInfo.word)}
+          onRemoveFromDictionary={() => {}}
+          onClose={() => setPopupInfo({ visible: false, word: '', position: { x: 0, y: 0 } })}
+          loading={false}
+          nativeLanguage={getNativeLanguageForProfile(selectedProfile)}
+        />
+      )}
     </div>
   );
 }

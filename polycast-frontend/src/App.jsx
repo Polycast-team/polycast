@@ -21,6 +21,7 @@ import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
 import { createFlashcardEntry, fetchExamplePairs } from './components/FixedCardDefinitions';
+import ModeSelector from './components/ModeSelector';
 
 
 
@@ -409,7 +410,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   useEffect(() => {
     if (userRole === 'student') {
       if (roomSetup) {
-        // Student joined a room → switch to audio mode (transcript view)
+        // Student joined a room → switch to audio mode (classroom view)
         if (appMode === 'flashcard') {
           setAppMode('audio');
         }
@@ -675,6 +676,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Handle app mode changes from dropdown menu
   const handleAppModeChange = useCallback((newMode) => {
     console.log(`Mode change requested: ${appMode} → ${newMode}`);
+    
+    // Automatically stop recording when switching modes
+    if (isRecording && newMode !== 'audio' && newMode !== 'video') {
+      console.log('Automatically stopping recording due to mode change');
+      setIsRecording(false);
+    }
+    
     if (newMode === 'dictionary') {
       // Just update local state for dictionary mode
       console.log('Setting mode to dictionary (local only)');
@@ -692,7 +700,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       console.log('Setting mode to video (local only)');
       setAppMode('video');
     }
-  }, [appMode]);
+  }, [appMode, isRecording]);
 
   // Get connection status string
   const connectionStatus = {
@@ -724,6 +732,42 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
   return (
     <div className="App">
+      {/* Fullscreen button - upper left corner for all modes */}
+      <button
+        onClick={() => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+          } else {
+            document.exitFullscreen();
+          }
+        }}
+        style={{
+          position: 'fixed',
+          top: '20px',
+          left: '20px',
+          zIndex: 1001,
+          background: 'rgba(35, 35, 58, 0.9)',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          width: 44,
+          height: 44,
+          fontSize: 20,
+          fontWeight: 700,
+          cursor: 'pointer',
+          transition: 'background 0.2s',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+        }}
+        aria-label="Toggle Full Screen"
+        title="Full Screen (F11)"
+      >
+        <span>⛶</span>
+      </button>
+
       {/* Header container with logo and room code */}
       <div style={{
         display: 'flex',
@@ -775,9 +819,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           )}
         </div>
       </div>
-      <div className="controls-container" style={{ marginBottom: 4 }}>
-        {/* Main Toolbar */}
-        <div className="main-toolbar" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch', marginBottom: 0 }}>
+      {/* Hide controls in video mode */}
+      {appMode !== 'video' && (
+        <div className="controls-container" style={{ marginBottom: 4 }}>
+          {/* Main Toolbar */}
+          <div className="main-toolbar" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch', marginBottom: 0 }}>
           {/* Recording indicator for audio mode */}
           {appMode === 'audio' && isRecording && (
             <div style={{
@@ -854,6 +900,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           )}
         </div>
       </div>
+      )}
       
       {/* Header with room buttons - positioned above toolbar */}
       <div style={{ 
@@ -1166,6 +1213,15 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         onReorder={reorderQueue}
       />
       <TBAPopup tba={popupTBA} onClose={clearTBA} />
+
+      {/* Mode Selector */}
+      <ModeSelector
+        appMode={appMode}
+        onModeChange={handleAppModeChange}
+        userRole={userRole}
+        roomSetup={roomSetup}
+        selectedProfile={selectedProfile || internalSelectedProfile}
+      />
 
     </div>
   )
