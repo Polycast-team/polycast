@@ -574,3 +574,27 @@ h1, h2, h3 {
   text-transform: capitalize;
   color: inherit;
 }
+
+/* Transcript scrollbars: hidden by default, visible and controllable on hover */
+.pc-transcript-scroll {
+  scrollbar-width: thin; /* Firefox baseline */
+  scrollbar-color: transparent transparent;
+  scrollbar-gutter: stable;
+}
+.pc-transcript-scroll:hover {
+  scrollbar-color: rgba(124, 98, 255, 0.6) rgba(255, 255, 255, 0.06);
+}
+/* WebKit scrollbars */
+.pc-transcript-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.pc-transcript-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 6px;
+}
+.pc-transcript-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(124, 98, 255, 0.6);
+}
+.pc-transcript-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}

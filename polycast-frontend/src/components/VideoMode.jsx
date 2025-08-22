@@ -564,7 +564,7 @@ function VideoMode({
             boxShadow: '0 2px 12px 0 rgba(124,98,255,0.14)'
           }}
         >
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <TranscriptionDisplay
               showTBA={showTBA}
               fullTranscript={fullTranscript}

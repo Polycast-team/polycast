@@ -120,9 +120,10 @@ const TranscriptionDisplay = ({
     const scrollToBottom = () => {
       // Only auto-scroll if user hasn't manually scrolled up
       if (!isUserScrolling || isAtBottom()) {
-        const scrollAnchor = document.querySelector('.scroll-anchor');
-        if (scrollAnchor) {
-          scrollAnchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        const el = scrollContainerRef.current;
+        if (el) {
+          // Jump directly to the bottom to avoid bounce while new text streams in
+          el.scrollTop = el.scrollHeight;
         }
         setIsUserScrolling(false);
       }
@@ -404,12 +405,12 @@ const TranscriptionDisplay = ({
       
       {/* Transcript Box */}
       {showLiveTranscript && (
-        <div style={{ width: '100%', flex: showTranslation ? '0 0 33.5%' : '1 1 100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '100%', flex: showTranslation ? '0 0 33.5%' : '1 1 100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div
             style={{
               width: '100%',
               flex: 1,
-              overflowY: 'auto',
+              overflow: 'hidden',
               overflowX: 'hidden',
               background: '#181b2f',
               color: '#fff',
@@ -420,6 +421,7 @@ const TranscriptionDisplay = ({
               flexDirection: 'column',
               maxHeight: '100%',
               position: 'relative',
+              minHeight: 0
             }}
             ref={transcriptRef}
           >
@@ -441,8 +443,12 @@ const TranscriptionDisplay = ({
                 flex: 1, 
                 overflowY: 'auto', 
                 overflowX: 'hidden',
-                scrollBehavior: 'smooth'
+                scrollBehavior: 'smooth',
+                overscrollBehavior: 'contain'
               }}
+              className="pc-transcript-scroll"
+              onWheel={(e) => { e.stopPropagation(); }}
+              onTouchMove={(e) => { e.stopPropagation(); }}
             >
               {renderTranscript()}
             </div>
