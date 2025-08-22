@@ -6,7 +6,7 @@ import './App.css'
 
 // Import planned components (will be created next)
 import AudioRecorder from './components/AudioRecorder';
-import Controls from './components/Controls';
+import HostToolbar from './components/HostToolbar';
 
 import TranscriptionDisplay from './components/TranscriptionDisplay';
 import DictionaryTable from './components/DictionaryTable';
@@ -20,7 +20,7 @@ import { getLanguageForProfile, getTranslationsForProfile, getNativeLanguageForP
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
-import { createFlashcardEntry, fetchExamplePairs } from './components/FixedCardDefinitions';
+import { createFlashcardEntry } from './components/FixedCardDefinitions';
 import { extractSentenceWithWord, markClickedWordInSentence } from './utils/wordClickUtils';
 import ModeSelector from './components/ModeSelector';
 
@@ -121,14 +121,12 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     : `${apiService.wsBaseUrl}/ws`;
   console.log("Constructed WebSocket URL:", socketUrl);
 
-  const [messageHistory, setMessageHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
   const [fullTranscript, setFullTranscript] = useState('');
   const [currentPartial, setCurrentPartial] = useState(''); 
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   const [errorMessages, setErrorMessages] = useState([]); 
-  const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
-  const [showTranslation, setShowTranslation] = useState(false); 
+  
   // Students start in flashcard mode, hosts start in audio mode
   const [appMode, setAppMode] = useState(() => {
     // If student not in a room, start in flashcard mode
@@ -371,36 +369,55 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     ).length;
 
     setIsAddingWordBusy(true);
-    const promises = senses.map((sense, idx) => {
+    const promises = senses.map(async (sense, idx) => {
       const definitionNumber = baseCount + idx + 1;
       const wordSenseId = `${wordLower}-${Date.now()}-${idx}`;
-      const entry = createFlashcardEntry(
-        wordLower,
-        wordSenseId,
-        sense?.example || '',
-        sense?.definition || wordLower,
-        '',
-        definitionNumber
-      );
-      // Generate example pairs for this sense using its example
-      const sentenceWithTilde = sense?.example || `~${wordLower}~`;
-      return fetchExamplePairs({
-        word: wordLower,
-        sentenceWithTilde,
-        targetLanguage,
-        nativeLanguage
-      }).then((examples) => {
+      
+      // Use the unified API to get complete word data including examples
+      const sentenceWithMarkedWord = sense?.example || `~${wordLower}~`;
+      
+      try {
+        const url = apiService.getUnifiedWordDataUrl(
+          wordLower,
+          sentenceWithMarkedWord,
+          nativeLanguage,
+          targetLanguage
+        );
+        
+        const unifiedData = await apiService.fetchJson(url);
+        
+        // Create enriched entry with unified data
+        const entry = createFlashcardEntry(
+          wordLower,
+          wordSenseId,
+          sentenceWithMarkedWord,
+          unifiedData.definition || sense?.definition || wordLower,
+          '',
+          definitionNumber
+        );
+        
         const enriched = {
           ...entry,
-          translation: sense?.translation || '',
-          example: sense?.example || '',
-          contextSentence: sense?.example || '',
-          frequency: Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
-          exampleSentencesGenerated: examples
+          translation: unifiedData.translation || sense?.translation || '',
+          example: unifiedData.exampleForDictionary || sense?.example || '',
+          contextSentence: sentenceWithMarkedWord,
+          frequency: unifiedData.frequency || Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
+          exampleSentencesGenerated: unifiedData.exampleSentencesGenerated || ''
         };
+        
         setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
-      }).catch((err) => {
-        console.error('Failed to generate example pairs for sense:', err);
+      } catch (err) {
+        console.error('Failed to get unified word data for sense:', err);
+        // Fallback to basic entry without examples
+        const entry = createFlashcardEntry(
+          wordLower,
+          wordSenseId,
+          sense?.example || '',
+          sense?.definition || wordLower,
+          '',
+          definitionNumber
+        );
+        
         const enriched = {
           ...entry,
           translation: sense?.translation || '',
@@ -409,9 +426,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           frequency: Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
           exampleSentencesGenerated: ''
         };
+        
         setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
-      });
+      }
     });
+    
     setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
     Promise.allSettled(promises).finally(() => setIsAddingWordBusy(false));
   }, [wordDefinitions, fullTranscript, selectedProfile, internalSelectedProfile]);
@@ -654,20 +673,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         // setMessageHistory((prev) => prev.concat(lastMessage));
       }
     }
-  }, [lastMessage, showLiveTranscript]); // Update dependency array
+  }, [lastMessage]); // Update dependency array
 
-  // Listen for toggleLiveTranscript event from Controls
-  useEffect(() => {
-    function handler(e) { setShowLiveTranscript(!!e.detail); }
-    window.addEventListener('toggleLiveTranscript', handler);
-    return () => window.removeEventListener('toggleLiveTranscript', handler);
-  }, []);
-
-  // Provide a global getter for Controls to read the toggle state
-  useEffect(() => {
-    window.showLiveTranscript = () => showLiveTranscript;
-    return () => { delete window.showLiveTranscript; };
-  }, [showLiveTranscript]);
+  
 
   // Handlers for recording controls (passed down to components that need to send audio)
   const handleStartRecording = useCallback(() => {
@@ -755,6 +763,29 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     [],
     0
   );
+
+  // Open join modal when classroom tapped from toolbar
+  useEffect(() => {
+    const open = () => setShowJoinRoomModal(true);
+    window.addEventListener('openJoinRoom', open);
+    return () => window.removeEventListener('openJoinRoom', open);
+  }, []);
+
+  // Track bottom toolbar height to keep transcript 10px above it
+  useEffect(() => {
+    const el = () => document.getElementById('pc-bottom-toolbar');
+    function updateVar() {
+      const h = el()?.offsetHeight || 72;
+      document.documentElement.style.setProperty('--bottom-toolbar-h', `${h}`);
+    }
+    updateVar();
+    window.addEventListener('resize', updateVar);
+    const mo = new MutationObserver(updateVar);
+    const node = el();
+    if (node) mo.observe(node, { attributes: true, childList: true, subtree: true });
+    const id = setInterval(updateVar, 250);
+    return () => { window.removeEventListener('resize', updateVar); mo.disconnect(); clearInterval(id); };
+  }, []);
 
   return (
     <div className="App">
@@ -845,147 +876,92 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           )}
         </div>
       </div>
-      {/* Hide controls in video mode */}
-      {appMode !== 'video' && (
+      {/* Top toolbar: show only for host in audio mode */}
+      {appMode === 'audio' && roomSetup && roomSetup.isHost && (
         <div className="controls-container" style={{ marginBottom: 4 }}>
-          {/* Main Toolbar */}
           <div className="main-toolbar" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch', marginBottom: 0 }}>
-          {/* Recording indicator for audio mode */}
-          {appMode === 'audio' && isRecording && (
-            <div style={{
-              position: 'absolute',
-              top: 100,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              color: '#ff5733',
-              fontWeight: 'bold',
-              fontSize: '1.1rem',
-              textShadow: '0 1px 3px #fff',
-              pointerEvents: 'none',
-              letterSpacing: 0.2,
-              opacity: 0.98,
-              zIndex: 2,
-            }}>
-              {ui.recording}
-            </div>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            {/* Audio recorder for hosts in audio mode */}
-            {appMode === 'audio' && roomSetup && roomSetup.isHost && (
+            {isRecording && (
+              <div style={{
+                position: 'absolute',
+                top: 100,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                color: '#ff5733',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                textShadow: '0 1px 3px #fff',
+                pointerEvents: 'none',
+                letterSpacing: 0.2,
+                opacity: 0.98,
+                zIndex: 2,
+              }}>
+                {ui.recording}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
               <AudioRecorder
                 sendMessage={sendMessage}
                 isRecording={isRecording}
                 onAudioSent={onAudioSent}
               />
-            )}
-          </div>
-          <Controls
-            showTBA={showTBA}
-            readyState={readyState}
-            isRecording={isRecording}
-            onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
-            onStopRecording={roomSetup && roomSetup.isHost ? handleStopRecording : null}
-            appMode={appMode}
-            setAppMode={handleAppModeChange}
-            toolbarStats={toolbarStats}
-            showLiveTranscript={true}
-            setShowLiveTranscript={() => {}}
-            showTranslation={false}
-            setShowTranslation={() => {}}
-            roomSetup={roomSetup}
-            selectedProfile={selectedProfile || internalSelectedProfile}
-            setSelectedProfile={profile => {
-              console.log('Profile switched to:', profile);
-              if (onProfileChange) {
-                onProfileChange(profile);
-              } else {
-                // Fallback for when no callback is provided
-                setSelectedProfile(profile);
-              }
-            }}
-            userRole={userRole}
-          />
-          {/* User instructions for hosts in audio mode - removed */}
-          {/* User instructions for students in audio mode */}
-          {appMode === 'audio' && roomSetup && !roomSetup.isHost && (
-            <div style={{
-              marginTop: -45,
-              marginBottom: 0,
-              width: '100%',
-              textAlign: 'center',
-              color: '#10b981',
-              fontWeight: 600,
-              fontSize: '1.05rem',
-              letterSpacing: 0.1,
-              textShadow: '0 1px 2px #2228',
-              opacity: 0.96,
-              userSelect: 'none',
-            }}>
-              Viewing host's transcription in real-time • <span style={{ color: '#ffb84d' }}>Click words to add to dictionary</span>
             </div>
-          )}
+            <HostToolbar
+              showTBA={showTBA}
+              readyState={readyState}
+              isRecording={isRecording}
+              onStartRecording={handleStartRecording}
+              onStopRecording={handleStopRecording}
+              appMode={appMode}
+              setAppMode={handleAppModeChange}
+              toolbarStats={toolbarStats}
+              showLiveTranscript={true}
+              setShowLiveTranscript={() => {}}
+              showTranslation={false}
+              setShowTranslation={() => {}}
+              roomSetup={roomSetup}
+              selectedProfile={selectedProfile || internalSelectedProfile}
+              setSelectedProfile={profile => {
+                console.log('Profile switched to:', profile);
+                if (onProfileChange) {
+                  onProfileChange(profile);
+                } else {
+                  setSelectedProfile(profile);
+                }
+              }}
+              userRole={userRole}
+            />
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Student guidance in audio mode (no toolbar) */}
+      {appMode === 'audio' && roomSetup && !roomSetup.isHost && (
+        <div style={{
+          marginTop: -45,
+          marginBottom: 0,
+          width: '100%',
+          textAlign: 'center',
+          color: '#10b981',
+          fontWeight: 600,
+          fontSize: '1.05rem',
+          letterSpacing: 0.1,
+          textShadow: '0 1px 2px #2228',
+          opacity: 0.96,
+          userSelect: 'none',
+        }}>
+          Viewing host's transcription in real-time • <span style={{ color: '#ffb84d' }}>Click words to add to dictionary</span>
+        </div>
       )}
       
-      {/* Header with room buttons - positioned above toolbar */}
-      <div style={{ 
-        position: 'absolute', 
-        top: '20px', 
-        right: '20px', 
-        zIndex: 100,
-        display: 'flex',
-        gap: '8px',
-        alignItems: 'center'
-      }}>
-        {/* Show role indicator only for students */}
+      {/* Header right: role indicator and exit only (join moved to modal) */}
+      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
         {roomSetup && !roomSetup.isHost && (
-          <div style={{ 
-            fontSize: 14, 
-            color: '#fff', 
-            marginRight: 16,
-            background: 'rgba(0,0,0,0.3)',
-            padding: '8px 12px',
-            borderRadius: 4
-          }}>
+          <div style={{ fontSize: 14, color: '#fff', marginRight: 16, background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: 4 }}>
             <span>{ui.student}</span>
           </div>
         )}
-        
-        {/* Join Room button - only for students not in a room */}
-        {userRole === 'student' && !roomSetup && (
-          <button 
-            onClick={() => setShowJoinRoomModal(true)}
-            style={{
-              padding: '8px 16px',
-              fontSize: 14,
-              borderRadius: 4,
-              background: '#10b981',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            {ui.joinRoom}
-          </button>
-        )}
-        
-        {/* Exit Room button - only for students in a room */}
         {roomSetup && !roomSetup.isHost && (
-          <button 
-            onClick={onReset}
-            style={{
-              padding: '8px 16px',
-              fontSize: 14,
-              borderRadius: 4,
-              background: '#444',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            {ui.exitRoom}
-          </button>
+          <button onClick={onReset} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>{ui.exitRoom}</button>
         )}
       </div>
       
@@ -1010,6 +986,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             wordDefinitions={wordDefinitions}
             selectedProfile={selectedProfile || internalSelectedProfile}
             isAddingWordBusy={isAddingWordBusy}
+            toolbarStats={toolbarStats}
             onAddWordSenses={handleAddWordSenses}
             onRemoveWord={(wordSenseId, word) => {
               console.log(`Removing word from dictionary: ${word} (${wordSenseId})`);
@@ -1096,10 +1073,6 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             currentPartial={currentPartial}
             translations={translations}
             targetLanguages={effectiveLanguages}
-            showLiveTranscript={true}
-            setShowLiveTranscript={() => {}}
-            showTranslation={false}
-            setShowTranslation={() => {}}
             selectedProfile={selectedProfile || internalSelectedProfile}
             studentHomeLanguage={studentHomeLanguage}
             selectedWords={selectedWords}

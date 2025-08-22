@@ -8,22 +8,13 @@ const iconColor = '#a0a0b8';
 
 
 
-function CalendarIcon() {
-    return (
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <rect x="3" y="5" width="18" height="16" rx="2"/>
-            <line x1="8" y1="3" x2="8" y2="7"/>
-            <line x1="16" y1="3" x2="16" y2="7"/>
-            <line x1="3" y1="9" x2="21" y2="9"/>
-        </svg>
-    );
-}
 
 
 /**
- * Component for mode controls, language selection, font size, and recording indicator.
+ * Toolbar component for host/classroom mode.
+ * Contains profile selection, recording controls, and font size controls.
  */
-function Controls({ 
+function HostToolbar({ 
     showTBA,
     readyState,
     isRecording, 
@@ -113,37 +104,6 @@ function Controls({
                 )}
             </div>
             
-            {/* Flashcard controls - only show in flashcard mode */}
-            {(appMode === 'flashcard' || appMode === 'dictionary') && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 20 }}>
-                <button 
-                  onClick={() => window.location.reload()}
-                  style={{
-                    background: '#3f3969', color: 'white', border: 'none', padding: '6px 12px',
-                    borderRadius: '6px', cursor: 'pointer', fontSize: '13px'
-                  }}
-                >
-                  {ui.backToMain}
-                </button>
-                
-                <button 
-                  onClick={() => window.dispatchEvent(new CustomEvent('toggleFlashcardCalendar', { detail: true }))}
-                  style={{
-                    background: 'none', border: '1px solid #2196f3', borderRadius: '6px',
-                    padding: '8px 12px', fontSize: '13px', color: '#2196f3', cursor: 'pointer'
-                  }}
-                aria-label={ui.calendar}
-                >
-                  <CalendarIcon />
-                </button>
-                
-                <div style={{ color: '#ccc', fontSize: '12px' }}>
-                  <span style={{color: '#5f72ff'}}>{ui.new}: {toolbarStats?.newCards ?? 0}</span> • 
-                  <span style={{color: '#ef4444', marginLeft: '4px'}}>{ui.learning}: {toolbarStats?.learningCards ?? 0}</span> • 
-                  <span style={{color: '#10b981', marginLeft: '4px'}}>{ui.review}: {toolbarStats?.reviewCards ?? 0}</span>
-                </div>
-              </div>
-            )}
             
             {/* Font size controls - available to both hosts and students */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 18 }}>
@@ -175,7 +135,7 @@ function Controls({
     );
 }
 
-Controls.propTypes = {
+HostToolbar.propTypes = {
     readyState: PropTypes.number.isRequired,
     isRecording: PropTypes.bool.isRequired,
     onStartRecording: PropTypes.func,
@@ -199,4 +159,4 @@ Controls.propTypes = {
     }),
 };
 
-export default Controls;
+export default HostToolbar;

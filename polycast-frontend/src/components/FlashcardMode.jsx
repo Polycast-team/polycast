@@ -1,40 +1,37 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import './FlashcardMode.css';
-import MobileProfileSelector from '../mobile/components/MobileProfileSelector.jsx';
-import { shouldUseMobileApp } from '../utils/deviceDetection.js';
 import { useErrorHandler } from '../hooks/useErrorHandler';
 import ErrorPopup from './ErrorPopup';
 import { calculateNextReview, formatNextReviewTime } from '../utils/srsAlgorithm';
 import { useFlashcardSession } from '../hooks/useFlashcardSession';
 import { useFlashcardSRS } from '../hooks/useFlashcardSRS';
 import { useFlashcardCalendar } from '../hooks/useFlashcardCalendar';
-import { getTranslationsForProfile, getLanguageForProfile } from '../utils/profileLanguageMapping';
-import '../mobile/styles/mobile-flashcards.css';
+import { getTranslationsForProfile, getLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import '../services/apiService.js';
 import apiService from '../services/apiService.js';
-import { use } from 'react';
-// Removed TBA popup usage for cleaner UI
+//
+
 
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
   // Get translations for this profile's language
   const t = getTranslationsForProfile(selectedProfile);
+  const ui = getUITranslationsForProfile(selectedProfile);
   
-  // State for UI mode - desktop starts in flashcards, mobile starts in profile selection
-  const [currentMode, setCurrentMode] = useState(() => {
-    return shouldUseMobileApp() ? 'profile' : 'flashcards';
-  });
+  // Single responsive mode
+  const [currentMode, setCurrentMode] = useState('flashcards');
   // Calendar modal is now controlled globally in App.jsx
   const [dragState, setDragState] = useState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
   const [cardEntryAnimation, setCardEntryAnimation] = useState('');
   const [answerFeedback, setAnswerFeedback] = useState({ show: false, type: '', text: '' });
   const [audioState, setAudioState] = useState({ loading: false, error: null });
   const [currentAudio, setCurrentAudio] = useState(null);
+  const currentAudioRef = useRef(null);
   const [hasAutoPlayedThisFlip, setHasAutoPlayedThisFlip] = useState(false);
   const { error: popupError, showError, clearError } = useErrorHandler();
   // TBA popup removed
-  const isActuallyMobile = shouldUseMobileApp();
+  const isActuallyMobile = false;
 
   // Use shared session hook
   const sessionData = useFlashcardSession(selectedProfile, wordDefinitions);
@@ -231,35 +228,36 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     
     try {
       const audioUrl = await generateAudioForSentence(text, cacheKey);
-      
-      setCurrentAudio(prevAudio => {
-        // Stop any currently playing audio immediately
-        if (prevAudio) {
-          prevAudio.pause();
-          prevAudio.currentTime = 0;
-          prevAudio.src = ''; // Clear source to stop any loading
-        }
-        
-        const audio = new Audio(audioUrl);
-        audio.onended = () => {
-          setAudioState({ loading: false, error: null });
-          audioGenerationLockRef.current = false;
-        };
-        audio.onerror = () => {
-          setAudioState({ loading: false, error: null });
-          audioGenerationLockRef.current = false;
-        };
-        
-        audio.play().then(() => {
-          setAudioState({ loading: false, error: null });
-        }).catch(err => {
-          console.error('Audio play error:', err);
-          setAudioState({ loading: false, error: null });
-          audioGenerationLockRef.current = false;
-        });
-        
-        return audio;
-      });
+      // Stop any currently playing audio immediately (ref-based to avoid race)
+      if (currentAudioRef.current) {
+        try {
+          currentAudioRef.current.pause();
+          currentAudioRef.current.currentTime = 0;
+          currentAudioRef.current.src = '';
+        } catch {}
+      }
+
+      const audio = new Audio(audioUrl);
+      audio.onended = () => {
+        setAudioState({ loading: false, error: null });
+        audioGenerationLockRef.current = false;
+      };
+      audio.onerror = () => {
+        setAudioState({ loading: false, error: null });
+        audioGenerationLockRef.current = false;
+      };
+
+      try {
+        await audio.play();
+        setAudioState({ loading: false, error: null });
+      } catch (err) {
+        console.error('Audio play error:', err);
+        setAudioState({ loading: false, error: null });
+        audioGenerationLockRef.current = false;
+      }
+
+      currentAudioRef.current = audio;
+      setCurrentAudio(audio);
       
     } catch (error) {
       console.error('Audio generation error:', error);
@@ -374,6 +372,107 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     }
   }, [isFlipped, flipCard]);
 
+  // Mobile swipe gestures: left = incorrect, right = correct (only when flipped)
+  const SWIPE_THRESHOLD = 60;
+  const getLeftSwipeIntensity = (dx) => {
+    const ratio = Math.max(0, Math.min(1, -dx / 220));
+    return ratio;
+  };
+  const [isExiting, setIsExiting] = useState(false);
+  const pendingResetRef = useRef(false);
+
+  const handleTouchStart = useCallback((e) => {
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    isDragging.current = true;
+    touchStartPos.current = { x: t.clientX, y: t.clientY };
+    touchStartTime.current = Date.now();
+    setDragState({ isDragging: true, deltaX: 0, deltaY: 0, opacity: 1 });
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!isDragging.current || !touchStartPos.current) return;
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    const dx = t.clientX - touchStartPos.current.x;
+    const dy = t.clientY - touchStartPos.current.y;
+    const opacity = Math.max(0.4, 1 - Math.min(1, Math.abs(dx) / 300));
+    setDragState(prev => ({ ...prev, deltaX: dx, deltaY: dy, opacity }));
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!touchStartPos.current) return;
+    const elapsed = Date.now() - (touchStartTime.current || 0);
+    const dx = dragState.deltaX || 0;
+    const absDx = Math.abs(dx);
+
+    // Quick swipe behavior
+    if (absDx > SWIPE_THRESHOLD && elapsed < 800) {
+      if (isFlipped) {
+        // Decide answer
+        const answer = dx > 0 ? 'correct' : 'incorrect';
+        // animate off-screen and keep it off until next shown
+        setIsExiting(true);
+        const offscreen = (dx > 0 ? window.innerWidth : -window.innerWidth) * 1.2;
+        setDragState(prev => ({ ...prev, deltaX: offscreen, opacity: 0 }));
+        setTimeout(() => {
+          // Trigger SRS update; do not reset position here so the old card stays off-screen
+          markCard(answer);
+          // Schedule a fallback reset in case the next instance reuses the same key/index
+          pendingResetRef.current = true;
+          setTimeout(() => {
+            if (pendingResetRef.current) {
+              setIsExiting(false);
+              setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+              pendingResetRef.current = false;
+            }
+          }, 280);
+        }, 160);
+      } else {
+        // If not flipped, treat as flip gesture
+        flipCard();
+        setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+      }
+    } else {
+      // Reset
+      setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+    }
+    isDragging.current = false;
+    touchStartPos.current = null;
+  }, [dragState.deltaX, isFlipped, markCard, flipCard]);
+
+  // When the current card changes, reset swipe state so the new card appears centered
+  const prevCardKeyRef = useRef(null);
+  useEffect(() => {
+    const key = currentCard?.key || currentCard?.wordSenseId || currentCard?.word || '';
+    if (prevCardKeyRef.current && prevCardKeyRef.current !== key) {
+      setIsExiting(false);
+      setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+    }
+    prevCardKeyRef.current = key;
+  }, [currentCard]);
+
+  // Also reset on index change (handles cases where same word/key advances to next sentence)
+  useEffect(() => {
+    setIsExiting(false);
+    setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+  }, [currentDueIndex]);
+
+  // Compute a render instance id for the card (handles same word/different sentence cases)
+  const renderInstanceId = React.useMemo(() => {
+    if (!currentCard) return 'none';
+    const iv = currentCard?.srsData?.SRS_interval || 1;
+    const sentenceBucket = ((iv - 1) % 5);
+    return `${currentCard.wordSenseId || currentCard.word}-${sentenceBucket}`;
+  }, [currentCard]);
+
+  useEffect(() => {
+    // When the visible instance changes, make sure swipe state is reset
+    setIsExiting(false);
+    setDragState({ isDragging: false, deltaX: 0, deltaY: 0, opacity: 1 });
+    pendingResetRef.current = false;
+  }, [renderInstanceId]);
+
   // Auto-play audio when card is flipped
   useEffect(() => {
     if (!isFlipped) {
@@ -399,6 +498,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
   useEffect(() => {
     if (isFlipped && currentCard && !hasAutoPlayedThisFlip && !autoPlayLockRef.current && !audioGenerationLockRef.current) {
       // Prevent duplicate autoplay in React StrictMode/development
+      if (autoPlayLockRef.current) return; // guard
       autoPlayLockRef.current = true;
       setHasAutoPlayedThisFlip(true);
       
@@ -419,13 +519,11 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       }
       
       if (textToPlay) {
-        if (autoPlayTimeoutRef.current) {
-          clearTimeout(autoPlayTimeoutRef.current);
-        }
+        if (autoPlayTimeoutRef.current) clearTimeout(autoPlayTimeoutRef.current);
         autoPlayTimeoutRef.current = setTimeout(() => {
           generateAndPlayAudio(textToPlay, currentCard);
           autoPlayTimeoutRef.current = null;
-        }, 300);
+        }, 320);
       }
     }
   }, [isFlipped, currentCard, hasAutoPlayedThisFlip, generateAndPlayAudio]);
@@ -471,19 +569,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     );
   }
 
-  // Profile selection mode (only for actual mobile devices)
-  if (currentMode === 'profile') {
-    return (
-      <div className="flashcard-profile-wrapper">
-        <MobileProfileSelector 
-          selectedProfile={selectedProfile}
-          onStartStudying={handleStartStudying}
-          onBack={!isActuallyMobile ? handleBackToMain : null}
-        />
-        <ErrorPopup error={popupError} onClose={clearError} />
-      </div>
-    );
-  }
+  // Removed separate mobile profile selection
 
   // Flashcard study mode - show message if no cards available
   if (!currentCard) {
@@ -492,14 +578,14 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         <div className="desktop-card-container">
           <div className="no-flashcards-message">
             <div className="no-flashcards-icon">📚</div>
-            <h2>{t.noFlashcardsTitle}</h2>
-            <p>{t.noFlashcardsMessage}</p>
+            <h2>{ui.noFlashcardsTitle}</h2>
+            <p>{ui.noFlashcardsMessage}</p>
             <div className="no-flashcards-instructions">
-              <p><strong>{t.instructionsTitle}</strong></p>
+              <p><strong>{ui.instructionsTitle}</strong></p>
               <ol>
-                <li>{t.methodDictionary}</li>
-                <li>{t.methodTranscript}</li>
-                <li>{t.methodReturn}</li>
+                <li>{ui.methodDictionary}</li>
+                <li>{ui.methodTranscript}</li>
+                <li>{ui.methodReturn}</li>
               </ol>
             </div>
           </div>
@@ -519,13 +605,32 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         <div 
           className={`desktop-flashcard ${cardEntryAnimation}`}
           onClick={handleCardClick}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           style={{
-            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-            transition: 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+            // Drag transforms only (no rotateY here) so the visible side doesn't mirror during swipe
+            transform: `translateX(${dragState.deltaX}px) rotate(${dragState.deltaX * 0.03}deg)`,
+            transition: dragState.isDragging ? 'none' : 'transform 0.32s ease-out, opacity 0.25s ease-out',
+            opacity: dragState.opacity,
+            transformStyle: 'preserve-3d'
           }}
         >
+          {/* Flip wrapper handles Y-rotation only on flip */}
+          <div
+            className="desktop-flip-wrapper"
+            style={{
+              transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+              transition: 'transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              transformStyle: 'preserve-3d',
+              width: '100%',
+              height: '100%'
+            }}
+          >
           {/* Front of Card */}
-          <div className="desktop-card-front">
+          <div className="desktop-card-front" style={{
+            border: getLeftSwipeIntensity(dragState.deltaX) > 0 ? `2px solid rgba(220,38,38,${0.3 + 0.5*getLeftSwipeIntensity(dragState.deltaX)})` : undefined
+          }}>
             {(() => {
               if (!currentCard.exampleSentencesGenerated) {
                 throw new Error(`Card "${currentCard.word || 'unknown'}" is missing exampleSentencesGenerated field. Backend must generate proper ~word~ markup data. No fallback UI allowed.`);
@@ -558,7 +663,9 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           </div>
 
           {/* Back of Card */}
-          <div className="desktop-card-back">
+          <div className="desktop-card-back" style={{
+            border: getLeftSwipeIntensity(dragState.deltaX) > 0 ? `2px solid rgba(220,38,38,${0.3 + 0.5*getLeftSwipeIntensity(dragState.deltaX)})` : undefined
+          }}>
             <div className="desktop-card-content">
               {(() => {
                 if (!currentCard.exampleSentencesGenerated) {
@@ -592,6 +699,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
               })()}
             </div>
           </div>
+          </div>{/* end flip-wrapper */}
         </div>
       </div>
 

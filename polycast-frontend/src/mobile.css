@@ -1,0 +1,82 @@
+/* Mobile-only overrides scoped under .pc-mobile so desktop is unaffected */
+.pc-mobile {
+  background: #23243a;
+}
+
+.pc-mobile #root,
+.pc-mobile .App {
+  width: 100vw;
+  max-width: 100vw;
+  margin: 0;
+  padding: 0 12px;
+}
+
+/* Title sizing */
+.pc-mobile .polycast-title {
+  font-size: 2rem !important;
+  letter-spacing: 0.04em !important;
+}
+
+/* Header spacing */
+.pc-mobile [style*="width: '200px'"] { /* the left/right spacers in header */
+  width: 80px !important;
+}
+.pc-mobile [style*="margin: '24px 24px 12px 24px'"] {
+  margin: 16px 12px 8px 12px !important;
+}
+
+/* No-cards panel scale */
+.pc-mobile .no-flashcards-message {
+  max-width: 92vw !important;
+  padding: 20px !important;
+}
+.pc-mobile .no-flashcards-message h2 {
+  font-size: 1.25rem !important;
+}
+.pc-mobile .no-flashcards-message p {
+  font-size: 0.95rem !important;
+}
+
+.pc-mobile .no-flashcards-instructions {
+  padding: 14px !important;
+}
+
+/* Dictionary container fit */
+.pc-mobile .dictionary-container {
+  max-height: calc(100vh - 160px) !important;
+}
+
+/* Bottom toolbar: add safe-area spacing */
+.pc-mobile .bottom-toolbar {
+  bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+}
+.pc-mobile .bottom-toolbar-content {
+  width: min(94vw, 680px) !important;
+}
+
+/* Ensure content clears the toolbar */
+.pc-mobile .display-container {
+  padding-bottom: calc(var(--bottom-toolbar-h, 72px) + 60px + env(safe-area-inset-bottom)) !important;
+}
+
+/* Flashcards: fit viewport vertically */
+.pc-mobile .desktop-flashcard {
+  min-width: 0 !important;
+  width: 92vw !important;
+  height: min(52vh, 380px) !important;
+}
+.pc-mobile .desktop-card-container {
+  padding-top: 12px !important;
+}
+.pc-mobile .desktop-answer-buttons {
+  height: 72px !important;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+}
+
+/* Ensure any absolute elements inside study containers don't extend below toolbar */
+.pc-mobile .flashcard-study-container {
+  min-height: auto !important;
+  padding-bottom: calc(var(--bottom-toolbar-h, 72px) + 70px + env(safe-area-inset-bottom)) !important;
+}
+
+

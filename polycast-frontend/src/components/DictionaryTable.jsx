@@ -5,6 +5,19 @@ import PropTypes from 'prop-types';
 import './DictionaryTable.css';
 import TBAPopup from './popups/TBAPopup';
 import { useTBAHandler } from '../hooks/useTBAHandler';
+import { getUITranslationsForProfile } from '../utils/profileLanguageMapping';
+
+// Calendar icon component
+function CalendarIcon() {
+    return (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="3" y="5" width="18" height="16" rx="2"/>
+            <line x1="8" y1="3" x2="8" y2="7"/>
+            <line x1="16" y1="3" x2="16" y2="7"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+        </svg>
+    );
+}
 
 
 // Helper to render example text: highlight ~word~ in yellow, remove tildes
@@ -12,63 +25,7 @@ const renderExampleHtml = (text = '') => {
   return (text || '').replace(/~([^~]+)~/g, '<span class="dict-highlight">$1<\/span>');
 };
 
-// Component to display word frequency rating (1-5)
-const FrequencyIndicator = ({ word }) => {
-  // In a real app, this would come from actual frequency data
-  // For now, we'll generate a random but consistent rating based on the word
-  const getWordFrequency = (word) => {
-    // Generate a consistent frequency rating between 1-5 based on word
-    const sum = word.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return (sum % 5) + 1; // Rating from 1 to 5
-  };
-
-  const frequency = getWordFrequency(word);
-  
-  // Determine color based on frequency (5=green, 1=red)
-  const getColorForFrequency = (freq) => {
-    const colors = {
-      1: '#ff4d4d', // Red
-      2: '#ff944d', // Orange
-      3: '#ffdd4d', // Yellow
-      4: '#75d147', // Light green
-      5: '#4ade80', // Green
-    };
-    return colors[freq] || colors[3]; // Default to yellow if invalid
-  };
-
-  // Generate the dots for the rating
-  const renderFrequencyDots = (rating) => {
-    const dots = [];
-    for (let i = 1; i <= 5; i++) {
-      dots.push(
-        <div 
-          key={i}
-          className={`frequency-dot ${i <= rating ? 'active' : 'inactive'}`}
-          style={{ 
-            backgroundColor: i <= rating ? getColorForFrequency(rating) : '#39394d',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            display: 'inline-block'
-          }}
-        />
-      );
-    }
-    return dots;
-  };
-
-  return (
-    <div className="frequency-indicator" title={`Frequency rating: ${frequency}/5`}>
-      <div className="frequency-dots" style={{ display: 'flex', gap: '3px' }}>
-        {renderFrequencyDots(frequency)}
-      </div>
-    </div>
-  );
-};
-
-FrequencyIndicator.propTypes = {
-  word: PropTypes.string.isRequired
-};
+// Removed unused FrequencyIndicator component
 
 // Frequency dot indicator component for reuse
 const FrequencyDots = ({ frequency, showValue = false, size = 8, gap = 2 }) => {
@@ -153,7 +110,7 @@ const FrequencyLegend = () => {
   );
 };
 
-const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSenses, selectedProfile, isAddingWordBusy }) => {
+const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSenses, selectedProfile, isAddingWordBusy, toolbarStats }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -169,6 +126,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
   const searchInputRef = React.useRef(null);
   const addWordInputRef = React.useRef(null);
   const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
+  const ui = getUITranslationsForProfile(selectedProfile);
 
 
   // Group entries by word
@@ -368,12 +326,9 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
 
   // Show debug info if dictionary has entries but none pass filtering
   if (filteredWords.length === 0) {
-    const totalEntries = Object.keys(wordDefinitions).length;
-    const hasEntries = totalEntries > 0;
-    
     return (
       <div className="dictionary-container">
-        {/* Controls row: Search + Add Word buttons */}
+        {/* Controls row: Search + Add Word buttons + Calendar + Stats */}
         <div className="dictionary-controls" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             onClick={() => setIsSearchOpen(true)}
@@ -387,8 +342,31 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
           >
             ＋ Add Word
           </button>
+          {/* Calendar button */}
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('toggleFlashcardCalendar', { detail: true }))}
+            style={{
+              background: 'none', 
+              border: '1px solid #2196f3', 
+              borderRadius: '6px',
+              padding: '6px 10px', 
+              color: '#2196f3', 
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            aria-label={ui.calendar}
+          >
+            <CalendarIcon />
+          </button>
+          {/* Stats display */}
+          <div style={{ color: '#ccc', fontSize: '13px', marginLeft: 'auto' }}>
+            <span style={{color: '#5f72ff'}}>{ui.new}: {toolbarStats?.newCards ?? 0}</span> • 
+            <span style={{color: '#ef4444', marginLeft: '4px'}}>{ui.learning}: {toolbarStats?.learningCards ?? 0}</span> • 
+            <span style={{color: '#10b981', marginLeft: '4px'}}>{ui.review}: {toolbarStats?.reviewCards ?? 0}</span>
+          </div>
         </div>
-        
         {/* Popups */}
         <DictionarySearchPopup
           isOpen={isSearchOpen}
@@ -408,77 +386,18 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
             }
           }}
         />
-        
-        {hasEntries ? (
-          <div style={{ 
-            padding: '20px', 
-            backgroundColor: '#2a1f3d', 
-            borderRadius: '8px', 
-            margin: '16px',
-            border: '1px solid #ff6b6b'
-          }}>
-            <h3 style={{ color: '#ff6b6b', marginBottom: '16px' }}>
-              🐛 Dictionary Failure - Debug Information
-            </h3>
-            <div style={{ color: '#f5f5f5', fontSize: '14px', lineHeight: 1.6 }}>
-              <p><strong>Issue:</strong> Found {totalEntries} entries in wordDefinitions, but none passed filtering.</p>
-              
-              <h4 style={{ color: '#ffd93d', marginTop: '20px', marginBottom: '10px' }}>
-                Required Fields for Dictionary Display:
-              </h4>
-              <ul style={{ color: '#b3b3e7', marginLeft: '20px' }}>
-                <li><code>entry.inFlashcards</code> must be <code>true</code></li>
-                <li><code>entry.wordSenseId</code> must exist</li>
-                <li><code>entry.word</code> must exist</li>
-              </ul>
-
-              <h4 style={{ color: '#ffd93d', marginTop: '20px', marginBottom: '10px' }}>
-                Current wordDefinitions Entries:
-              </h4>
-              <div style={{ 
-                backgroundColor: '#1a1a2e', 
-                padding: '12px', 
-                borderRadius: '4px', 
-                fontFamily: 'monospace',
-                fontSize: '12px',
-                overflowX: 'auto',
-                maxHeight: '300px',
-                overflowY: 'auto'
-              }}>
-                {Object.entries(wordDefinitions).map(([key, entry]) => (
-                  <div key={key} style={{ marginBottom: '12px', borderBottom: '1px solid #333', paddingBottom: '8px' }}>
-                    <div style={{ color: '#4ade80' }}>Key: {key}</div>
-                    <div style={{ color: '#fbbf24' }}>
-                      ✓ inFlashcards: {entry?.inFlashcards ? 'true' : 'false/missing'}
-                    </div>
-                    <div style={{ color: '#fbbf24' }}>
-                      ✓ wordSenseId: {entry?.wordSenseId ? entry.wordSenseId : 'missing'}
-                    </div>
-                    <div style={{ color: '#fbbf24' }}>
-                      ✓ word: {entry?.word ? entry.word : 'missing'}
-                    </div>
-                    <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>
-                      Full entry: {JSON.stringify(entry, null, 2)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="empty-dictionary-message">
-            {searchTerm ? 
-              `No words matching "${searchTerm}" found in your dictionary.` : 
-              'Your dictionary is empty. Add words from the transcript by clicking on them!'}
-          </div>
-        )}
+        <div className="empty-dictionary-message">
+          {searchTerm ? 
+            `No words matching "${searchTerm}" found in your dictionary.` : 
+            'Your dictionary is empty. Add words from the transcript by clicking on them!'}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="dictionary-container" style={{ width: '800px', maxWidth: '100%', margin: '0 auto' }}>
-      {/* Controls row: Search + Add Word buttons */}
+      {/* Controls row: Search + Add Word buttons + Calendar + Stats */}
       <div className="dictionary-controls" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button
           onClick={() => setIsSearchOpen(true)}
@@ -492,11 +411,40 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
         >
           ＋ Add Word
         </button>
+        
+        {/* Calendar button */}
+        <button 
+          onClick={() => window.dispatchEvent(new CustomEvent('toggleFlashcardCalendar', { detail: true }))}
+          style={{
+            background: 'none', 
+            border: '1px solid #2196f3', 
+            borderRadius: '6px',
+            padding: '6px 10px', 
+            color: '#2196f3', 
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+          aria-label={ui.calendar}
+        >
+          <CalendarIcon />
+        </button>
+        
         {isAddingWordBusy && (
           <div style={{ color: '#a0a0b8', fontSize: 13 }}>Adding word…</div>
         )}
-        <div style={{ marginLeft: 'auto', color: '#aaa', fontSize: 13 }}>
-          {sortedWords.length} {sortedWords.length === 1 ? 'word' : 'words'}
+        
+        {/* Stats and word count */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ color: '#ccc', fontSize: '13px' }}>
+            <span style={{color: '#5f72ff'}}>{ui.new}: {toolbarStats?.newCards ?? 0}</span> • 
+            <span style={{color: '#ef4444', marginLeft: '4px'}}>{ui.learning}: {toolbarStats?.learningCards ?? 0}</span> • 
+            <span style={{color: '#10b981', marginLeft: '4px'}}>{ui.review}: {toolbarStats?.reviewCards ?? 0}</span>
+          </div>
+          <div style={{ color: '#aaa', fontSize: 13 }}>
+            {sortedWords.length} {sortedWords.length === 1 ? 'word' : 'words'}
+          </div>
         </div>
       </div>
       
@@ -753,6 +701,14 @@ DictionaryTable.propTypes = {
   wordDefinitions: PropTypes.object.isRequired,
   onRemoveWord: PropTypes.func, // optional – only needed if removal UI is desired
   onAddWord: PropTypes.func, // optional – only needed if manual word addition is desired
+  onAddWordSenses: PropTypes.func,
+  selectedProfile: PropTypes.string,
+  isAddingWordBusy: PropTypes.bool,
+  toolbarStats: PropTypes.shape({
+    newCards: PropTypes.number,
+    learningCards: PropTypes.number,
+    reviewCards: PropTypes.number,
+  }),
 };
 
 export default DictionaryTable;

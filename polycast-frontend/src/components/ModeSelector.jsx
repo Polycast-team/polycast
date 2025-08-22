@@ -23,19 +23,17 @@ function ModeSelector({
       mode: 'audio',
       label: ui.classroomMode,
       icon: (
+        // Silhouette (head + torso) icon
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="4" y1="5" x2="20" y2="5"/>
-          <line x1="6" y1="5" x2="6" y2="7"/>
-          <line x1="18" y1="5" x2="18" y2="7"/>
-          <rect x="6" y="7" width="12" height="8" rx="1.5"/>
-          <line x1="12" y1="15" x2="12" y2="20"/>
-          <line x1="9" y1="20" x2="15" y2="20"/>
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M5 20c0-4 3-7 7-7s7 3 7 7"/>
         </svg>
       ),
       colorIndex: 0,
       onClick: () => {
         if (userRole === 'student' && !roomSetup) {
-          alert(ui.joinRoomFirst);
+          // Open join room modal instead of alert
+          window.dispatchEvent(new CustomEvent('openJoinRoom'));
           return;
         }
         onModeChange('audio');
@@ -63,11 +61,10 @@ function ModeSelector({
       mode: 'flashcard',
       label: ui.flashcardMode,
       icon: (
+        // Diagonal pencil icon
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="14" rx="2"/>
-          <rect x="5" y="5" width="14" height="10" rx="1"/>
-          <line x1="8" y1="8" x2="16" y2="8"/>
-          <line x1="8" y1="11" x2="13" y2="11"/>
+          <path d="M12 20l-7 1 1-7L15.5 4.5a2.121 2.121 0 0 1 3 0l1 1a2.121 2.121 0 0 1 0 3L12 20z"/>
+          <path d="M16 5l3 3"/>
         </svg>
       ),
       colorIndex: 2,
@@ -90,7 +87,7 @@ function ModeSelector({
   return (
     <>
       {/* Bottom Toolbar - All Mode Buttons */}
-      <div className="bottom-toolbar">
+      <div className="bottom-toolbar" id="pc-bottom-toolbar">
         <div className="bottom-toolbar-content">
           {buttons.map((button) => {
             const colors = buttonColors[button.colorIndex];

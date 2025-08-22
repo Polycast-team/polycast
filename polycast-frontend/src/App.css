@@ -35,7 +35,6 @@ h1, h2, h3 {
   border-radius: 16px;
   box-shadow: 0 2px 8px 0 rgba(80, 98, 255, 0.05);
   padding: 16px 0;
-  margin-bottom: 24px;
   display: flex;
   flex-direction: row;
   justify-content: center;
@@ -455,7 +454,8 @@ h1, h2, h3 {
   align-items: center;
   justify-content: center;
   width: 100vw;
-  padding-bottom: 120px; /* Space for bottom toolbar */
+  /* Space for bottom toolbar (height + 20px offset + 10px gap) */
+  padding-bottom: calc(var(--bottom-toolbar-h, 72px) + 30px);
   box-sizing: border-box;
 }
 
@@ -487,16 +487,17 @@ h1, h2, h3 {
 }
 
 .bottom-toolbar-content {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: rgba(24, 25, 38, 0.92); /* match app background with slight opacity */
+  backdrop-filter: blur(8px);
   border-radius: 25px;
-  padding: 10px 15px;
+  padding: 14px 22px;
   display: flex;
-  gap: 20px;
+  gap: 12px;
   align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  justify-content: space-between;
+  box-shadow: none; /* remove drop shadow so the bar is visually seamless */
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  width: clamp(520px, 70vw, 1000px); /* make the bar about 2x wider while responsive */
 }
 
 .bottom-toolbar-button {
@@ -508,11 +509,12 @@ h1, h2, h3 {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 12px 20px;
+  padding: 12px 28px; /* broaden button hit area horizontally */
   border-radius: 15px;
   transition: all 0.2s ease;
-  color: #6b7280;
-  min-width: 80px;
+  color: #e5e7eb; /* lighter default to stand out on dark background */
+  min-width: 0;
+  flex: 1 1 0; /* let each button share width evenly without stretching icons */
 }
 
 /* Red button (Classroom) */
@@ -563,10 +565,12 @@ h1, h2, h3 {
   width: 24px;
   height: 24px;
   stroke-width: 2;
+  color: inherit; /* ensure icons use the lighter color */
 }
 
 .bottom-toolbar-button span {
   font-size: 12px;
   font-weight: 500;
   text-transform: capitalize;
+  color: inherit;
 }

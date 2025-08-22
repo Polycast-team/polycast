@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
 import AppRouter from './AppRouter.jsx'
+import MobileShell from './components/MobileShell.jsx'
 import ProfileSelectorScreen from './components/ProfileSelectorScreen.jsx';
 import LanguageSelectorScreen from './components/LanguageSelectorScreen.jsx';
-import MobileApp from './mobile/MobileApp.jsx';
 import { shouldUseMobileApp } from './utils/deviceDetection.js';
 import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
 import './components/RoomSelectionScreen.css'; // Import styles
@@ -25,10 +24,7 @@ function Main() {
     setIsMobile(shouldUseMobileApp());
   }, []);
 
-  // If mobile device OR flashcard mode is forced, render mobile app instead
-  if (isMobile || forceFlashcardMobile) {
-    return <MobileApp />;
-  }
+  // Always render the unified responsive App; keep detection for future defaults only
 
   // Host flow: clicking Host should immediately create a room and jump straight into transcript
   const handleHostClick = async () => {
@@ -102,10 +98,7 @@ function Main() {
       // Update roomSetup to connect student to the room
       setRoomSetup({ isHost: false, roomCode: roomCode });
     },
-    onFlashcardModeChange: (isFlashcardMode) => {
-      // Force mobile mode when entering flashcard mode
-      setForceFlashcardMobile(isFlashcardMode);
-    },
+    onFlashcardModeChange: () => {},
     onProfileChange: (newProfile) => {
       // Update profile in main.jsx state and recalculate languages
       console.log('Profile change requested in main.jsx:', newProfile);
@@ -117,7 +110,11 @@ function Main() {
   
   console.log('Props being passed to AppRouter:', JSON.stringify(propsToPass, null, 2));
   
-  return (
+  return isMobile ? (
+    <MobileShell>
+      <AppRouter {...propsToPass} />
+    </MobileShell>
+  ) : (
     <AppRouter {...propsToPass} />
   );
 }

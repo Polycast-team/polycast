@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import TranscriptionDisplay from './TranscriptionDisplay';
 import AudioRecorder from './AudioRecorder';
+import TranscriptionDisplay from './TranscriptionDisplay';
 import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import apiService from '../services/apiService.js';
@@ -18,10 +18,6 @@ function VideoMode({
   currentPartial,
   translations,
   targetLanguages,
-  showLiveTranscript,
-  setShowLiveTranscript,
-  showTranslation,
-  setShowTranslation,
   selectedProfile,
   studentHomeLanguage,
   // dictionary state from App
@@ -38,6 +34,12 @@ function VideoMode({
   const [videoReady, setVideoReady] = useState(false);
   const [fontSize, setFontSize] = useState(20);
   const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
+  const [isHoveringVideo, setIsHoveringVideo] = useState(false);
+  const containerRef = useRef(null);
+  const [splitRatio, setSplitRatio] = useState(0.5); // 50/50 split
+  const [dragging, setDragging] = useState(false);
+  const [dividerHover, setDividerHover] = useState(false);
+  const clamp = (v, min = 0.2, max = 0.8) => Math.min(max, Math.max(min, v));
   
   const ui = getUITranslationsForProfile(selectedProfile);
 
@@ -79,6 +81,33 @@ function VideoMode({
       }
     };
   }, []);
+
+  // Divider drag handlers
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragging || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const ratio = (clientX - rect.left) / rect.width;
+      setSplitRatio(clamp(ratio));
+      // Prevent touch scrolling while dragging
+      if (e.cancelable) e.preventDefault();
+    };
+    const onUp = () => setDragging(false);
+    const onLeave = () => setDragging(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('mouseleave', onLeave);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('mouseleave', onLeave);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [dragging]);
 
   // Font size controls
   useEffect(() => {
@@ -158,8 +187,31 @@ function VideoMode({
     }
   };
 
+  const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 900);
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 900);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const leftPercent = Math.round(splitRatio * 100);
+  const rightPercent = 100 - leftPercent;
+
+  // While dragging, show global ew-resize cursor and disable text selection
+  useEffect(() => {
+    if (!dragging) return;
+    const prevCursor = document.body.style.cursor;
+    const prevSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    return () => {
+      document.body.style.cursor = prevCursor || '';
+      document.body.style.userSelect = prevSelect || '';
+    };
+  }, [dragging]);
+
   return (
-    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', padding: '16px', minHeight: '100vh', boxSizing: 'border-box' }}>
+    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', padding: '16px', minHeight: '100vh', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* Full-screen loading overlay while camera initializes */}
       {!videoReady && !videoError && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -171,46 +223,107 @@ function VideoMode({
         </div>
       )}
       
-      {/* Top section: video, controls, and transcript header (red box area) */}
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center',
-        marginBottom: '0'
-      }}>
-        {/* Centered video */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: '700px', width: '100%' }}>
-          <div style={{ position: 'relative', background: '#0f1020', borderRadius: 12, overflow: 'hidden' }}>
+      {/* Split container fits entirely above the bottom toolbar */}
+      <div
+        ref={containerRef}
+        style={{
+          display: 'flex',
+          flexDirection: isNarrow ? 'column' : 'row',
+          gap: isNarrow ? 12 : 0,
+          alignItems: 'stretch',
+          width: '100%',
+          height: 'calc(100vh - (var(--bottom-toolbar-h, 72px) + 10px + env(safe-area-inset-bottom)))',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+          position: 'relative'
+        }}
+      >
+        {/* LEFT: video */}
+        <div
+          style={{
+            width: isNarrow ? '100%' : `${leftPercent}%`,
+            flexGrow: 0,
+            flexShrink: 0,
+            minWidth: isNarrow ? '100%' : '20%',
+            maxWidth: isNarrow ? '100%' : '80%',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            overflow: 'hidden'
+          }}
+        >
+          <div
+            style={{ position: 'relative', background: '#0f1020', borderRadius: 12, overflow: 'hidden', flex: 1 }}
+            onMouseEnter={() => setIsHoveringVideo(true)}
+            onMouseLeave={() => setIsHoveringVideo(false)}
+          >
             <video
               ref={videoRef}
               playsInline
               muted
-              style={{ width: '100%', height: 'auto', transform: 'scaleX(-1)', display: 'block' }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: 'block' }}
             />
             {videoError && (
               <div style={{ position: 'absolute', inset: 0, color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
                 {videoError}
               </div>
             )}
-          </div>
 
-          {/* Mute/Unmute control */}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: '16px' }}>
-            {isRecording ? (
+            {/* Hover toolbar (Zoom-like) */}
+            <div
+              style={{
+                position: 'absolute',
+                left: 12,
+                right: 12,
+                bottom: 12,
+                background: 'rgba(0, 0, 0, 0.45)',
+                borderRadius: 10,
+                padding: '8px 12px',
+                display: 'flex',
+                gap: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: isHoveringVideo ? 1 : 0,
+                transform: `translateY(${isHoveringVideo ? 0 : 8}px)`,
+                transition: 'opacity 160ms ease, transform 160ms ease',
+                pointerEvents: isHoveringVideo ? 'auto' : 'none'
+              }}
+            >
               <button
-                onClick={onStopRecording || (() => {})}
-                style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+                onClick={isRecording ? (onStopRecording || (() => {})) : (onStartRecording || (() => {}))}
+                title={isRecording ? 'Mute' : 'Unmute'}
+                style={{
+                  background: isRecording ? '#ef4444' : '#10b981',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '8px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer'
+                }}
               >
-                Mute
+                {isRecording ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10a7 7 0 0 1-14 0"/>
+                    <line x1="12" y1="17" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10a7 7 0 0 1-14 0"/>
+                    <line x1="12" y1="17" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                    <line x1="4" y1="4" x2="20" y2="20"/>
+                  </svg>
+                )}
+                <span style={{ fontWeight: 600 }}>{isRecording ? 'Mute' : 'Unmute'}</span>
               </button>
-            ) : (
-              <button
-                onClick={onStartRecording || (() => {})}
-                style={{ background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
-              >
-                Unmute
-              </button>
-            )}
+            </div>
           </div>
 
           {/* Hidden audio pipeline to drive transcript */}
@@ -218,114 +331,93 @@ function VideoMode({
             <AudioRecorder sendMessage={sendMessage} isRecording={isRecording} />
           </div>
         </div>
-        
-        {/* Transcript header with font controls - full width */}
-        <div style={{
-          width: '100%',
-          background: '#181b2f',
-          borderTop: '6px solid #7c62ff',
-          borderRadius: '10px 10px 0 0',
-          boxShadow: '0 2px 12px 0 rgba(124, 98, 255, 0.14)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '18px 20px 10px 20px',
-        }}>
-          <span style={{ 
-            letterSpacing: 0.5, 
-            fontWeight: 800, 
-            fontSize: 20, 
-            color: '#b3b3e7', 
-            textTransform: 'uppercase', 
-            opacity: 0.92 
-          }}>
-            {ui.transcriptHeader}
-          </span>
-          
-          {/* Font size controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent('changeFontSize', { detail: -2 }))}
-              style={{
-                background: '#23233a', color: '#fff', border: 'none', borderRadius: 6, width: 28, height: 28,
-                fontSize: 18, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              –
-            </button>
-            <span style={{ color: '#aaa', fontSize: 14, fontWeight: 500, minWidth: 30, textAlign: 'center' }}>
-              {fontSize}px
-            </span>
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent('changeFontSize', { detail: 2 }))}
-              style={{
-                background: '#23233a', color: '#fff', border: 'none', borderRadius: 6, width: 28, height: 28,
-                fontSize: 18, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              +
-            </button>
-          </div>
-        </div>
-      </div>
 
-      {/* Bottom: transcript content area (pink box area) */}
-      <div style={{
-        width: '100%',
-        flex: 1,
-        background: '#181b2f',
-        color: '#fff',
-        borderRadius: '0 0 10px 10px',
-        boxShadow: '0 2px 12px 0 rgba(124, 98, 255, 0.14)',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        marginBottom: '120px', // Space for bottom toolbar
-        minHeight: '200px'
-      }}>
-        {/* Transcript content */}
-        <div style={{ 
-          flex: 1, 
-          overflowY: 'auto', 
-          padding: '20px',
-          fontSize: `${fontSize}px`,
-          lineHeight: 1.6
-        }}>
-            {fullTranscript ? (
-              <div>
-                {fullTranscript.split(/(\s+)/).map((token, index) => {
-                  const word = token.trim().toLowerCase().replace(/[^\w]/g, '');
-                  if (!word || token.match(/^\s+$/)) {
-                    return <span key={index}>{token}</span>;
-                  }
-                  return (
-                    <span
-                      key={index}
-                      onClick={(e) => handleWordClick(word, e)}
-                      style={{
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#333'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      {token}
-                    </span>
-                  );
-                })}
-                {currentPartial && (
-                  <span style={{ color: '#777', fontStyle: 'italic' }}>
-                    {' ' + currentPartial}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div style={{ color: '#777', fontStyle: 'italic' }}>
-                {isHost ? 'Click "Unmute" to start recording...' : 'Waiting for host to start...'}
-              </div>
+        {/* Invisible divider overlay positioned at the border */}
+        {!isNarrow && (
+          <div
+            onMouseDown={() => setDragging(true)}
+            onTouchStart={() => setDragging(true)}
+            onMouseEnter={() => setDividerHover(true)}
+            onMouseLeave={() => setDividerHover(false)}
+            style={{
+              position: 'absolute',
+              left: `${leftPercent}%`,
+              top: 0,
+              width: 8,
+              height: '100%',
+              cursor: 'ew-resize',
+              background: 'transparent',
+              userSelect: 'none',
+              zIndex: 20,
+              transform: 'translateX(-4px)' // Center the 8px wide area on the border
+            }}
+            aria-label="Resize panels"
+            role="separator"
+            aria-orientation="vertical"
+            title="Drag to resize"
+          >
+            {/* Optional: subtle visual indicator on hover */}
+            {(dividerHover || dragging) && (
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 2,
+                height: '60%',
+                background: '#8b7bff',
+                borderRadius: 1,
+                boxShadow: '0 0 8px #7c62ff',
+                transition: 'opacity 0.2s ease'
+              }} />
             )}
+          </div>
+        )}
+
+        {/* Drag overlay to guarantee pointer capture and cursor across the page */}
+        {dragging && (
+          <div
+            style={{ position: 'fixed', inset: 0, cursor: 'ew-resize', zIndex: 9999, background: 'transparent' }}
+          />
+        )}
+
+        {/* RIGHT: transcript */}
+        <div
+          style={{
+            width: isNarrow ? '100%' : `${rightPercent}%`,
+            flexGrow: 0,
+            flexShrink: 0,
+            minWidth: isNarrow ? '100%' : '20%',
+            maxWidth: isNarrow ? '100%' : '80%',
+            boxSizing: 'border-box',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            background: '#181b2f',
+            borderRadius: 10,
+            boxShadow: '0 2px 12px 0 rgba(124,98,255,0.14)'
+          }}
+        >
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            <TranscriptionDisplay
+              showTBA={showTBA}
+              fullTranscript={fullTranscript}
+              currentPartial={currentPartial}
+              targetLanguages={targetLanguages}
+              translations={translations}
+              showLiveTranscript={true}
+              showTranslation={false}
+              selectedWords={selectedWords}
+              setSelectedWords={setSelectedWords}
+              wordDefinitions={wordDefinitions}
+              setWordDefinitions={setWordDefinitions}
+              isStudentMode={roomSetup && !roomSetup.isHost}
+              studentHomeLanguage={studentHomeLanguage}
+              selectedProfile={selectedProfile}
+              onAddWord={onAddWord}
+            />
+          </div>
         </div>
       </div>
       
@@ -357,10 +449,6 @@ VideoMode.propTypes = {
   currentPartial: PropTypes.string,
   translations: PropTypes.object,
   targetLanguages: PropTypes.array,
-  showLiveTranscript: PropTypes.bool,
-  setShowLiveTranscript: PropTypes.func,
-  showTranslation: PropTypes.bool,
-  setShowTranslation: PropTypes.func,
   selectedProfile: PropTypes.string.isRequired,
   studentHomeLanguage: PropTypes.string
 };
