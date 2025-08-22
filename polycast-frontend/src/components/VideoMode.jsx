@@ -43,6 +43,28 @@ function VideoMode({
   
   const ui = getUITranslationsForProfile(selectedProfile);
 
+  // --- Placeholder multi-participant layout state (kept local to this file) ---
+  // We model a simple list of participants: local camera ("me") + 4 placeholders.
+  // The strip shows 3 thumbnails and a 4th partially cut off; clicking the red arrow
+  // scrolls to reveal the hidden one. Clicking a thumbnail swaps it with the main.
+  const initialParticipants = React.useMemo(() => [
+    { id: 'me', name: 'You', color: '#3b82f6', type: 'me' },
+    { id: 'p1', name: 'Person 1', color: '#f472b6' },
+    { id: 'p2', name: 'Person 2', color: '#22c55e' },
+    { id: 'p3', name: 'Person 3', color: '#f59e0b' },
+    { id: 'p4', name: 'Person 4', color: '#a78bfa' }
+  ], []);
+  const [participantOrder, setParticipantOrder] = useState(initialParticipants.map(p => p.id));
+  const [mainParticipantId, setMainParticipantId] = useState('me');
+  const [thumbScrollIndex, setThumbScrollIndex] = useState(0); // 0 or 1 with 4 thumbs showing 3 at a time
+  const thumbVideoRef = useRef(null); // second <video> when local camera is in thumbnails
+
+  const getParticipantById = (id) => initialParticipants.find(p => p.id === id);
+  const mainParticipant = getParticipantById(mainParticipantId);
+  const thumbnails = participantOrder.filter(id => id !== mainParticipantId).map(getParticipantById);
+  const visibleThumbs = 3; // show 3 fully, one cut off
+  const maxScrollIndex = Math.max(0, thumbnails.length - visibleThumbs);
+
   useEffect(() => {
     async function initCamera() {
       try {
@@ -81,6 +103,30 @@ function VideoMode({
       }
     };
   }, []);
+
+  // Keep the thumbnail "me" video wired if/when local feed is not main
+  useEffect(() => {
+    const isMeInThumbs = mainParticipantId !== 'me' && thumbVideoRef.current && streamRef.current;
+    if (isMeInThumbs) {
+      try {
+        thumbVideoRef.current.srcObject = streamRef.current;
+        const p = thumbVideoRef.current.play();
+        if (p && typeof p.then === 'function') p.catch(() => {});
+      } catch (_) {}
+    }
+  }, [mainParticipantId, thumbnails.length]);
+
+  // Reconnect main video when switching back to "me"
+  useEffect(() => {
+    const isMeMain = mainParticipantId === 'me' && videoRef.current && streamRef.current;
+    if (isMeMain) {
+      try {
+        videoRef.current.srcObject = streamRef.current;
+        const p = videoRef.current.play();
+        if (p && typeof p.then === 'function') p.catch(() => {});
+      } catch (_) {}
+    }
+  }, [mainParticipantId]);
 
   // Divider drag handlers
   useEffect(() => {
@@ -238,7 +284,7 @@ function VideoMode({
           position: 'relative'
         }}
       >
-        {/* LEFT: video */}
+        {/* LEFT: video + placeholder participants strip */}
         <div
           style={{
             width: isNarrow ? '100%' : `${leftPercent}%`,
@@ -258,12 +304,29 @@ function VideoMode({
             onMouseEnter={() => setIsHoveringVideo(true)}
             onMouseLeave={() => setIsHoveringVideo(false)}
           >
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: 'block' }}
-            />
+            {mainParticipant && mainParticipant.id === 'me' ? (
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: 'block' }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: mainParticipant ? mainParticipant.color : '#374151'
+                }}
+              >
+                <span style={{ fontSize: 36, fontWeight: 900, color: '#111827', textShadow: '0 2px 10px rgba(0,0,0,0.25)' }}>
+                  {mainParticipant ? mainParticipant.name : ''}
+                </span>
+              </div>
+            )}
             {videoError && (
               <div style={{ position: 'absolute', inset: 0, color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
                 {videoError}
@@ -330,6 +393,107 @@ function VideoMode({
           <div style={{ display: 'none' }}>
             <AudioRecorder sendMessage={sendMessage} isRecording={isRecording} />
           </div>
+
+          {/* Bottom thumbnails strip (carousel) */}
+          <div
+            style={{
+              position: 'relative',
+              marginTop: 10,
+              height: 120,
+              borderRadius: 10,
+              background: 'transparent',
+              overflow: 'hidden'
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                overflow: 'hidden'
+              }}
+            >
+              {/* Inner row with transform to simulate scrolling */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  height: '100%',
+                  display: 'flex',
+                  gap: 12,
+                  paddingRight: 80, // leave space for arrow button
+                  transform: `translateX(${-thumbScrollIndex * (212 + 12)}px)`,
+                  transition: 'transform 200ms ease'
+                }}
+              >
+                {thumbnails.map((p) => (
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      // Swap clicked participant with main: update order and main id
+                      setParticipantOrder(prev => {
+                        const a = [...prev];
+                        const i = a.indexOf(p.id);
+                        const j = a.indexOf(mainParticipantId);
+                        if (i !== -1 && j !== -1) {
+                          const tmp = a[i];
+                          a[i] = a[j];
+                          a[j] = tmp;
+                        }
+                        return a;
+                      });
+                      setMainParticipantId(p.id);
+                    }}
+                    title={`Promote ${p.name}`}
+                    style={{
+                      width: 212,
+                      height: '100%',
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+                      border: '1px solid rgba(255,255,255,0.08)'
+                    }}
+                  >
+                    {p.id === 'me' ? (
+                      <video
+                        ref={thumbVideoRef}
+                        playsInline
+                        muted
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+                      />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', background: p.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: 22, fontWeight: 900, color: '#111827' }}>{p.name}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Right arrow button */}
+            <button
+              onClick={() => setThumbScrollIndex((i) => (i >= maxScrollIndex ? 0 : i + 1))}
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: 68,
+                border: 'none',
+                background: '#ef4444',
+                color: '#fff',
+                fontWeight: 900,
+                fontSize: 26,
+                borderRadius: 10,
+                cursor: maxScrollIndex === 0 ? 'default' : 'pointer',
+                opacity: thumbnails.length > visibleThumbs ? 1 : 0.7
+              }}
+              title={maxScrollIndex > 0 ? 'Show next' : 'No more'}
+            >
+              →
+            </button>
+          </div>
         </div>
 
         {/* Invisible divider overlay positioned at the border */}
@@ -383,6 +547,7 @@ function VideoMode({
 
         {/* RIGHT: transcript */}
         <div
+          onWheel={(e) => e.stopPropagation()}
           style={{
             width: isNarrow ? '100%' : `${rightPercent}%`,
             flexGrow: 0,
