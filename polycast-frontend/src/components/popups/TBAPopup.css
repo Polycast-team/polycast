@@ -1,0 +1,144 @@
+.tba-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: tba-popup-fade-in 0.2s ease-out;
+}
+
+.tba-popup {
+  background: #1a1a2e;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  border: 2px solid #f09930;
+  max-width: 400px;
+  width: 90%;
+  margin: 20px;
+  animation: tba-popup-slide-in 0.3s ease-out;
+}
+
+.tba-popup-header {
+  display: flex;
+  align-items: center;
+  padding: 20px 20px 16px 20px;
+  border-bottom: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.tba-popup-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.tba-popup-title {
+  flex: 1;
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f09930;
+}
+
+.tba-popup-close {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.tba-popup-close:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f09930;
+}
+
+.tba-popup-content {
+  padding: 16px 20px;
+}
+
+.tba-popup-message {
+  margin: 0;
+  color: #ffffff;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.tba-popup-actions {
+  padding: 16px 20px 20px 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tba-popup-button {
+  background: #f0b062;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tba-popup-button:hover {
+  background: #f09930;
+  transform: translateY(-1px);
+}
+
+.tba-popup-button:active {
+  transform: translateY(0);
+}
+
+@keyframes tba-popup-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tba-popup-slide-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+  .tba-popup {
+    margin: 40px 16px;
+    max-width: none;
+  }
+  
+  .tba-popup-header {
+    padding: 16px 16px 12px 16px;
+  }
+  
+  .tba-popup-content {
+    padding: 12px 16px;
+  }
+  
+  .tba-popup-actions {
+    padding: 12px 16px 16px 16px;
+  }
+}
