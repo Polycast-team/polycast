@@ -200,7 +200,7 @@ function handleWebSocketConnection(ws, req, heartbeat) {
     // TODO: Add room broadcast functionality for multi-user transcription
 
     // Set client data
-    const targetLangsArray = []; // Simplified - no target languages for now
+    // targetLangsArray was parsed above from the URL; use it here
     clientTargetLanguages.set(ws, targetLangsArray);
     clientTextBuffers.set(ws, { text: '', lastEndTimeMs: 0 });
 
