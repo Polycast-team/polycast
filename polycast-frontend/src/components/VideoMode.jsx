@@ -353,6 +353,7 @@ function VideoMode({
                     ref={mainVideoRef}
                     playsInline
                     muted
+                    autoPlay
                     style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scaleX(-1)', display: 'block', background: '#000' }}
                   />
                 ) : hasRemoteTrack ? (

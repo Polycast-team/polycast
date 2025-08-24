@@ -451,9 +451,9 @@ h1, h2, h3 {
 .display-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100vw;
+  align-items: stretch; /* make content fill full width */
+  justify-content: flex-start; /* top-align content */
+  width: 100%; /* allow full page width without forcing viewport overflow */
   /* Space for bottom toolbar (height + 20px offset + 10px gap) */
   padding-bottom: calc(var(--bottom-toolbar-h, 72px) + 30px);
   box-sizing: border-box;
