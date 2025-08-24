@@ -199,8 +199,7 @@ function handleWebSocketConnection(ws, req, heartbeat) {
     // TODO: Implement proper room joining/leaving with participant limits
     // TODO: Add room broadcast functionality for multi-user transcription
 
-    // Set client data
-    // targetLangsArray was parsed above from the URL; use it here
+    // Set client data (use targetLangsArray parsed above)
     clientTargetLanguages.set(ws, targetLangsArray);
     clientTextBuffers.set(ws, { text: '', lastEndTimeMs: 0 });
 
