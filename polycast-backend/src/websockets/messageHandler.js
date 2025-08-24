@@ -224,7 +224,7 @@ async function handleAudioMessage(ws, message, clientData) {
     
     // Forward audio chunk to Deepgram
     try {
-        console.log('[Audio] Forwarding', message.length, 'bytes to Deepgram');
+        // console.log('[Audio] Forwarding', message.length, 'bytes to Deepgram'); // noisy; keep commented
         ws.deepgramSession.send(message);
     } catch (err) {
         console.error('[Audio] Error sending to Deepgram:', err.message || err);

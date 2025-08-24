@@ -26,7 +26,9 @@ function VideoMode({
   wordDefinitions,
   setWordDefinitions,
   onAddWord,
-  showTBA
+  showTBA,
+  registerWebrtcSignalHandler,
+  unregisterWebrtcSignalHandler
 }) {
   const mainVideoRef = useRef(null);
   const streamRef = useRef(null);
@@ -204,8 +206,7 @@ function VideoMode({
       console.log('[WebRTC] iceConnectionState:', pc.iceConnectionState);
     };
 
-    const onSignal = async (evt) => {
-      const data = evt.detail;
+    const onSignal = async (data) => {
       if (!data || !pcRef.current) return;
       try {
         if (data.type === 'webrtc_offer' && isHost) {
@@ -228,7 +229,7 @@ function VideoMode({
         console.warn('Signaling error:', err);
       }
     };
-    window.addEventListener('pc_webrtc_signal', onSignal);
+    if (registerWebrtcSignalHandler) registerWebrtcSignalHandler(onSignal);
 
     const startOffer = async () => {
       if (!isHost) {
@@ -246,7 +247,7 @@ function VideoMode({
     startOffer();
 
     return () => {
-      window.removeEventListener('pc_webrtc_signal', onSignal);
+      if (unregisterWebrtcSignalHandler) unregisterWebrtcSignalHandler();
       try { pcRef.current && pcRef.current.close(); } catch {}
       pcRef.current = null;
     };

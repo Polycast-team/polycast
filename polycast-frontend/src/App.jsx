@@ -148,6 +148,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
   const { error: popupError, showError, clearError } = useErrorHandler();
   const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
+  // WebRTC signaling dispatch with queueing to avoid race with VideoMode mount
+  const webrtcSignalHandlerRef = useRef(null);
+  const pendingWebrtcSignalsRef = useRef([]);
 
 
   // Toggle behavior disabled while translation UI is hidden
@@ -658,10 +661,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           parsedData.type === 'webrtc_answer' ||
           parsedData.type === 'webrtc_ice'
         ) {
-          try {
-            window.dispatchEvent(new CustomEvent('pc_webrtc_signal', { detail: parsedData }));
-          } catch (e) {
-            console.warn('Failed to dispatch webrtc signal event', e);
+          const handler = webrtcSignalHandlerRef.current;
+          if (handler) {
+            try { handler(parsedData); } catch (e) { console.warn('Failed to handle webrtc signal via handler:', e); }
+          } else {
+            pendingWebrtcSignalsRef.current.push(parsedData);
           }
         } else {
             console.warn('Received unknown message type:', parsedData.type);
@@ -1124,6 +1128,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               handleAddWord(word);
             }}
             showTBA={showTBA}
+            registerWebrtcSignalHandler={(handler) => {
+              webrtcSignalHandlerRef.current = handler;
+              const q = pendingWebrtcSignalsRef.current;
+              pendingWebrtcSignalsRef.current = [];
+              q.forEach((msg) => { try { handler(msg); } catch (e) { console.warn('Failed delivering pending signal:', e); } });
+            }}
+            unregisterWebrtcSignalHandler={() => { webrtcSignalHandlerRef.current = null; }}
           />
         ) : (
           <TranscriptionDisplay 
