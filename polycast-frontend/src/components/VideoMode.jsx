@@ -158,6 +158,7 @@ function VideoMode({
   }, []);
 
   const isHost = !!(roomSetup && roomSetup.isHost);
+  const allowMic = !roomSetup || isHost; // allow local mic when not in a room, or when hosting
   const inRoom = !!(roomSetup && roomSetup.roomCode);
 
   // WebRTC setup
@@ -341,13 +342,13 @@ function VideoMode({
           }}
         >
           <div
-            style={{ position: 'relative', background: '#0f1020', borderRadius: 12, overflow: 'hidden', flex: 1 }}
+            style={{ position: 'relative', background: 'transparent', borderRadius: 0, overflow: 'visible', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onMouseEnter={() => setIsHoveringVideo(true)}
             onMouseLeave={() => setIsHoveringVideo(false)}
           >
-            {/* 16:10 aspect wrapper */}
-            <div style={{ position: 'absolute', inset: 12, borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: '100%', height: 'auto', maxHeight: '100%', aspectRatio: '16 / 10', background: '#111827', borderRadius: 8, overflow: 'hidden' }}>
+            {/* 16:10 aspect wrapper - no absolute box, scales with width */}
+            <div style={{ width: '100%', padding: 12, boxSizing: 'border-box', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ width: '100%', aspectRatio: '16 / 10', background: '#111827', borderRadius: 8, overflow: 'hidden' }}>
                 {mainParticipant && mainParticipant.id === 'me' ? (
                   <video
                     ref={mainVideoRef}
@@ -361,6 +362,7 @@ function VideoMode({
                     ref={mainVideoRef}
                     playsInline
                     autoPlay
+                    muted
                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#000' }}
                   />
                 ) : (
@@ -375,8 +377,8 @@ function VideoMode({
               </div>
             )}
 
-            {/* Hover toolbar - host only */}
-            {isHost && (
+            {/* Hover toolbar - always visible when mic allowed */}
+            {allowMic && (
               <div
                 style={{
                   position: 'absolute',
@@ -390,10 +392,9 @@ function VideoMode({
                   gap: 10,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  opacity: isHoveringVideo ? 1 : 0,
-                  transform: `translateY(${isHoveringVideo ? 0 : 8}px)`,
-                  transition: 'opacity 160ms ease, transform 160ms ease',
-                  pointerEvents: isHoveringVideo ? 'auto' : 'none'
+                  opacity: 1,
+                  transform: 'translateY(0)',
+                  pointerEvents: 'auto'
                 }}
               >
                 <button
@@ -417,8 +418,8 @@ function VideoMode({
             )}
           </div>
 
-          {/* Hidden audio pipeline - host only */}
-          {isHost && (
+          {/* Hidden audio pipeline - allow when hosting or not in room */}
+          {allowMic && (
             <div style={{ display: 'none' }}>
               <AudioRecorder sendMessage={sendMessage} isRecording={isRecording} />
             </div>
