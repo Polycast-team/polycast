@@ -27,7 +27,7 @@ import ModeSelector from './components/ModeSelector';
 
 
 // App now receives an array of target languages and room setup as props
-function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange, onProfileChange }) {
+function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onHostRoom, onFlashcardModeChange, onProfileChange }) {
   // Debug logging
   console.log('App component received props:', { targetLanguages, selectedProfile, roomSetup, userRole, studentHomeLanguage });
   
@@ -128,14 +128,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [errorMessages, setErrorMessages] = useState([]); 
   
   // Students start in flashcard mode, hosts start in audio mode
-  const [appMode, setAppMode] = useState(() => {
-    // If student not in a room, start in flashcard mode
-    if (userRole === 'student' && !roomSetup) {
-      return 'flashcard';
-    }
-    // Otherwise start in audio mode (hosts or students in rooms)
-    return 'audio';
-  }); // Options: 'audio', 'dictionary', 'flashcard'
+  const [appMode, setAppMode] = useState('audio'); // Options: 'audio', 'dictionary', 'flashcard', 'video'
   const [selectedWords, setSelectedWords] = useState([]); // Profile-scoped selected words
   const [wordDefinitions, setWordDefinitions] = useState({}); // Profile-scoped word definitions
   const [showNotification, setShowNotification] = useState(false);
@@ -456,22 +449,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     }
   }, [appMode, roomSetup]);
 
-  // Auto-switch modes for students based on room status
-  useEffect(() => {
-    if (userRole === 'student') {
-      if (roomSetup) {
-        // Student joined a room → switch to audio mode (classroom view)
-        if (appMode === 'flashcard') {
-          setAppMode('audio');
-        }
-      } else {
-        // Student not in a room → switch to flashcard mode
-        if (appMode === 'audio') {
-          setAppMode('flashcard');
-        }
-      }
-    }
-  }, [roomSetup, userRole, appMode]);
+  // No role-based auto mode switching
 
   // Join Room handler for students
   const handleJoinRoom = async () => {
@@ -1285,9 +1263,10 @@ App.propTypes = {
         isHost: PropTypes.bool.isRequired,
         roomCode: PropTypes.string.isRequired
     }), // Made optional for students not in a room
-    userRole: PropTypes.oneOf(['host', 'student']),
+    userRole: PropTypes.oneOf(['host', null]),
     studentHomeLanguage: PropTypes.string,
     onJoinRoom: PropTypes.func,
+    onHostRoom: PropTypes.func,
     onFlashcardModeChange: PropTypes.func
 };
 

@@ -57,42 +57,7 @@ function Main() {
     } catch {}
   }, [roomSetup]);
 
-  // Step 1: Choose Host or Join as Student
-  if (!roomSetup) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#23243a' }}>
-        <h1 style={{ color: '#f7f7fa', marginBottom: 12 }}>PolyCast</h1>
-        <div style={{ background: '#23243a', borderRadius: 16, boxShadow: '0 4px 18px 0 rgba(60, 60, 90, 0.09)', padding: 36, minWidth: 320, maxWidth: 420, textAlign: 'center' }}>
-          <h2 style={{ color: '#fff', marginBottom: 24 }}>Choose Your Role</h2>
-          <button onClick={handleHostClick} disabled={isLoading} style={{ margin: '0 0 18px 0', padding: '12px 32px', fontSize: 18, fontWeight: 700, borderRadius: 8, background: 'linear-gradient(90deg, #5f72ff 0%, #9a5cff 100%)', color: '#fff', border: 'none', cursor: 'pointer', width: '100%' }}>
-            {isLoading ? 'Creating Room...' : 'Host'}
-          </button>
-          <div style={{ margin: '18px 0', color: '#b3b3e7', fontWeight: 600 }}>or</div>
-          <button onClick={() => setRoomSetup({ isHost: false, needsLanguageSelection: true })} disabled={isLoading} style={{ margin: '0', padding: '12px 32px', fontSize: 18, fontWeight: 700, borderRadius: 8, background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', cursor: 'pointer', width: '100%' }}>
-            Student
-          </button>
-          {error && <div style={{ color: '#dc2626', marginTop: 12 }}>{error}</div>}
-        </div>
-      </div>
-    );
-  }
-
-  // Step 2: Language/Profile selection (students only)
-  if (roomSetup && !selectedLanguages) {
-    if (!roomSetup.isHost) {
-      // Students still see profile selection screen
-      return <ProfileSelectorScreen 
-        onProfileSelected={(languages, profile) => {
-          setSelectedLanguages(languages);
-          setSelectedProfile(profile);
-        }}
-        userRole="student"
-      />;
-    } else {
-      // Host path now skips setup; languages/profile already set
-      // Fall through to main app render
-    }
-  }
+  // Always render the main app; users can host or join from within modes
 
   // Step 3: Main app
   const propsToPass = {
@@ -104,12 +69,14 @@ function Main() {
       setSelectedProfile(null);
       setForceFlashcardMobile(false); // Reset mobile mode when resetting
     },
-    roomSetup: roomSetup?.roomCode ? roomSetup : null, // Only pass room setup when there's a valid room code
-    userRole: roomSetup?.isHost ? 'host' : 'student',
+    roomSetup: roomSetup?.roomCode ? roomSetup : null, // Only pass room setup when valid
+    userRole: roomSetup?.isHost ? 'host' : null, // no fixed role prior to joining
     studentHomeLanguage: roomSetup?.isHost ? null : selectedLanguages?.[0],
     onJoinRoom: (roomCode) => {
-      // Update roomSetup to connect student to the room
-      setRoomSetup({ isHost: false, roomCode: roomCode });
+      setRoomSetup({ isHost: false, roomCode });
+    },
+    onHostRoom: async () => {
+      await handleHostClick();
     },
     onFlashcardModeChange: () => {},
     onProfileChange: (newProfile) => {

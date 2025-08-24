@@ -45,7 +45,7 @@ function HostToolbar({
             {/* Mode Dropdown */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {/* Profile Dropdown - only show for hosts */}
-                {userRole === 'host' && (
+                {roomSetup?.isHost && (
                   <>
                     <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>{ui.profile}:</label>
                     <select
