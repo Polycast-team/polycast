@@ -145,6 +145,11 @@ function VideoMode({
         const p = el.play();
         if (p && typeof p.then === 'function') p.catch(() => {});
       }
+      // If remote is selected but we somehow don't have a video track, show a clear error
+      if (effectiveMainId !== 'me') {
+        const hasVideo = !!(desiredStream.getVideoTracks && desiredStream.getVideoTracks().length > 0);
+        if (!hasVideo) setRemoteAttachError('No remote video track present in stream.');
+      }
     } catch (_) {}
   }, [effectiveMainId, hasRemoteVideoTrack]);
 
@@ -248,6 +253,10 @@ function VideoMode({
       if (event.track && event.track.kind === 'video') {
         setHasRemoteVideoTrack(true);
         setHasRemoteTrack(true);
+        try {
+          // Ensure the remote video track is enabled for rendering
+          event.track.enabled = true;
+        } catch (_) {}
       }
       // If remote is already/main selected, ensure it is attached immediately
       if (mainVideoRef.current && stream && (effectiveMainId !== 'me')) {
@@ -324,7 +333,7 @@ function VideoMode({
       try { pcRef.current && pcRef.current.close(); } catch {}
       pcRef.current = null;
     };
-  }, [inRoom, isHost, sendMessage, mainParticipantId]);
+  }, [inRoom, isHost, sendMessage]);
   
   const handleWordClick = async (word, event) => {
     try {
