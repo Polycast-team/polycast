@@ -858,8 +858,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           )}
         </div>
       </div>
-      {/* Top toolbar: show only for host in audio mode */}
-      {appMode === 'audio' && roomSetup && roomSetup.isHost && (
+      {/* Top toolbar: show in audio mode (available pre-room too) */}
+      {appMode === 'audio' && (
         <div className="controls-container" style={{ marginBottom: 4 }}>
           <div className="main-toolbar" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch', marginBottom: 0 }}>
             {isRecording && (
@@ -935,9 +935,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         </div>
       )}
       
-      {/* Header right: video call host/join controls and role indicator */}
+      {/* Header right: host/join controls and role indicator (video or audio modes) */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
-        {appMode === 'video' && !roomSetup && (
+        {(appMode === 'video' || appMode === 'audio') && !roomSetup && (
           <>
             <button
               onClick={async () => {
