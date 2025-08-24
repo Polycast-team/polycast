@@ -60,6 +60,7 @@ function VideoMode({
   const [mainParticipantId, setMainParticipantId] = useState('me');
   const [thumbScrollIndex, setThumbScrollIndex] = useState(0); // 0 or 1 with 4 thumbs showing 3 at a time
   const thumbVideoRef = useRef(null); // second <video> when local camera is in thumbnails
+  const remoteThumbVideoRef = useRef(null); // <video> element for remote participant thumbnail
 
   const getParticipantById = (id) => initialParticipants.find(p => p.id === id);
   const mainParticipant = getParticipantById(mainParticipantId);
@@ -115,16 +116,34 @@ function VideoMode({
     }
   }, [mainParticipantId, thumbnails.length]);
 
+  // Bind remote stream to remote thumbnail when available
   useEffect(() => {
-    const isMeMain = mainParticipantId === 'me' && mainVideoRef.current && streamRef.current;
-    if (isMeMain) {
-      try {
-        mainVideoRef.current.srcObject = streamRef.current;
-        const p = mainVideoRef.current.play();
-        if (p && typeof p.then === 'function') p.catch((e) => console.warn('[VideoMode] play() rejected for local preview:', e?.message || e));
-      } catch (_) {}
-    }
-  }, [mainParticipantId]);
+    const el = remoteThumbVideoRef.current;
+    const s = remoteStreamRef.current;
+    if (!el || !s) return;
+    try {
+      if (el.srcObject !== s) {
+        el.srcObject = s;
+        const p = el.play();
+        if (p && typeof p.then === 'function') p.catch(() => {});
+      }
+    } catch (_) {}
+  }, [hasRemoteTrack, mainParticipantId, thumbnails.length]);
+
+  // Always bind the appropriate stream to the main video element based on selection
+  useEffect(() => {
+    const el = mainVideoRef.current;
+    if (!el) return;
+    const desiredStream = (mainParticipantId === 'me') ? streamRef.current : remoteStreamRef.current;
+    if (!desiredStream) return;
+    try {
+      if (el.srcObject !== desiredStream) {
+        el.srcObject = desiredStream;
+        const p = el.play();
+        if (p && typeof p.then === 'function') p.catch(() => {});
+      }
+    } catch (_) {}
+  }, [mainParticipantId, hasRemoteTrack]);
 
   useEffect(() => {
     const onMove = (e) => {
@@ -192,13 +211,25 @@ function VideoMode({
 
     pc.ontrack = (event) => {
       console.log('[WebRTC] ontrack fired. Streams:', event.streams?.length, 'tracks:', event.track?.kind);
-      const [remoteStream] = event.streams;
-      if (remoteStream && mainVideoRef.current) {
+      let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+      if (!stream) {
+        // Some browsers (notably iOS Safari) do not populate event.streams; assemble manually
+        if (!remoteStreamRef.current) remoteStreamRef.current = new MediaStream();
+        remoteStreamRef.current.addTrack(event.track);
+        stream = remoteStreamRef.current;
+      } else {
+        remoteStreamRef.current = stream;
+      }
+      setHasRemoteTrack(true);
+      // If remote is already/main selected, ensure it is attached immediately
+      if (mainVideoRef.current && stream && (mainParticipantId !== 'me')) {
         try {
-          mainVideoRef.current.srcObject = remoteStream;
-          mainVideoRef.current.play().catch((e) => console.warn('[WebRTC] Remote video play() failed:', e?.message || e));
-          setHasRemoteTrack(true);
-        } catch {}
+          if (mainVideoRef.current.srcObject !== stream) {
+            mainVideoRef.current.srcObject = stream;
+            const p = mainVideoRef.current.play();
+            if (p && typeof p.then === 'function') p.catch(() => {});
+          }
+        } catch (_) {}
       }
       // Promote remote participant to main view automatically
       setMainParticipantId('p1');
@@ -520,6 +551,13 @@ function VideoMode({
                         playsInline
                         muted
                         style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scaleX(-1)', background: '#000' }}
+                      />
+                    ) : p.id === 'p1' && hasRemoteTrack ? (
+                      <video
+                        ref={remoteThumbVideoRef}
+                        playsInline
+                        muted
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
                       />
                     ) : (
                       <div style={{ width: '100%', height: '100%', background: '#111827' }} />
