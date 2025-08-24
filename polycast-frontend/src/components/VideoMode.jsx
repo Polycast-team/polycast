@@ -449,7 +449,7 @@ function VideoMode({
                     autoPlay
                     style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scaleX(-1)', display: 'block', background: '#000' }}
                   />
-                ) : hasRemoteTrack ? (
+                ) : hasRemoteVideoTrack ? (
                   <video
                     ref={mainVideoRef}
                     playsInline
@@ -583,7 +583,7 @@ function VideoMode({
                         muted
                         style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scaleX(-1)', background: '#000' }}
                       />
-                    ) : p.id === 'p1' && hasRemoteTrack ? (
+                    ) : p.id === 'p1' && hasRemoteVideoTrack ? (
                       <video
                         ref={remoteThumbVideoRef}
                         playsInline

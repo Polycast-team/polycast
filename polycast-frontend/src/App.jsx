@@ -136,6 +136,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [isAddingWordBusy, setIsAddingWordBusy] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [toolbarStats, setToolbarStats] = useState({ newCards: 0, learningCards: 0, reviewCards: 0 });
+  const [signalLog, setSignalLog] = useState([]); // recent signaling/debug events
   // Auto-send functionality removed - using manual Record/Stop button instead
   const notificationTimeoutRef = useRef(null);
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
@@ -497,6 +498,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     skip: !socketUrl,
     onOpen: () => {
       console.log('WebSocket connection opened with URL:', socketUrl);
+      setSignalLog(prev => [`ws: open ${socketUrl}`, ...prev].slice(0, 10));
       // Reset reconnection attempts on successful connection
       setReconnectAttempts(0);
       
@@ -507,9 +509,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     },
     onClose: () => {
       console.log('WebSocket connection closed');
+      setSignalLog(prev => ['ws: close', ...prev].slice(0, 10));
     },
     onError: (event) => {
       console.error('WebSocket error:', event);
+      setSignalLog(prev => [`ws: error ${event?.type || ''}`, ...prev].slice(0, 10));
       setErrorMessages(prev => [...prev, `WebSocket error: ${event.type}`]);
     },
     // Only reconnect if we haven't exceeded max attempts and the room is not invalid
@@ -602,7 +606,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           setTimeout(() => onReset(), 1000); // Go back to home screen after 1 second
         } else if (parsedData.type === 'info') {
           console.log('Backend Info:', parsedData.message);
-          // Optionally display info messages somewhere
+          setSignalLog(prev => [`info: ${parsedData.message}`, ...prev].slice(0, 10));
         } else if (parsedData.type === 'translation') {
           // Handle single translation (non-batch)
           setTranslations(prevTranslations => {
@@ -640,6 +644,12 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           parsedData.type === 'webrtc_ice'
         ) {
           const handler = webrtcSignalHandlerRef.current;
+          try {
+            const summary = parsedData.type === 'webrtc_ice'
+              ? `ice: ${parsedData?.candidate?.candidate?.slice(0, 28) || 'candidate'}`
+              : `${parsedData.type.replace('webrtc_', '')}`;
+            setSignalLog(prev => [`rtc: ${summary}`, ...prev].slice(0, 10));
+          } catch (_) {}
           if (handler) {
             try { handler(parsedData); } catch (e) { console.warn('Failed to handle webrtc signal via handler:', e); }
           } else {
@@ -771,6 +781,17 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
   return (
     <div className="App">
+      {/* Signaling/WS overlay */}
+      {roomSetup && (
+        <div style={{ position: 'fixed', right: 16, top: 76, zIndex: 1200, width: 360, pointerEvents: 'none' }}>
+          <div style={{ background: 'rgba(17, 24, 39, 0.82)', color: '#d1d5db', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 10, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, textAlign: 'left' }}>
+            <div style={{ marginBottom: 6, fontWeight: 700 }}>WS: {socketUrl}</div>
+            {signalLog.slice(0, 8).map((line, i) => (
+              <div key={i} style={{ opacity: i === 0 ? 1 : 0.9 - i * 0.08 }}>{line}</div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Fullscreen button - upper left corner for all modes */}
       <button
         onClick={() => {
