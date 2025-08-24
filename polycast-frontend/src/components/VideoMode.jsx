@@ -63,7 +63,7 @@ function VideoMode({
   const remoteThumbVideoRef = useRef(null); // <video> element for remote participant thumbnail
 
   const getParticipantById = (id) => initialParticipants.find(p => p.id === id);
-  const availableIds = React.useMemo(() => ['me', ...(hasRemoteTrack ? ['p1'] : [])], [hasRemoteTrack]);
+  const availableIds = React.useMemo(() => ['me', ...(hasRemoteVideoTrack ? ['p1'] : [])], [hasRemoteVideoTrack]);
   const renderOrder = participantOrder.filter(id => availableIds.includes(id));
   const effectiveMainId = renderOrder.includes(mainParticipantId) ? mainParticipantId : 'me';
   const mainParticipant = getParticipantById(effectiveMainId);
@@ -131,7 +131,7 @@ function VideoMode({
         if (p && typeof p.then === 'function') p.catch(() => {});
       }
     } catch (_) {}
-  }, [hasRemoteTrack, mainParticipantId, thumbnails.length]);
+  }, [hasRemoteVideoTrack, mainParticipantId, thumbnails.length]);
 
   // Always bind the appropriate stream to the main video element based on selection
   useEffect(() => {
@@ -146,7 +146,7 @@ function VideoMode({
         if (p && typeof p.then === 'function') p.catch(() => {});
       }
     } catch (_) {}
-  }, [effectiveMainId, hasRemoteTrack]);
+  }, [effectiveMainId, hasRemoteVideoTrack]);
 
   // Track play/error for remote main video
   useEffect(() => {
@@ -245,8 +245,10 @@ function VideoMode({
       } else {
         remoteStreamRef.current = stream;
       }
-      setHasRemoteTrack(true);
-      if (event.track && event.track.kind === 'video') setHasRemoteVideoTrack(true);
+      if (event.track && event.track.kind === 'video') {
+        setHasRemoteVideoTrack(true);
+        setHasRemoteTrack(true);
+      }
       // If remote is already/main selected, ensure it is attached immediately
       if (mainVideoRef.current && stream && (effectiveMainId !== 'me')) {
         try {
@@ -258,7 +260,7 @@ function VideoMode({
         } catch (_) {}
       }
       // Promote remote participant to main view automatically
-      setMainParticipantId('p1');
+      if (event.track?.kind === 'video') setMainParticipantId('p1');
     };
 
     pc.onicecandidate = (e) => {
