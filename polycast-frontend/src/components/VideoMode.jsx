@@ -33,6 +33,9 @@ function VideoMode({
   const mainVideoRef = useRef(null);
   const streamRef = useRef(null);
   const [hasRemoteTrack, setHasRemoteTrack] = useState(false);
+  const [hasRemoteVideoTrack, setHasRemoteVideoTrack] = useState(false);
+  const [remoteVideoPlaying, setRemoteVideoPlaying] = useState(false);
+  const [remoteAttachError, setRemoteAttachError] = useState('');
   const [videoError, setVideoError] = useState('');
   const [videoReady, setVideoReady] = useState(false);
   const [fontSize, setFontSize] = useState(20);
@@ -51,10 +54,7 @@ function VideoMode({
   // Participants: local camera (me) + dynamic peers (p1..p4)
   const initialParticipants = React.useMemo(() => [
     { id: 'me', name: '', color: '#3b82f6', type: 'me' },
-    { id: 'p1', name: '', color: '#f472b6' },
-    { id: 'p2', name: '', color: '#22c55e' },
-    { id: 'p3', name: '', color: '#f59e0b' },
-    { id: 'p4', name: '', color: '#a78bfa' }
+    { id: 'p1', name: '', color: '#f472b6' }
   ], []);
   const [participantOrder, setParticipantOrder] = useState(initialParticipants.map(p => p.id));
   const [mainParticipantId, setMainParticipantId] = useState('me');
@@ -63,8 +63,11 @@ function VideoMode({
   const remoteThumbVideoRef = useRef(null); // <video> element for remote participant thumbnail
 
   const getParticipantById = (id) => initialParticipants.find(p => p.id === id);
-  const mainParticipant = getParticipantById(mainParticipantId);
-  const thumbnails = participantOrder.filter(id => id !== mainParticipantId).map(getParticipantById);
+  const availableIds = React.useMemo(() => ['me', ...(hasRemoteTrack ? ['p1'] : [])], [hasRemoteTrack]);
+  const renderOrder = participantOrder.filter(id => availableIds.includes(id));
+  const effectiveMainId = renderOrder.includes(mainParticipantId) ? mainParticipantId : 'me';
+  const mainParticipant = getParticipantById(effectiveMainId);
+  const thumbnails = renderOrder.filter(id => id !== effectiveMainId).map(getParticipantById);
   const visibleThumbs = 3; // show 3 fully, one cut off
   const maxScrollIndex = Math.max(0, thumbnails.length - visibleThumbs);
 
@@ -134,7 +137,7 @@ function VideoMode({
   useEffect(() => {
     const el = mainVideoRef.current;
     if (!el) return;
-    const desiredStream = (mainParticipantId === 'me') ? streamRef.current : remoteStreamRef.current;
+    const desiredStream = (effectiveMainId === 'me') ? streamRef.current : remoteStreamRef.current;
     if (!desiredStream) return;
     try {
       if (el.srcObject !== desiredStream) {
@@ -143,7 +146,29 @@ function VideoMode({
         if (p && typeof p.then === 'function') p.catch(() => {});
       }
     } catch (_) {}
-  }, [mainParticipantId, hasRemoteTrack]);
+  }, [effectiveMainId, hasRemoteTrack]);
+
+  // Track play/error for remote main video
+  useEffect(() => {
+    const el = mainVideoRef.current;
+    if (!el) return;
+    const onPlaying = () => { setRemoteVideoPlaying(true); setRemoteAttachError(''); };
+    const onError = (e) => { setRemoteAttachError(e?.message || 'Video element error'); };
+    el.addEventListener('playing', onPlaying);
+    el.addEventListener('error', onError);
+    return () => { el.removeEventListener('playing', onPlaying); el.removeEventListener('error', onError); };
+  }, [effectiveMainId]);
+
+  // Give a small window to surface a connection error if no frames arrive
+  useEffect(() => {
+    if (effectiveMainId !== 'p1' || !hasRemoteTrack) return;
+    setRemoteVideoPlaying(false);
+    setRemoteAttachError('');
+    const id = setTimeout(() => {
+      if (!remoteVideoPlaying) setRemoteAttachError('No remote video received yet. Check connection or permissions.');
+    }, 4000);
+    return () => clearTimeout(id);
+  }, [effectiveMainId, hasRemoteTrack]);
 
   useEffect(() => {
     const onMove = (e) => {
@@ -221,8 +246,9 @@ function VideoMode({
         remoteStreamRef.current = stream;
       }
       setHasRemoteTrack(true);
+      if (event.track && event.track.kind === 'video') setHasRemoteVideoTrack(true);
       // If remote is already/main selected, ensure it is attached immediately
-      if (mainVideoRef.current && stream && (mainParticipantId !== 'me')) {
+      if (mainVideoRef.current && stream && (effectiveMainId !== 'me')) {
         try {
           if (mainVideoRef.current.srcObject !== stream) {
             mainVideoRef.current.srcObject = stream;
@@ -413,7 +439,7 @@ function VideoMode({
             {/* 16:10 aspect wrapper - no absolute box, scales with width */}
             <div style={{ width: '100%', padding: 12, boxSizing: 'border-box', display: 'flex', justifyContent: 'center' }}>
               <div style={{ width: '100%', aspectRatio: '16 / 10', background: '#111827', borderRadius: 8, overflow: 'hidden' }}>
-                {mainParticipant && mainParticipant.id === 'me' && !hasRemoteTrack ? (
+                {mainParticipant && mainParticipant.id === 'me' ? (
                   <video
                     ref={mainVideoRef}
                     playsInline
@@ -430,7 +456,10 @@ function VideoMode({
                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#000' }}
                   />
                 ) : (
-                  <div style={{ width: '100%', height: '100%', background: '#111827' }} />
+                  // No placeholder: show an explicit connection message instead
+                  <div style={{ width: '100%', height: '100%', background: '#0f1020', color: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                    {remoteAttachError || 'Waiting for remote video…'}
+                  </div>
                 )}
               </div>
             </div>
@@ -560,7 +589,9 @@ function VideoMode({
                         style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
                       />
                     ) : (
-                      <div style={{ width: '100%', height: '100%', background: '#111827' }} />
+                      <div style={{ width: '100%', height: '100%', background: '#0f1020', color: '#b3b3e7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+                        {p.id === 'p1' ? (remoteAttachError || 'Waiting…') : ''}
+                      </div>
                     )}
                   </div>
                 ))}

@@ -941,28 +941,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           <>
             <button
               onClick={async () => {
-                try {
-                  const data = await apiService.postJson(apiService.createRoomUrl(), {});
-                  if (data && data.roomCode) {
-                    // Become host for this call
-                    if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
-                      try { window.history.replaceState({}, '', '/'); } catch {}
-                    }
-                    // Simulate host selection flow: we don't have setter here, but we can reload props
-                    // Prefer: notify parent via onJoinRoom-like host setter. As a fallback, reload.
-                    if (onJoinRoom) {
-                      // Use parent to set room as student if needed; but here we need host
-                      // No direct host setter passed, so fallback to full reload with a hint
-                      console.log('Room created. Please navigate back to landing to enter as host if not auto-connected.');
-                    }
-                    // Store a hint for Main to pick up (optional)
-                    try { sessionStorage.setItem('pc_pendingHostRoom', data.roomCode); } catch {}
-                    // Soft navigation: we rely on current session props update from Main on next mount
-                    window.location.reload();
-                  }
-                } catch (e) {
-                  alert('Failed to create room: ' + (e?.message || e));
-                }
+                // Preserve current mode; ask parent to host and update props in place
+                try { await onHostRoom?.(); }
+                catch (e) { alert('Failed to create room: ' + (e?.message || e)); }
               }}
               style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#3b82f6', color: '#fff', border: 'none', cursor: 'pointer' }}
             >
