@@ -57,6 +57,19 @@ function Main() {
     } catch {}
   }, [roomSetup]);
 
+  // Show login/profile selection first
+  if (!selectedProfile) {
+    return (
+      <ProfileSelectorScreen
+        onProfileSelected={(languages, profile) => {
+          setSelectedLanguages(languages);
+          setSelectedProfile(profile);
+        }}
+        userRole="student"
+      />
+    );
+  }
+
   // Always render the main app; users can host or join from within modes
 
   // Step 3: Main app
