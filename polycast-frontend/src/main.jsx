@@ -44,6 +44,19 @@ function Main() {
     }
   };
 
+  // If we reloaded after creating a room from inside the app (video->Host call), pick it up
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem('pc_pendingHostRoom');
+      if (pending && !roomSetup) {
+        setRoomSetup({ isHost: true, roomCode: pending });
+        setSelectedLanguages(['English']);
+        setSelectedProfile('joshua');
+        sessionStorage.removeItem('pc_pendingHostRoom');
+      }
+    } catch {}
+  }, [roomSetup]);
+
   // Step 1: Choose Host or Join as Student
   if (!roomSetup) {
     return (

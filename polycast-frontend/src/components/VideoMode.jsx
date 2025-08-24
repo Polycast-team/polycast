@@ -28,8 +28,9 @@ function VideoMode({
   onAddWord,
   showTBA
 }) {
-  const videoRef = useRef(null);
+  const mainVideoRef = useRef(null);
   const streamRef = useRef(null);
+  const [hasRemoteTrack, setHasRemoteTrack] = useState(false);
   const [videoError, setVideoError] = useState('');
   const [videoReady, setVideoReady] = useState(false);
   const [fontSize, setFontSize] = useState(20);
@@ -42,6 +43,8 @@ function VideoMode({
   const clamp = (v, min = 0.2, max = 0.8) => Math.min(max, Math.max(min, v));
   
   const ui = getUITranslationsForProfile(selectedProfile);
+  const pcRef = useRef(null);
+  const remoteStreamRef = useRef(null);
 
   // --- Placeholder multi-participant layout state (kept local to this file) ---
   // We model a simple list of participants: local camera ("me") + 4 placeholders.
@@ -73,8 +76,8 @@ function VideoMode({
           video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false
         });
-        if (videoRef.current) {
-          const el = videoRef.current;
+        if (mainVideoRef.current) {
+          const el = mainVideoRef.current;
           el.srcObject = streamRef.current;
           // Mark ready as soon as video starts playing
           const onPlaying = () => setVideoReady(true);
@@ -118,11 +121,11 @@ function VideoMode({
 
   // Reconnect main video when switching back to "me"
   useEffect(() => {
-    const isMeMain = mainParticipantId === 'me' && videoRef.current && streamRef.current;
+    const isMeMain = mainParticipantId === 'me' && mainVideoRef.current && streamRef.current;
     if (isMeMain) {
       try {
-        videoRef.current.srcObject = streamRef.current;
-        const p = videoRef.current.play();
+        mainVideoRef.current.srcObject = streamRef.current;
+        const p = mainVideoRef.current.play();
         if (p && typeof p.then === 'function') p.catch(() => {});
       } catch (_) {}
     }
@@ -165,6 +168,86 @@ function VideoMode({
   }, []);
 
   const isHost = !!(roomSetup && roomSetup.isHost);
+  const inRoom = !!(roomSetup && roomSetup.roomCode);
+
+  // Basic 1:1 WebRTC using WS signaling already wired in App.jsx
+  useEffect(() => {
+    if (!inRoom) return; // Only negotiate when in a room
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+    });
+    pcRef.current = pc;
+    remoteStreamRef.current = new MediaStream();
+
+    // Add local tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => pc.addTrack(track, streamRef.current));
+    }
+
+    // Handle remote track
+    pc.ontrack = (event) => {
+      const [remoteStream] = event.streams;
+      if (remoteStream && mainVideoRef.current) {
+        try {
+          mainVideoRef.current.srcObject = remoteStream;
+          mainVideoRef.current.play().catch(() => {});
+          setHasRemoteTrack(true);
+        } catch {}
+      }
+      // When a remote stream arrives, show it as main by default
+      setMainParticipantId('p1');
+    };
+
+    // ICE candidates -> WS
+    pc.onicecandidate = (e) => {
+      if (e.candidate && typeof sendMessage === 'function') {
+        sendMessage(JSON.stringify({ type: 'webrtc_ice', candidate: e.candidate }));
+      }
+    };
+
+    // Listen for signaling from App
+    const onSignal = async (evt) => {
+      const data = evt.detail;
+      if (!data || !pcRef.current) return;
+      try {
+        if (data.type === 'webrtc_offer' && isHost) {
+          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          const answer = await pcRef.current.createAnswer();
+          await pcRef.current.setLocalDescription(answer);
+          sendMessage(JSON.stringify({ type: 'webrtc_answer', sdp: answer }));
+        } else if (data.type === 'webrtc_answer' && !isHost) {
+          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        } else if (data.type === 'webrtc_ice' && data.candidate) {
+          try {
+            await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+          } catch {}
+        }
+      } catch (err) {
+        console.warn('Signaling error:', err);
+      }
+    };
+    window.addEventListener('pc_webrtc_signal', onSignal);
+
+    // If student, create offer immediately
+    const startOffer = async () => {
+      if (!isHost) {
+        try {
+          const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+          await pc.setLocalDescription(offer);
+          sendMessage(JSON.stringify({ type: 'webrtc_offer', sdp: offer }));
+        } catch (err) {
+          console.warn('Failed to create/send offer:', err);
+        }
+      }
+    };
+    startOffer();
+
+    return () => {
+      window.removeEventListener('pc_webrtc_signal', onSignal);
+      try { pcRef.current && pcRef.current.close(); } catch {}
+      pcRef.current = null;
+    };
+  }, [inRoom, isHost, sendMessage, mainParticipantId]);
   
   // Word click handler using UNIFIED API
   const handleWordClick = async (word, event) => {
@@ -306,10 +389,17 @@ function VideoMode({
           >
             {mainParticipant && mainParticipant.id === 'me' ? (
               <video
-                ref={videoRef}
+                ref={mainVideoRef}
                 playsInline
                 muted
                 style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: 'block' }}
+              />
+            ) : hasRemoteTrack ? (
+              <video
+                ref={mainVideoRef}
+                playsInline
+                autoPlay
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
               />
             ) : (
               <div

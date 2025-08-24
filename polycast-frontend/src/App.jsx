@@ -470,27 +470,16 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
   // Join Room handler for students
   const handleJoinRoom = async () => {
-    // TODO: Add room code validation via GET /api/check-room/:code
-    // TODO: Validate room exists and is accepting new students
-    // TODO: Handle room joining with proper error handling and state management
-    // TODO: Update app state to join room and switch to student mode
-    // TODO: Establish WebSocket connection to specific room
-    
-    setJoinRoomError('Room joining functionality will be added in a future update');
-    return;
-    
-    // DISABLED: Room joining logic
-    /*
     const cleanedRoomCode = joinRoomCode.replace(/[^0-9]/g, '').trim();
-    
+
     if (cleanedRoomCode.length !== 5) {
       setJoinRoomError(t.enterRoomCode + ' (5 digits)');
       return;
     }
-    
+
     setIsJoiningRoom(true);
     setJoinRoomError('');
-    
+
     try {
       const data = await apiService.fetchJson(apiService.checkRoomUrl(cleanedRoomCode));
       console.log('Join room response:', data);
@@ -498,8 +487,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       if (!data.exists) {
         throw new Error(data.message || 'Room not found');
       }
-      
-      // Join the room by updating the app state
+
       if (onJoinRoom) {
         onJoinRoom(cleanedRoomCode);
         setShowJoinRoomModal(false);
@@ -511,9 +499,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     } catch (error) {
       console.error('Error joining room:', error);
       setJoinRoomError(`Failed to join room: ${error.message}`);
+    } finally {
       setIsJoiningRoom(false);
     }
-    */
   };
 
   // Track reconnection attempts and invalid room state
@@ -663,6 +651,16 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             }
             return newTranslations;
           });
+        } else if (
+          parsedData.type === 'webrtc_offer' ||
+          parsedData.type === 'webrtc_answer' ||
+          parsedData.type === 'webrtc_ice'
+        ) {
+          try {
+            window.dispatchEvent(new CustomEvent('pc_webrtc_signal', { detail: parsedData }));
+          } catch (e) {
+            console.warn('Failed to dispatch webrtc signal event', e);
+          }
         } else {
             console.warn('Received unknown message type:', parsedData.type);
         }
@@ -953,15 +951,55 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         </div>
       )}
       
-      {/* Header right: role indicator and exit only (join moved to modal) */}
+      {/* Header right: video call host/join controls and role indicator */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
-        {roomSetup && !roomSetup.isHost && (
-          <div style={{ fontSize: 14, color: '#fff', marginRight: 16, background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: 4 }}>
-            <span>{ui.student}</span>
-          </div>
+        {appMode === 'video' && !roomSetup && (
+          <>
+            <button
+              onClick={async () => {
+                try {
+                  const data = await apiService.postJson(apiService.createRoomUrl(), {});
+                  if (data && data.roomCode) {
+                    // Become host for this call
+                    if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+                      try { window.history.replaceState({}, '', '/'); } catch {}
+                    }
+                    // Simulate host selection flow: we don't have setter here, but we can reload props
+                    // Prefer: notify parent via onJoinRoom-like host setter. As a fallback, reload.
+                    if (onJoinRoom) {
+                      // Use parent to set room as student if needed; but here we need host
+                      // No direct host setter passed, so fallback to full reload with a hint
+                      console.log('Room created. Please navigate back to landing to enter as host if not auto-connected.');
+                    }
+                    // Store a hint for Main to pick up (optional)
+                    try { sessionStorage.setItem('pc_pendingHostRoom', data.roomCode); } catch {}
+                    // Soft navigation: we rely on current session props update from Main on next mount
+                    window.location.reload();
+                  }
+                } catch (e) {
+                  alert('Failed to create room: ' + (e?.message || e));
+                }
+              }}
+              style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#3b82f6', color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              Host call
+            </button>
+            <button
+              onClick={() => setShowJoinRoomModal(true)}
+              style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              Join call
+            </button>
+          </>
         )}
-        {roomSetup && !roomSetup.isHost && (
-          <button onClick={onReset} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>{ui.exitRoom}</button>
+
+        {appMode === 'video' && roomSetup && (
+          <>
+            <div style={{ fontSize: 14, color: '#fff', marginRight: 8, background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: 4 }}>
+              {roomSetup.isHost ? `Host • ${ui.room}: ${roomSetup.roomCode}` : `${ui.student} • ${ui.room}: ${roomSetup.roomCode}`}
+            </div>
+            <button onClick={onReset} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>End call</button>
+          </>
         )}
       </div>
       
