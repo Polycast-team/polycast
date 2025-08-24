@@ -167,7 +167,17 @@ function VideoMode({
   useEffect(() => {
     if (!inRoom) return;
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+      iceServers: [
+        { urls: ['stun:stun.l.google.com:19302'] },
+        // Optional TURN fallback – replace with your own TURN if available
+        ...(import.meta.env.VITE_TURN_URL && import.meta.env.VITE_TURN_USERNAME && import.meta.env.VITE_TURN_CREDENTIAL
+          ? [{
+              urls: import.meta.env.VITE_TURN_URL.split(',').map(u => u.trim()),
+              username: import.meta.env.VITE_TURN_USERNAME,
+              credential: import.meta.env.VITE_TURN_CREDENTIAL
+            }]
+          : [])
+      ]
     });
     pcRef.current = pc;
     remoteStreamRef.current = new MediaStream();
@@ -190,6 +200,7 @@ function VideoMode({
           setHasRemoteTrack(true);
         } catch {}
       }
+      // Promote remote participant to main view automatically
       setMainParticipantId('p1');
     };
 
@@ -211,14 +222,17 @@ function VideoMode({
       try {
         if (data.type === 'webrtc_offer' && isHost) {
           console.log('[WebRTC] Received offer (host). Setting remote description and creating answer');
-          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          // Some browsers send/expect RTCSessionDescriptionInit; handle both safely
+          const offerDesc = data.sdp?.type ? data.sdp : { type: 'offer', sdp: data.sdp?.sdp || data.sdp };
+          await pcRef.current.setRemoteDescription(offerDesc);
           const answer = await pcRef.current.createAnswer();
           await pcRef.current.setLocalDescription(answer);
           console.log('[WebRTC] Sending answer');
-          sendMessage(JSON.stringify({ type: 'webrtc_answer', sdp: answer }));
+          sendMessage(JSON.stringify({ type: 'webrtc_answer', sdp: pcRef.current.localDescription }));
         } else if (data.type === 'webrtc_answer' && !isHost) {
           console.log('[WebRTC] Received answer (student). Setting remote description');
-          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          const answerDesc = data.sdp?.type ? data.sdp : { type: 'answer', sdp: data.sdp?.sdp || data.sdp };
+          await pcRef.current.setRemoteDescription(answerDesc);
         } else if (data.type === 'webrtc_ice' && data.candidate) {
           try {
             console.log('[WebRTC] Adding remote ICE candidate');
@@ -238,7 +252,7 @@ function VideoMode({
           const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
           await pc.setLocalDescription(offer);
           console.log('[WebRTC] Sending offer');
-          sendMessage(JSON.stringify({ type: 'webrtc_offer', sdp: offer }));
+          sendMessage(JSON.stringify({ type: 'webrtc_offer', sdp: pc.localDescription }));
         } catch (err) {
           console.warn('Failed to create/send offer:', err);
         }
@@ -368,7 +382,7 @@ function VideoMode({
             {/* 16:10 aspect wrapper - no absolute box, scales with width */}
             <div style={{ width: '100%', padding: 12, boxSizing: 'border-box', display: 'flex', justifyContent: 'center' }}>
               <div style={{ width: '100%', aspectRatio: '16 / 10', background: '#111827', borderRadius: 8, overflow: 'hidden' }}>
-                {mainParticipant && mainParticipant.id === 'me' ? (
+                {mainParticipant && mainParticipant.id === 'me' && !hasRemoteTrack ? (
                   <video
                     ref={mainVideoRef}
                     playsInline
