@@ -776,7 +776,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     const el = () => document.getElementById('pc-bottom-toolbar');
     function updateVar() {
       const h = el()?.offsetHeight || 72;
-      document.documentElement.style.setProperty('--bottom-toolbar-h', `${h}`);
+      document.documentElement.style.setProperty('--bottom-toolbar-h', `${h}px`);
     }
     updateVar();
     window.addEventListener('resize', updateVar);

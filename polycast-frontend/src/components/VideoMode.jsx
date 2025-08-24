@@ -300,7 +300,7 @@ function VideoMode({
   }, [dragging]);
 
   return (
-    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', padding: '16px', minHeight: '100vh', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', padding: '16px', minHeight: '100vh', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
       {!videoReady && !videoError && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#0f1020', color: '#d1d5db', padding: 24, borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -346,21 +346,21 @@ function VideoMode({
             onMouseLeave={() => setIsHoveringVideo(false)}
           >
             {/* 16:10 aspect wrapper */}
-            <div style={{ position: 'absolute', inset: 12, borderRadius: 8, overflow: 'hidden' }}>
-              <div style={{ position: 'relative', width: '100%', height: '100%', aspectRatio: '16 / 10' }}>
+            <div style={{ position: 'absolute', inset: 12, borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '100%', height: 'auto', maxHeight: '100%', aspectRatio: '16 / 10', background: '#111827', borderRadius: 8, overflow: 'hidden' }}>
                 {mainParticipant && mainParticipant.id === 'me' ? (
                   <video
                     ref={mainVideoRef}
                     playsInline
                     muted
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: 'block' }}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scaleX(-1)', display: 'block', background: '#000' }}
                   />
                 ) : hasRemoteTrack ? (
                   <video
                     ref={mainVideoRef}
                     playsInline
                     autoPlay
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#000' }}
                   />
                 ) : (
                   <div style={{ width: '100%', height: '100%', background: '#111827' }} />
@@ -469,8 +469,9 @@ function VideoMode({
                     }}
                     title={`Promote`}
                     style={{
-                      width: 212,
                       height: '100%',
+                      aspectRatio: '16 / 10',
+                      width: 'auto',
                       borderRadius: 10,
                       overflow: 'hidden',
                       cursor: 'pointer',
@@ -483,7 +484,7 @@ function VideoMode({
                         ref={thumbVideoRef}
                         playsInline
                         muted
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scaleX(-1)', background: '#000' }}
                       />
                     ) : (
                       <div style={{ width: '100%', height: '100%', background: '#111827' }} />
