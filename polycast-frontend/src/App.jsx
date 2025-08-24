@@ -442,14 +442,16 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     }
   }, [appMode, isRecording]);
 
-  // Auto-unmute when entering Video mode
+  // Auto-unmute when entering Video mode (host only)
   useEffect(() => {
-    if (appMode === 'video') {
-      // Delay a tick to allow AudioRecorder to acquire mic stream first
+    if (appMode === 'video' && roomSetup && roomSetup.isHost) {
       const id = setTimeout(() => setIsRecording(true), 50);
       return () => clearTimeout(id);
+    } else if (appMode === 'video' && roomSetup && !roomSetup.isHost) {
+      // Ensure students are muted on entry
+      setIsRecording(false);
     }
-  }, [appMode]);
+  }, [appMode, roomSetup]);
 
   // Auto-switch modes for students based on room status
   useEffect(() => {

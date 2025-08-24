@@ -46,16 +46,13 @@ function VideoMode({
   const pcRef = useRef(null);
   const remoteStreamRef = useRef(null);
 
-  // --- Placeholder multi-participant layout state (kept local to this file) ---
-  // We model a simple list of participants: local camera ("me") + 4 placeholders.
-  // The strip shows 3 thumbnails and a 4th partially cut off; clicking the red arrow
-  // scrolls to reveal the hidden one. Clicking a thumbnail swaps it with the main.
+  // Participants: local camera (me) + dynamic peers (p1..p4)
   const initialParticipants = React.useMemo(() => [
-    { id: 'me', name: 'You', color: '#3b82f6', type: 'me' },
-    { id: 'p1', name: 'Person 1', color: '#f472b6' },
-    { id: 'p2', name: 'Person 2', color: '#22c55e' },
-    { id: 'p3', name: 'Person 3', color: '#f59e0b' },
-    { id: 'p4', name: 'Person 4', color: '#a78bfa' }
+    { id: 'me', name: '', color: '#3b82f6', type: 'me' },
+    { id: 'p1', name: '', color: '#f472b6' },
+    { id: 'p2', name: '', color: '#22c55e' },
+    { id: 'p3', name: '', color: '#f59e0b' },
+    { id: 'p4', name: '', color: '#a78bfa' }
   ], []);
   const [participantOrder, setParticipantOrder] = useState(initialParticipants.map(p => p.id));
   const [mainParticipantId, setMainParticipantId] = useState('me');
@@ -73,13 +70,12 @@ function VideoMode({
       try {
         // Request user-facing camera and mirror it
         streamRef.current = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 800 } },
           audio: false
         });
         if (mainVideoRef.current) {
           const el = mainVideoRef.current;
           el.srcObject = streamRef.current;
-          // Mark ready as soon as video starts playing
           const onPlaying = () => setVideoReady(true);
           el.addEventListener('playing', onPlaying, { once: true });
           try {
@@ -88,7 +84,6 @@ function VideoMode({
               await p.catch(() => {});
             }
           } finally {
-            // Fallback: ensure we don't keep loader forever
             setTimeout(() => setVideoReady(true), 150);
           }
         }
@@ -96,7 +91,7 @@ function VideoMode({
       } catch (err) {
         console.error('Camera error:', err);
         setVideoError('Camera access denied or unavailable');
-        setVideoReady(true); // dismiss loader to show error overlay
+        setVideoReady(true);
       }
     }
     initCamera();
@@ -107,7 +102,6 @@ function VideoMode({
     };
   }, []);
 
-  // Keep the thumbnail "me" video wired if/when local feed is not main
   useEffect(() => {
     const isMeInThumbs = mainParticipantId !== 'me' && thumbVideoRef.current && streamRef.current;
     if (isMeInThumbs) {
@@ -119,7 +113,6 @@ function VideoMode({
     }
   }, [mainParticipantId, thumbnails.length]);
 
-  // Reconnect main video when switching back to "me"
   useEffect(() => {
     const isMeMain = mainParticipantId === 'me' && mainVideoRef.current && streamRef.current;
     if (isMeMain) {
@@ -131,7 +124,6 @@ function VideoMode({
     }
   }, [mainParticipantId]);
 
-  // Divider drag handlers
   useEffect(() => {
     const onMove = (e) => {
       if (!dragging || !containerRef.current) return;
@@ -139,7 +131,6 @@ function VideoMode({
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const ratio = (clientX - rect.left) / rect.width;
       setSplitRatio(clamp(ratio));
-      // Prevent touch scrolling while dragging
       if (e.cancelable) e.preventDefault();
     };
     const onUp = () => setDragging(false);
@@ -158,7 +149,6 @@ function VideoMode({
     };
   }, [dragging]);
 
-  // Font size controls
   useEffect(() => {
     const handleFontSizeChange = (e) => {
       setFontSize(prev => Math.max(12, Math.min(60, prev + e.detail)));
@@ -170,21 +160,19 @@ function VideoMode({
   const isHost = !!(roomSetup && roomSetup.isHost);
   const inRoom = !!(roomSetup && roomSetup.roomCode);
 
-  // Basic 1:1 WebRTC using WS signaling already wired in App.jsx
+  // WebRTC setup
   useEffect(() => {
-    if (!inRoom) return; // Only negotiate when in a room
+    if (!inRoom) return;
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
     });
     pcRef.current = pc;
     remoteStreamRef.current = new MediaStream();
 
-    // Add local tracks
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => pc.addTrack(track, streamRef.current));
     }
 
-    // Handle remote track
     pc.ontrack = (event) => {
       const [remoteStream] = event.streams;
       if (remoteStream && mainVideoRef.current) {
@@ -194,18 +182,15 @@ function VideoMode({
           setHasRemoteTrack(true);
         } catch {}
       }
-      // When a remote stream arrives, show it as main by default
       setMainParticipantId('p1');
     };
 
-    // ICE candidates -> WS
     pc.onicecandidate = (e) => {
       if (e.candidate && typeof sendMessage === 'function') {
         sendMessage(JSON.stringify({ type: 'webrtc_ice', candidate: e.candidate }));
       }
     };
 
-    // Listen for signaling from App
     const onSignal = async (evt) => {
       const data = evt.detail;
       if (!data || !pcRef.current) return;
@@ -228,7 +213,6 @@ function VideoMode({
     };
     window.addEventListener('pc_webrtc_signal', onSignal);
 
-    // If student, create offer immediately
     const startOffer = async () => {
       if (!isHost) {
         try {
@@ -249,38 +233,26 @@ function VideoMode({
     };
   }, [inRoom, isHost, sendMessage, mainParticipantId]);
   
-  // Word click handler using UNIFIED API
   const handleWordClick = async (word, event) => {
     try {
       const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
       const targetLanguage = getLanguageForProfile(selectedProfile);
-      
-      // Extract sentence and mark the clicked word
       const sentence = extractSentenceWithWord(fullTranscript, word);
-      // For video mode clicks, mark first occurrence (simpler than tracking instances)
       const sentenceWithMarkedWord = sentence.replace(
         new RegExp(`\\b(${word})\\b`, 'i'),
         '~$1~'
       );
-      
-      console.log(`[VideoMode] Using unified API for word: "${word}"`);
-      console.log(`[VideoMode] Sentence with marked word:`, sentenceWithMarkedWord);
-      
       const url = apiService.getUnifiedWordDataUrl(
         word,
         sentenceWithMarkedWord,
         nativeLanguage,
         targetLanguage
       );
-      
       const unifiedData = await apiService.fetchJson(url);
-      
-      // Store unified data for popup display
       setWordDefinitions(prev => ({
         ...prev,
         [word.toLowerCase()]: {
           ...unifiedData,
-          // Ensure compatibility with popup
           word: word,
           translation: unifiedData.translation || word,
           contextualExplanation: unifiedData.definition || 'Definition unavailable',
@@ -289,15 +261,8 @@ function VideoMode({
           frequency: unifiedData.frequency || 5
         }
       }));
-      
-      setPopupInfo({
-        visible: true,
-        word: word,
-        position: { x: event.clientX, y: event.clientY }
-      });
+      setPopupInfo({ visible: true, word: word, position: { x: event.clientX, y: event.clientY } });
     } catch (err) {
-      console.error('Error fetching word definitions with unified API:', err);
-      // Fallback data
       setWordDefinitions(prev => ({
         ...prev,
         [word.toLowerCase()]: {
@@ -308,11 +273,7 @@ function VideoMode({
           example: `~${word}~`
         }
       }));
-      setPopupInfo({
-        visible: true,
-        word: word,
-        position: { x: event.clientX, y: event.clientY }
-      });
+      setPopupInfo({ visible: true, word: word, position: { x: event.clientX, y: event.clientY } });
     }
   };
 
@@ -326,7 +287,6 @@ function VideoMode({
   const leftPercent = Math.round(splitRatio * 100);
   const rightPercent = 100 - leftPercent;
 
-  // While dragging, show global ew-resize cursor and disable text selection
   useEffect(() => {
     if (!dragging) return;
     const prevCursor = document.body.style.cursor;
@@ -341,7 +301,6 @@ function VideoMode({
 
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', padding: '16px', minHeight: '100vh', overflow: 'hidden', boxSizing: 'border-box' }}>
-      {/* Full-screen loading overlay while camera initializes */}
       {!videoReady && !videoError && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#0f1020', color: '#d1d5db', padding: 24, borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -352,7 +311,6 @@ function VideoMode({
         </div>
       )}
       
-      {/* Split container fits entirely above the bottom toolbar */}
       <div
         ref={containerRef}
         style={{
@@ -367,7 +325,7 @@ function VideoMode({
           position: 'relative'
         }}
       >
-        {/* LEFT: video + placeholder participants strip */}
+        {/* LEFT: video */}
         <div
           style={{
             width: isNarrow ? '100%' : `${leftPercent}%`,
@@ -387,104 +345,85 @@ function VideoMode({
             onMouseEnter={() => setIsHoveringVideo(true)}
             onMouseLeave={() => setIsHoveringVideo(false)}
           >
-            {mainParticipant && mainParticipant.id === 'me' ? (
-              <video
-                ref={mainVideoRef}
-                playsInline
-                muted
-                style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: 'block' }}
-              />
-            ) : hasRemoteTrack ? (
-              <video
-                ref={mainVideoRef}
-                playsInline
-                autoPlay
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: mainParticipant ? mainParticipant.color : '#374151'
-                }}
-              >
-                <span style={{ fontSize: 36, fontWeight: 900, color: '#111827', textShadow: '0 2px 10px rgba(0,0,0,0.25)' }}>
-                  {mainParticipant ? mainParticipant.name : ''}
-                </span>
+            {/* 16:10 aspect wrapper */}
+            <div style={{ position: 'absolute', inset: 12, borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ position: 'relative', width: '100%', height: '100%', aspectRatio: '16 / 10' }}>
+                {mainParticipant && mainParticipant.id === 'me' ? (
+                  <video
+                    ref={mainVideoRef}
+                    playsInline
+                    muted
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: 'block' }}
+                  />
+                ) : hasRemoteTrack ? (
+                  <video
+                    ref={mainVideoRef}
+                    playsInline
+                    autoPlay
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', background: '#111827' }} />
+                )}
               </div>
-            )}
+            </div>
+
             {videoError && (
               <div style={{ position: 'absolute', inset: 0, color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
                 {videoError}
               </div>
             )}
 
-            {/* Hover toolbar (Zoom-like) */}
-            <div
-              style={{
-                position: 'absolute',
-                left: 12,
-                right: 12,
-                bottom: 12,
-                background: 'rgba(0, 0, 0, 0.45)',
-                borderRadius: 10,
-                padding: '8px 12px',
-                display: 'flex',
-                gap: 10,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: isHoveringVideo ? 1 : 0,
-                transform: `translateY(${isHoveringVideo ? 0 : 8}px)`,
-                transition: 'opacity 160ms ease, transform 160ms ease',
-                pointerEvents: isHoveringVideo ? 'auto' : 'none'
-              }}
-            >
-              <button
-                onClick={isRecording ? (onStopRecording || (() => {})) : (onStartRecording || (() => {}))}
-                title={isRecording ? 'Mute' : 'Unmute'}
+            {/* Hover toolbar - host only */}
+            {isHost && (
+              <div
                 style={{
-                  background: isRecording ? '#ef4444' : '#10b981',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '8px 14px',
+                  position: 'absolute',
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  background: 'rgba(0, 0, 0, 0.45)',
+                  borderRadius: 10,
+                  padding: '8px 12px',
                   display: 'flex',
+                  gap: 10,
                   alignItems: 'center',
-                  gap: 8,
-                  cursor: 'pointer'
+                  justifyContent: 'center',
+                  opacity: isHoveringVideo ? 1 : 0,
+                  transform: `translateY(${isHoveringVideo ? 0 : 8}px)`,
+                  transition: 'opacity 160ms ease, transform 160ms ease',
+                  pointerEvents: isHoveringVideo ? 'auto' : 'none'
                 }}
               >
-                {isRecording ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 1a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                    <path d="M19 10a7 7 0 0 1-14 0"/>
-                    <line x1="12" y1="17" x2="12" y2="23"/>
-                    <line x1="8" y1="23" x2="16" y2="23"/>
-                  </svg>
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 1a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                    <path d="M19 10a7 7 0 0 1-14 0"/>
-                    <line x1="12" y1="17" x2="12" y2="23"/>
-                    <line x1="8" y1="23" x2="16" y2="23"/>
-                    <line x1="4" y1="4" x2="20" y2="20"/>
-                  </svg>
-                )}
-                <span style={{ fontWeight: 600 }}>{isRecording ? 'Mute' : 'Unmute'}</span>
-              </button>
+                <button
+                  onClick={isRecording ? (onStopRecording || (() => {})) : (onStartRecording || (() => {}))}
+                  title={isRecording ? 'Mute' : 'Unmute'}
+                  style={{
+                    background: isRecording ? '#ef4444' : '#10b981',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '8px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{isRecording ? 'Mute' : 'Unmute'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Hidden audio pipeline - host only */}
+          {isHost && (
+            <div style={{ display: 'none' }}>
+              <AudioRecorder sendMessage={sendMessage} isRecording={isRecording} />
             </div>
-          </div>
+          )}
 
-          {/* Hidden audio pipeline to drive transcript */}
-          <div style={{ display: 'none' }}>
-            <AudioRecorder sendMessage={sendMessage} isRecording={isRecording} />
-          </div>
-
-          {/* Bottom thumbnails strip (carousel) */}
+          {/* Bottom thumbnails strip */}
           <div
             style={{
               position: 'relative',
@@ -502,7 +441,6 @@ function VideoMode({
                 overflow: 'hidden'
               }}
             >
-              {/* Inner row with transform to simulate scrolling */}
               <div
                 style={{
                   position: 'absolute',
@@ -511,7 +449,7 @@ function VideoMode({
                   height: '100%',
                   display: 'flex',
                   gap: 12,
-                  paddingRight: 80, // leave space for arrow button
+                  paddingRight: 80,
                   transform: `translateX(${-thumbScrollIndex * (212 + 12)}px)`,
                   transition: 'transform 200ms ease'
                 }}
@@ -520,21 +458,16 @@ function VideoMode({
                   <div
                     key={p.id}
                     onClick={() => {
-                      // Swap clicked participant with main: update order and main id
                       setParticipantOrder(prev => {
                         const a = [...prev];
                         const i = a.indexOf(p.id);
                         const j = a.indexOf(mainParticipantId);
-                        if (i !== -1 && j !== -1) {
-                          const tmp = a[i];
-                          a[i] = a[j];
-                          a[j] = tmp;
-                        }
+                        if (i !== -1 && j !== -1) { const tmp = a[i]; a[i] = a[j]; a[j] = tmp; }
                         return a;
                       });
                       setMainParticipantId(p.id);
                     }}
-                    title={`Promote ${p.name}`}
+                    title={`Promote`}
                     style={{
                       width: 212,
                       height: '100%',
@@ -553,15 +486,12 @@ function VideoMode({
                         style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
                       />
                     ) : (
-                      <div style={{ width: '100%', height: '100%', background: p.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ fontSize: 22, fontWeight: 900, color: '#111827' }}>{p.name}</span>
-                      </div>
+                      <div style={{ width: '100%', height: '100%', background: '#111827' }} />
                     )}
                   </div>
                 ))}
               </div>
             </div>
-            {/* Right arrow button */}
             <button
               onClick={() => setThumbScrollIndex((i) => (i >= maxScrollIndex ? 0 : i + 1))}
               style={{
@@ -586,7 +516,7 @@ function VideoMode({
           </div>
         </div>
 
-        {/* Invisible divider overlay positioned at the border */}
+        {/* Divider */}
         {!isNarrow && (
           <div
             onMouseDown={() => setDragging(true)}
@@ -603,14 +533,13 @@ function VideoMode({
               background: 'transparent',
               userSelect: 'none',
               zIndex: 20,
-              transform: 'translateX(-4px)' // Center the 8px wide area on the border
+              transform: 'translateX(-4px)'
             }}
             aria-label="Resize panels"
             role="separator"
             aria-orientation="vertical"
             title="Drag to resize"
           >
-            {/* Optional: subtle visual indicator on hover */}
             {(dividerHover || dragging) && (
               <div style={{
                 position: 'absolute',
@@ -628,7 +557,6 @@ function VideoMode({
           </div>
         )}
 
-        {/* Drag overlay to guarantee pointer capture and cursor across the page */}
         {dragging && (
           <div
             style={{ position: 'fixed', inset: 0, cursor: 'ew-resize', zIndex: 9999, background: 'transparent' }}
@@ -676,7 +604,6 @@ function VideoMode({
         </div>
       </div>
       
-      {/* Word definition popup */}
       {popupInfo.visible && (
         <WordDefinitionPopup
           word={popupInfo.word}
