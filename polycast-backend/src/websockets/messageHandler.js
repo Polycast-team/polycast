@@ -48,6 +48,7 @@ async function handleWebSocketMessage(ws, message, clientData) {
             }
             // Buffer payloads can also carry signaling in some clients; handle here
             if (data && (data.type === 'webrtc_offer' || data.type === 'webrtc_answer' || data.type === 'webrtc_ice')) {
+                console.log('[Signaling] Buffer payload', data.type);
                 return forwardSignaling(ws, data, { clientRooms, activeRooms });
             }
         } catch (err) {
@@ -60,6 +61,7 @@ async function handleWebSocketMessage(ws, message, clientData) {
             if (data.type === 'text_submit') {
                 ws.send(JSON.stringify({ type: 'error', message: 'Text submissions are not supported.' }));
             } else if (data.type === 'webrtc_offer' || data.type === 'webrtc_answer' || data.type === 'webrtc_ice') {
+                console.log('[Signaling] Text payload', data.type);
                 return forwardSignaling(ws, data, { clientRooms, activeRooms });
             }
         } catch (err) {
@@ -87,6 +89,8 @@ function forwardSignaling(ws, data, { clientRooms, activeRooms }) {
         // Student sends to the host
         if (room.hostWs) targets = [room.hostWs];
     }
+
+    console.log(`[Signaling] Forwarding ${data.type} from ${isHost ? 'host' : 'student'} in room ${roomCode} to ${targets.length} peer(s)`);
 
     for (const peer of targets) {
         try {

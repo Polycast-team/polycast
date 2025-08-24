@@ -119,7 +119,7 @@ function VideoMode({
       try {
         mainVideoRef.current.srcObject = streamRef.current;
         const p = mainVideoRef.current.play();
-        if (p && typeof p.then === 'function') p.catch(() => {});
+        if (p && typeof p.then === 'function') p.catch((e) => console.warn('[VideoMode] play() rejected for local preview:', e?.message || e));
       } catch (_) {}
     }
   }, [mainParticipantId]);
@@ -169,17 +169,22 @@ function VideoMode({
     });
     pcRef.current = pc;
     remoteStreamRef.current = new MediaStream();
+    console.log('[WebRTC] Created RTCPeerConnection');
 
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => pc.addTrack(track, streamRef.current));
+      streamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, streamRef.current);
+        console.log('[WebRTC] Added local track:', track.kind);
+      });
     }
 
     pc.ontrack = (event) => {
+      console.log('[WebRTC] ontrack fired. Streams:', event.streams?.length, 'tracks:', event.track?.kind);
       const [remoteStream] = event.streams;
       if (remoteStream && mainVideoRef.current) {
         try {
           mainVideoRef.current.srcObject = remoteStream;
-          mainVideoRef.current.play().catch(() => {});
+          mainVideoRef.current.play().catch((e) => console.warn('[WebRTC] Remote video play() failed:', e?.message || e));
           setHasRemoteTrack(true);
         } catch {}
       }
@@ -188,8 +193,15 @@ function VideoMode({
 
     pc.onicecandidate = (e) => {
       if (e.candidate && typeof sendMessage === 'function') {
+        console.log('[WebRTC] ICE candidate generated, sending');
         sendMessage(JSON.stringify({ type: 'webrtc_ice', candidate: e.candidate }));
       }
+    };
+    pc.onconnectionstatechange = () => {
+      console.log('[WebRTC] connectionState:', pc.connectionState);
+    };
+    pc.oniceconnectionstatechange = () => {
+      console.log('[WebRTC] iceConnectionState:', pc.iceConnectionState);
     };
 
     const onSignal = async (evt) => {
@@ -197,14 +209,18 @@ function VideoMode({
       if (!data || !pcRef.current) return;
       try {
         if (data.type === 'webrtc_offer' && isHost) {
+          console.log('[WebRTC] Received offer (host). Setting remote description and creating answer');
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
           const answer = await pcRef.current.createAnswer();
           await pcRef.current.setLocalDescription(answer);
+          console.log('[WebRTC] Sending answer');
           sendMessage(JSON.stringify({ type: 'webrtc_answer', sdp: answer }));
         } else if (data.type === 'webrtc_answer' && !isHost) {
+          console.log('[WebRTC] Received answer (student). Setting remote description');
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
         } else if (data.type === 'webrtc_ice' && data.candidate) {
           try {
+            console.log('[WebRTC] Adding remote ICE candidate');
             await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
           } catch {}
         }
@@ -217,8 +233,10 @@ function VideoMode({
     const startOffer = async () => {
       if (!isHost) {
         try {
+          console.log('[WebRTC] Creating offer (student)');
           const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
           await pc.setLocalDescription(offer);
+          console.log('[WebRTC] Sending offer');
           sendMessage(JSON.stringify({ type: 'webrtc_offer', sdp: offer }));
         } catch (err) {
           console.warn('Failed to create/send offer:', err);
