@@ -42,6 +42,7 @@ function VideoMode({
 
   const pcRef = useRef(null);
   const remoteStreamRef = useRef(null);
+  const remoteAudioRef = useRef(null);
 
   // Participants: local camera (me) + dynamic peers (p1..p4)
   const initialParticipants = React.useMemo(() => [
@@ -69,7 +70,7 @@ function VideoMode({
         // Request user-facing camera and mirror it
         streamRef.current = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 800 } },
-          audio: false
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
         });
         if (mainVideoRef.current) {
           const el = mainVideoRef.current;
@@ -167,6 +168,20 @@ function VideoMode({
     return () => clearTimeout(id);
   }, [effectiveMainId, hasRemoteTrack]);
 
+  // Ensure remote audio plays regardless of which video is displayed
+  useEffect(() => {
+    const el = remoteAudioRef.current;
+    const s = remoteStreamRef.current;
+    if (!el || !s) return;
+    try {
+      if (el.srcObject !== s) {
+        el.srcObject = s;
+        const p = el.play();
+        if (p && typeof p.then === 'function') p.catch(() => {});
+      }
+    } catch (_) {}
+  }, [hasRemoteTrack, hasRemoteVideoTrack]);
+
   useEffect(() => {
     const onMove = (e) => {
       if (!dragging || !containerRef.current) return;
@@ -236,13 +251,15 @@ function VideoMode({
       } else {
         remoteStreamRef.current = stream;
       }
-      if (event.track && event.track.kind === 'video') {
-        setHasRemoteVideoTrack(true);
+      if (event.track) {
+        if (event.track.kind === 'video') {
+          setHasRemoteVideoTrack(true);
+          try { event.track.enabled = true; } catch (_) {}
+        }
+        if (event.track.kind === 'audio') {
+          try { event.track.enabled = true; } catch (_) {}
+        }
         setHasRemoteTrack(true);
-        try {
-          // Ensure the remote video track is enabled for rendering
-          event.track.enabled = true;
-        } catch (_) {}
       }
       // If remote is already/main selected, ensure it is attached immediately
       if (mainVideoRef.current && stream && (effectiveMainId !== 'me')) {
@@ -470,6 +487,10 @@ function VideoMode({
             <div style={{ display: 'none' }}>
               <AudioRecorder sendMessage={sendMessage} isRecording={isRecording} />
             </div>
+          )}
+
+          {hasRemoteTrack && (
+            <audio ref={remoteAudioRef} autoPlay playsInline />
           )}
 
           {/* Bottom thumbnails strip */}
