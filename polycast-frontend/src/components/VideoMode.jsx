@@ -454,7 +454,17 @@ function VideoMode({
                     }}
                   >
                 <button
-                  onClick={isRecording ? (onStopRecording || (() => {})) : (onStartRecording || (() => {}))}
+                  onClick={() => {
+                    try {
+                      const tracks = (streamRef.current && streamRef.current.getAudioTracks) ? streamRef.current.getAudioTracks() : [];
+                      tracks.forEach(t => { t.enabled = !isRecording; });
+                    } catch (_) {}
+                    if (isRecording) {
+                      (onStopRecording || (() => {}))();
+                    } else {
+                      (onStartRecording || (() => {}))();
+                    }
+                  }}
                   title={isRecording ? 'Mute' : 'Unmute'}
                   style={{
                     background: isRecording ? '#ef4444' : '#10b981',
