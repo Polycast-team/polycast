@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
-import { getLanguageForProfile } from '../utils/profileLanguageMapping';
+import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import apiService from '../services/apiService.js';
 import config from '../config/config.js';
+import { extractSentenceWithWord } from '../utils/wordClickUtils';
 
 // Helper function to tokenize text into words and punctuation
 const tokenizeText = (text) => {
@@ -65,17 +66,20 @@ const TranscriptionDisplay = ({
   translations = {}, 
   showLiveTranscript = true, 
   showTranslation = true, 
+  defaultFontSize,
+  compactLines = false,
   selectedWords = [],
   setSelectedWords,
   wordDefinitions = {},
   setWordDefinitions,
   isStudentMode = false,
   studentHomeLanguage,
-  selectedProfile = 'non-saving'
+  selectedProfile = 'joshua',
+  onAddWord
 }) => {
   const transcriptRef = useRef(null);
   const scrollContainerRef = useRef(null);
-  const [fontSize, setFontSize] = useState(30);
+  const [fontSize, setFontSize] = useState(() => defaultFontSize || 30);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const [popupInfo, setPopupInfo] = useState({
     visible: false,
@@ -83,6 +87,7 @@ const TranscriptionDisplay = ({
     position: { x: 0, y: 0 }
   });
   const [loadingDefinition, setLoadingDefinition] = useState(false);
+  const ui = getUITranslationsForProfile(selectedProfile);
 
   // Check if user is at bottom of scroll container
   const isAtBottom = () => {
@@ -115,9 +120,10 @@ const TranscriptionDisplay = ({
     const scrollToBottom = () => {
       // Only auto-scroll if user hasn't manually scrolled up
       if (!isUserScrolling || isAtBottom()) {
-        const scrollAnchor = document.querySelector('.scroll-anchor');
-        if (scrollAnchor) {
-          scrollAnchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        const el = scrollContainerRef.current;
+        if (el) {
+          // Jump directly to the bottom to avoid bounce while new text streams in
+          el.scrollTop = el.scrollHeight;
         }
         setIsUserScrolling(false);
       }
@@ -145,7 +151,7 @@ const TranscriptionDisplay = ({
     return () => window.removeEventListener('changeFontSize', handler);
   }, [fontSize]);
 
-  const handleWordClick = async (word, event) => {
+  const handleWordClick = async (word, event, wordInstanceIndex = 0) => {
     if (!event) return;
     
     const rect = event.currentTarget.getBoundingClientRect();
@@ -165,31 +171,95 @@ const TranscriptionDisplay = ({
       }
     });
     
-    // Fetch definition from API
+    // Use UNIFIED API for fetching definition
     setLoadingDefinition(true);
     try {
+      const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
       const targetLanguage = getLanguageForProfile(selectedProfile);
-      const contextSentence = fullTranscript; // Use full transcript as context
-      const data = await apiService.fetchJson(apiService.getWordPopupUrl(word, contextSentence, targetLanguage));
+      
+      // Extract sentence and mark the clicked instance
+      const sentence = extractSentenceWithWord(fullTranscript, word);
+      
+      // Mark the specific clicked instance of the word
+      let currentIndex = 0;
+      const sentenceWithMarkedWord = sentence.replace(
+        new RegExp(`\\b(${word})\\b`, 'gi'),
+        (match) => {
+          if (currentIndex === wordInstanceIndex) {
+            currentIndex++;
+            return `~${match}~`;
+          }
+          currentIndex++;
+          return match;
+        }
+      );
+      
+      console.log(`[TranscriptionDisplay] Using unified API for word: "${word}", instance: ${wordInstanceIndex}`);
+      console.log(`[TranscriptionDisplay] Sentence with marked word:`, sentenceWithMarkedWord);
+      
+      const url = apiService.getUnifiedWordDataUrl(
+        word,
+        sentenceWithMarkedWord,
+        nativeLanguage,
+        targetLanguage
+      );
+      
+      const unifiedData = await apiService.fetchJson(url);
+      
+      // Store unified data in wordDefinitions for popup display
       setWordDefinitions(prev => ({
         ...prev,
-        [word.toLowerCase()]: data.definition
+        [word.toLowerCase()]: {
+          ...unifiedData,
+          // Ensure compatibility with popup expectations
+          word: word,
+          translation: unifiedData.translation || word,
+          contextualExplanation: unifiedData.definition || 'Definition unavailable',
+          definition: unifiedData.definition || 'Definition unavailable',
+          example: unifiedData.exampleForDictionary || unifiedData.example || '',
+          frequency: unifiedData.frequency || 5
+        }
       }));
     } catch (error) {
-      console.error('Error fetching word definition:', error);
+      console.error('Error fetching word definition with unified API:', error);
+      // Fallback data
+      setWordDefinitions(prev => ({
+        ...prev,
+        [word.toLowerCase()]: {
+          word: word,
+          translation: word,
+          contextualExplanation: 'Definition unavailable',
+          definition: 'Definition unavailable',
+          example: `~${word}~`
+        }
+      }));
     } finally {
       setLoadingDefinition(false);
     }
   };
 
+  // Track word instance counts for proper marking
+  const wordInstanceCounts = useRef({});
+  
   const renderClickableWord = (word, index, isPartial = false) => {
     const isWord = /^[\p{L}\p{M}\d']+$/u.test(word);
     const isSelected = selectedWords.some(w => w.toLowerCase() === word.toLowerCase());
     
+    // Track which instance of this word we're rendering
+    let wordInstanceIndex = 0;
+    if (isWord && !isPartial) {
+      const wordLower = word.toLowerCase();
+      if (!wordInstanceCounts.current[wordLower]) {
+        wordInstanceCounts.current[wordLower] = 0;
+      }
+      wordInstanceIndex = wordInstanceCounts.current[wordLower];
+      wordInstanceCounts.current[wordLower]++;
+    }
+    
     return (
       <span
         key={`${index}-${word}`}
-        onClick={isWord && !isPartial ? (e) => handleWordClick(word, e) : undefined}
+        onClick={isWord && !isPartial ? (e) => handleWordClick(word, e, wordInstanceIndex) : undefined}
         style={{
           cursor: isWord && !isPartial ? 'pointer' : 'default',
           color: isPartial ? '#22c55e' : (isWord && isSelected ? '#1976d2' : undefined),
@@ -205,7 +275,30 @@ const TranscriptionDisplay = ({
   };
 
   const renderTranscript = () => {
+    // Reset word instance counter for each render
+    wordInstanceCounts.current = {};
+    
     const sentences = splitIntoSentences(fullTranscript);
+    // Decide if currentPartial should render on a NEW line immediately,
+    // based on whether the last committed line is "closed" (contains a long
+    // sentence >3 words or already grouped 3 short sentences).
+    const shouldPartialStartNewLine = (() => {
+      if (!currentPartial) return false;
+      if (sentences.length === 0) return false; // handled separately below
+      const lastLine = sentences[sentences.length - 1] || '';
+      // Split lastLine back into simple sentences using punctuation pairs
+      const parts = lastLine.split(/([.!?])/);
+      const simple = [];
+      for (let i = 0; i < parts.length; i += 2) {
+        const textPart = (parts[i] || '').trim();
+        const punct = parts[i + 1] || '';
+        const full = (textPart + punct).trim();
+        if (full) simple.push(textPart);
+      }
+      const numSimple = simple.length;
+      const hasLong = simple.some(s => (s.trim().split(/\s+/).filter(Boolean).length) > 3);
+      return hasLong || numSimple >= 3;
+    })();
     
     return (
       <div style={{ fontSize, lineHeight: 1.6, padding: '20px', minHeight: '100%' }}>
@@ -220,7 +313,7 @@ const TranscriptionDisplay = ({
                   renderClickableWord(token, `${sentIdx}-${tokenIdx}`)
                 )}
                 {/* Append currentPartial to the last sentence line to avoid jumping */}
-                {isLastSentence && currentPartial && (
+                {isLastSentence && currentPartial && !shouldPartialStartNewLine && (
                   <>
                     {' '}
                     {tokenizeText(currentPartial).map((token, idx) => 
@@ -229,7 +322,7 @@ const TranscriptionDisplay = ({
                   </>
                 )}
               </div>
-              {sentIdx < sentences.length - 1 && (
+              {sentIdx < sentences.length - 1 && !compactLines && (
                 <div style={{
                   display: 'flex',
                   justifyContent: 'center',
@@ -255,6 +348,14 @@ const TranscriptionDisplay = ({
             borderRadius: '4px',
             color: '#22c55e' // Green text
           }}>
+            {tokenizeText(currentPartial).map((token, idx) => 
+              renderClickableWord(token, `partial-${idx}`, true)
+            )}
+          </div>
+        )}
+        {/* Or render currentPartial as its own new line if the last line is closed */}
+        {sentences.length > 0 && currentPartial && shouldPartialStartNewLine && (
+          <div style={{ marginBottom: '10px' }}>
             {tokenizeText(currentPartial).map((token, idx) => 
               renderClickableWord(token, `partial-${idx}`, true)
             )}
@@ -293,23 +394,23 @@ const TranscriptionDisplay = ({
           word={popupInfo.word}
           definition={wordDefinitions[popupInfo.word.toLowerCase()]}
           position={popupInfo.position}
-          isInDictionary={false}
-          onAddToDictionary={() => showTBA('Dictionary feature coming soon')}
+          isInDictionary={Object.values(wordDefinitions).some(e => e && e.inFlashcards && e.word === (popupInfo.word || '').toLowerCase())}
+          onAddToDictionary={() => onAddWord && onAddWord(popupInfo.word)}
           onRemoveFromDictionary={() => {}}
           loading={loadingDefinition}
-          nativeLanguage={getLanguageForProfile(selectedProfile)}
+          nativeLanguage={getNativeLanguageForProfile(selectedProfile)}
           onClose={() => setPopupInfo(prev => ({ ...prev, visible: false }))}
         />
       )}
       
       {/* Transcript Box */}
       {showLiveTranscript && (
-        <div style={{ width: '100%', flex: showTranslation ? '0 0 33.5%' : '1 1 100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '100%', flex: showTranslation ? '0 0 33.5%' : '1 1 100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div
             style={{
               width: '100%',
               flex: 1,
-              overflowY: 'auto',
+              overflow: 'hidden',
               overflowX: 'hidden',
               background: '#181b2f',
               color: '#fff',
@@ -320,6 +421,7 @@ const TranscriptionDisplay = ({
               flexDirection: 'column',
               maxHeight: '100%',
               position: 'relative',
+              minHeight: 0
             }}
             ref={transcriptRef}
           >
@@ -333,7 +435,7 @@ const TranscriptionDisplay = ({
               textTransform: 'uppercase', 
               opacity: 0.92 
             }}>
-              Transcript
+              {ui.transcriptHeader}
             </span>
             <div 
               ref={scrollContainerRef}
@@ -341,8 +443,12 @@ const TranscriptionDisplay = ({
                 flex: 1, 
                 overflowY: 'auto', 
                 overflowX: 'hidden',
-                scrollBehavior: 'smooth'
+                scrollBehavior: 'smooth',
+                overscrollBehavior: 'contain'
               }}
+              className="pc-transcript-scroll"
+              onWheel={(e) => { e.stopPropagation(); }}
+              onTouchMove={(e) => { e.stopPropagation(); }}
             >
               {renderTranscript()}
             </div>
@@ -397,10 +503,10 @@ const TranscriptionDisplay = ({
                   opacity: 0.92,
                   marginBottom: 20,
                 }}>
-                  {isStudentMode ? (studentHomeLanguage || 'Student Language') : lang}
+                  {isStudentMode ? (studentHomeLanguage || ui.studentLanguage) : lang}
                 </span>
                 <p style={{ fontSize: 16, opacity: 0.7, textAlign: 'center' }}>
-                  Translation temporarily disabled for streaming mode
+                  {ui.translationDisabled}
                 </p>
               </div>
             );
@@ -419,13 +525,16 @@ TranscriptionDisplay.propTypes = {
   translations: PropTypes.object,
   showLiveTranscript: PropTypes.bool,
   showTranslation: PropTypes.bool,
+  defaultFontSize: PropTypes.number,
+  compactLines: PropTypes.bool,
   selectedWords: PropTypes.array,
   setSelectedWords: PropTypes.func,
   wordDefinitions: PropTypes.object,
   setWordDefinitions: PropTypes.func,
   isStudentMode: PropTypes.bool,
   studentHomeLanguage: PropTypes.string,
-  selectedProfile: PropTypes.string
+  selectedProfile: PropTypes.string,
+  onAddWord: PropTypes.func
 };
 
 export default TranscriptionDisplay;

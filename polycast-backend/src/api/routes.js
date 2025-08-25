@@ -4,6 +4,9 @@ const redisService = require('../services/redisService');
 const llmService = require('../services/llmService');
 const { generateTextWithGemini } = require('../services/llmService');
 const popupGeminiService = require('../services/popupGeminiService');
+const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+
+const ttsClient = new TextToSpeechClient();
 
 const router = express.Router();
 
@@ -68,31 +71,125 @@ router.get('/translate/:language/:text', async (req, res) => {
     }
 });
 
-// Dictionary API
-router.get('/dictionary/:word', async (req, res) => {
+// Sense Candidates API (for Add Word flow) - MUST be before /dictionary/:word
+router.get('/dictionary/senses', async (req, res) => {
     try {
-        const { word } = req.params;
-        const context = req.query.context || '';
-        const targetLanguage = req.query.targetLanguage || 'Spanish';
-        console.log(`[Dictionary API] Getting definition for: ${word}${context ? ' with context: "' + context + '"' : ''} in ${targetLanguage}`);
+        const { word, nativeLanguage = 'English', targetLanguage = 'English' } = req.query || {};
+        if (!word || !word.trim()) {
+            return res.status(400).json({ error: 'word is required' });
+        }
+        const senses = await popupGeminiService.getSenseCandidates(word.trim(), nativeLanguage, targetLanguage);
+        return res.json({ word: word.trim(), nativeLanguage, targetLanguage, senses });
+    } catch (error) {
+        console.error('[Senses API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// UNIFIED API - Single endpoint for all word data needs (popup & flashcards)
+router.get('/dictionary/unified', async (req, res) => {
+    try {
+        const { word, sentenceWithMarkedWord, nativeLanguage = 'English', targetLanguage = 'English' } = req.query || {};
+        if (!word || !word.trim()) {
+            return res.status(400).json({ error: 'word is required' });
+        }
+        if (!sentenceWithMarkedWord || !sentenceWithMarkedWord.trim()) {
+            return res.status(400).json({ error: 'sentenceWithMarkedWord is required' });
+        }
         
-        // Use the new popupGeminiService
-        const definition = await popupGeminiService.getContextualDefinition(word, context, targetLanguage);
+        console.log(`[Unified API] Processing: word="${word}", sentence="${sentenceWithMarkedWord}", native="${nativeLanguage}", target="${targetLanguage}"`);
         
-        // Format response to match existing popup expectations
-        const formattedResponse = {
-            word: word,
-            translation: definition.translation,
-            contextualExplanation: definition.contextualExplanation,
-            // Additional fields that may be used by the popup
-            partOfSpeech: '',
-            definition: definition.contextualExplanation,
-            isContextual: true
+        const unifiedData = await popupGeminiService.getUnifiedWordData(
+            word.trim(),
+            sentenceWithMarkedWord.trim(),
+            nativeLanguage,
+            targetLanguage
+        );
+        
+        return res.json(unifiedData);
+    } catch (error) {
+        console.error('[Unified API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// Text-to-Speech API using Google Cloud
+router.post('/generate-audio', async (req, res) => {
+    try {
+        const { text, voice, speakingRate, pitch } = req.body || {};
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: 'Missing text' });
+        }
+
+        // Strip tildes from text before synthesis
+        const cleanText = text.trim().replace(/~/g, '');
+        
+        // Randomly choose between natural male and female voices
+        const voices = ['en-US-Neural2-J', 'en-US-Neural2-F']; // J=male, F=female
+        const randomVoice = voices[Math.floor(Math.random() * voices.length)];
+
+        const request = {
+            input: { text: cleanText },
+            voice: {
+                languageCode: (voice && voice.languageCode) || 'en-US',
+                name: (voice && voice.name) || randomVoice
+            },
+            audioConfig: {
+                audioEncoding: 'MP3',
+                speakingRate: speakingRate ?? 1.0,
+                pitch: pitch ?? 0.0
+            }
         };
 
-        res.json(formattedResponse);
+        const [response] = await ttsClient.synthesizeSpeech(request);
+        const base64 = Buffer.from(response.audioContent).toString('base64');
+        
+        res.json({ audioUrl: `data:audio/mp3;base64,${base64}` });
     } catch (error) {
-        console.error("Dictionary API error:", error);
+        console.error('[TTS] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Legacy TTS API endpoint for backward compatibility
+router.post('/tts', async (req, res) => {
+    try {
+        const { text, voice, speakingRate, pitch } = req.body || {};
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: 'Missing text' });
+        }
+
+        // Strip tildes from text before synthesis
+        const cleanText = text.trim().replace(/~/g, '');
+        
+        // Randomly choose between natural male and female voices
+        const voices = ['en-US-Neural2-J', 'en-US-Neural2-F']; // J=male, F=female
+        const randomVoice = voices[Math.floor(Math.random() * voices.length)];
+
+        const request = {
+            input: { text: cleanText },
+            voice: {
+                languageCode: (voice && voice.languageCode) || 'en-US',
+                name: (voice && voice.name) || randomVoice
+            },
+            audioConfig: {
+                audioEncoding: 'MP3',
+                speakingRate: speakingRate ?? 1.0,
+                pitch: pitch ?? 0.0
+            }
+        };
+
+        const [response] = await ttsClient.synthesizeSpeech(request);
+        
+        // Return as blob for legacy compatibility
+        res.set({
+            'Content-Type': 'audio/mpeg',
+            'Content-Length': response.audioContent.length
+        });
+        res.send(response.audioContent);
+    } catch (error) {
+        console.error('[TTS Legacy] Error:', error);
         res.status(500).json({ error: error.message });
     }
 });

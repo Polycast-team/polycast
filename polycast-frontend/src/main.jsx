@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
 import AppRouter from './AppRouter.jsx'
+import MobileShell from './components/MobileShell.jsx'
 import ProfileSelectorScreen from './components/ProfileSelectorScreen.jsx';
 import LanguageSelectorScreen from './components/LanguageSelectorScreen.jsx';
-import MobileApp from './mobile/MobileApp.jsx';
 import { shouldUseMobileApp } from './utils/deviceDetection.js';
 import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
 import './components/RoomSelectionScreen.css'; // Import styles
@@ -25,19 +24,18 @@ function Main() {
     setIsMobile(shouldUseMobileApp());
   }, []);
 
-  // If mobile device OR flashcard mode is forced, render mobile app instead
-  if (isMobile || forceFlashcardMobile) {
-    return <MobileApp />;
-  }
+  // Always render the unified responsive App; keep detection for future defaults only
 
-  // Host flow: clicking Host should immediately create a room and advance to language selection
+  // Host flow: clicking Host should immediately create a room and jump straight into transcript
   const handleHostClick = async () => {
     setIsLoading(true);
     setError('');
     try {
       const data = await apiService.postJson(apiService.createRoomUrl(), {});
+      // Directly enter App with host room setup and default language/profile
       setRoomSetup({ isHost: true, roomCode: data.roomCode });
-        
+      setSelectedLanguages(['English']);
+      setSelectedProfile('joshua');
     } catch (err) {
       console.error('Error creating room:', err);
       setError(`Failed to create room: ${err.message}`);
@@ -46,47 +44,33 @@ function Main() {
     }
   };
 
-  // Step 1: Choose Host or Join as Student
-  if (!roomSetup) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#23243a' }}>
-        <h1 style={{ color: '#f7f7fa', marginBottom: 12 }}>PolyCast</h1>
-        <div style={{ background: '#23243a', borderRadius: 16, boxShadow: '0 4px 18px 0 rgba(60, 60, 90, 0.09)', padding: 36, minWidth: 320, maxWidth: 420, textAlign: 'center' }}>
-          <h2 style={{ color: '#fff', marginBottom: 24 }}>Choose Your Role</h2>
-          <button onClick={handleHostClick} disabled={isLoading} style={{ margin: '0 0 18px 0', padding: '12px 32px', fontSize: 18, fontWeight: 700, borderRadius: 8, background: 'linear-gradient(90deg, #5f72ff 0%, #9a5cff 100%)', color: '#fff', border: 'none', cursor: 'pointer', width: '100%' }}>
-            {isLoading ? 'Creating Room...' : 'Host'}
-          </button>
-          <div style={{ margin: '18px 0', color: '#b3b3e7', fontWeight: 600 }}>or</div>
-          <button onClick={() => setRoomSetup({ isHost: false, needsLanguageSelection: true })} disabled={isLoading} style={{ margin: '0', padding: '12px 32px', fontSize: 18, fontWeight: 700, borderRadius: 8, background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', cursor: 'pointer', width: '100%' }}>
-            Student
-          </button>
-          {error && <div style={{ color: '#dc2626', marginTop: 12 }}>{error}</div>}
-        </div>
-      </div>
-    );
-  }
+  // If we reloaded after creating a room from inside the app (video->Host call), pick it up
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem('pc_pendingHostRoom');
+      if (pending && !roomSetup) {
+        setRoomSetup({ isHost: true, roomCode: pending });
+        setSelectedLanguages(['English']);
+        setSelectedProfile('joshua');
+        sessionStorage.removeItem('pc_pendingHostRoom');
+      }
+    } catch {}
+  }, [roomSetup]);
 
-  // Step 2: Language/Profile selection
-  if (roomSetup && !selectedLanguages) {
-    if (roomSetup.isHost) {
-      // Hosts see language selection screen
-      return <LanguageSelectorScreen 
-        onLanguageSelected={(languages) => {
-          setSelectedLanguages(languages);
-          setSelectedProfile('non-saving'); // Auto-assign default profile for hosts
-        }}
-      />;
-    } else {
-      // Students still see profile selection screen
-      return <ProfileSelectorScreen 
+  // Show login/profile selection first
+  if (!selectedProfile) {
+    return (
+      <ProfileSelectorScreen
         onProfileSelected={(languages, profile) => {
           setSelectedLanguages(languages);
           setSelectedProfile(profile);
         }}
         userRole="student"
-      />;
-    }
+      />
+    );
   }
+
+  // Always render the main app; users can host or join from within modes
 
   // Step 3: Main app
   const propsToPass = {
@@ -98,17 +82,16 @@ function Main() {
       setSelectedProfile(null);
       setForceFlashcardMobile(false); // Reset mobile mode when resetting
     },
-    roomSetup: roomSetup?.roomCode ? roomSetup : null, // Only pass room setup when there's a valid room code
-    userRole: roomSetup?.isHost ? 'host' : 'student',
+    roomSetup: roomSetup?.roomCode ? roomSetup : null, // Only pass room setup when valid
+    userRole: roomSetup?.isHost ? 'host' : null, // no fixed role prior to joining
     studentHomeLanguage: roomSetup?.isHost ? null : selectedLanguages?.[0],
     onJoinRoom: (roomCode) => {
-      // Update roomSetup to connect student to the room
-      setRoomSetup({ isHost: false, roomCode: roomCode });
+      setRoomSetup({ isHost: false, roomCode });
     },
-    onFlashcardModeChange: (isFlashcardMode) => {
-      // Force mobile mode when entering flashcard mode
-      setForceFlashcardMobile(isFlashcardMode);
+    onHostRoom: async () => {
+      await handleHostClick();
     },
+    onFlashcardModeChange: () => {},
     onProfileChange: (newProfile) => {
       // Update profile in main.jsx state and recalculate languages
       console.log('Profile change requested in main.jsx:', newProfile);
@@ -120,7 +103,11 @@ function Main() {
   
   console.log('Props being passed to AppRouter:', JSON.stringify(propsToPass, null, 2));
   
-  return (
+  return isMobile ? (
+    <MobileShell>
+      <AppRouter {...propsToPass} />
+    </MobileShell>
+  ) : (
     <AppRouter {...propsToPass} />
   );
 }

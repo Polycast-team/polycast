@@ -35,29 +35,25 @@ function handleWebSocketConnection(ws, req, heartbeat) {
     ws.isAlive = true;
     ws.on('pong', heartbeat);
 
-    // TODO: Parse room-specific WebSocket URL: /ws/room/:roomCode
-    // TODO: Extract room code from URL path instead of query parameters
-    // TODO: Validate room exists in activeRooms or Redis before allowing connection
-    // TODO: Handle host vs student role assignment based on room state
-    // TODO: Add room participant limit and access control
-    
-    // SIMPLIFIED: Direct connection without room routing
+    // Parse URL and query params
     const parsedUrl = url.parse(req.url, true);
     const query = parsedUrl.query;
+    const pathParts = (parsedUrl.pathname || '').split('/').filter(Boolean);
 
-    // DISABLED: Room validation logic
-    /*
+    // If a student tries to connect with a previously rejected code, fail fast
     if (query && query.roomCode && query.isHost === 'false' && rejectedRoomCodes.has(query.roomCode)) {
         console.log(`[Room] Immediately rejected student connection for known bad room code: ${query.roomCode}`);
-        ws.send(JSON.stringify({
-            type: 'room_error',
-            message: 'This room does not exist or has expired. Please check the code and try again.'
-        }));
+        try {
+            ws.send(JSON.stringify({
+                type: 'room_error',
+                message: 'This room does not exist or has expired. Please check the code and try again.'
+            }));
+        } catch {}
         ws.close();
         return;
     }
 
-    // Connection timeout handler
+    // Connection timeout handler - require a room join within 60s if a room path is used
     const joinRoomTimeout = setTimeout(() => {
         if (!clientRooms.has(ws) && ws.readyState === WebSocket.OPEN) {
             console.log('[Room] Closing connection - timed out waiting to join a room');
@@ -90,9 +86,12 @@ function handleWebSocketConnection(ws, req, heartbeat) {
         targetLangsArray = []; // Fallback to empty array
     }
 
-    // Room handling logic
-    if (query && query.roomCode) {
-        const roomCode = query.roomCode.toString().trim(); // Ensure string and trim
+    // Room handling logic - supports both query (?roomCode=) and path (/ws/room/:roomCode)
+    const roomCodeFromPath = (pathParts[0] === 'ws' && pathParts[1] === 'room' && pathParts[2]) ? pathParts[2] : null;
+    const incomingRoomCode = (query && query.roomCode) ? query.roomCode.toString().trim() : (roomCodeFromPath || '').toString().trim();
+    const hasRoom = !!incomingRoomCode;
+    if (hasRoom) {
+        const roomCode = incomingRoomCode;
         const isHost = query.isHost === 'true';
 
         // Validate room code format (5 digits)
@@ -122,10 +121,12 @@ function handleWebSocketConnection(ws, req, heartbeat) {
             } else {
                 console.log(`[Room] Rejected student - room not found: ${roomCode}`);
                 rejectedRoomCodes.add(roomCode);
-                ws.send(JSON.stringify({
-                    type: 'room_error',
-                    message: 'Room not found. Please check the code and try again.'
-                }));
+                try {
+                    ws.send(JSON.stringify({
+                        type: 'room_error',
+                        message: 'Room not found. Please check the code and try again.'
+                    }));
+                } catch {}
                 ws.close();
                 return;
             }
@@ -135,10 +136,12 @@ function handleWebSocketConnection(ws, req, heartbeat) {
                 // Check if there's already an active host
                 if (room.hostWs && room.hostWs.readyState === WebSocket.OPEN) {
                     console.log(`[Room] Rejected host - room ${roomCode} already has an active host`);
-                    ws.send(JSON.stringify({
-                        type: 'room_error',
-                        message: 'This room already has an active host.'
-                    }));
+                    try {
+                        ws.send(JSON.stringify({
+                            type: 'room_error',
+                            message: 'This room already has an active host.'
+                        }));
+                    } catch {}
                     ws.close();
                     return;
                 }
@@ -149,10 +152,12 @@ function handleWebSocketConnection(ws, req, heartbeat) {
                 const MAX_STUDENTS = 200; // Reasonable limit
                 if (room.students.length >= MAX_STUDENTS) {
                     console.log(`[Room] Rejected student - room ${roomCode} is full`);
-                    ws.send(JSON.stringify({
-                        type: 'room_error',
-                        message: 'This room is full. Please try again later.'
-                    }));
+                    try {
+                        ws.send(JSON.stringify({
+                            type: 'room_error',
+                            message: 'This room is full. Please try again later.'
+                        }));
+                    } catch {}
                     ws.close();
                     return;
                 }
@@ -189,14 +194,12 @@ function handleWebSocketConnection(ws, req, heartbeat) {
             console.error(`[Room] Error sending room_joined message:`, error);
         }
     }
-    */
 
     // TODO: Add room participant management and state tracking
     // TODO: Implement proper room joining/leaving with participant limits
     // TODO: Add room broadcast functionality for multi-user transcription
 
-    // Set client data
-    const targetLangsArray = []; // Simplified - no target languages for now
+    // Set client data (use targetLangsArray parsed above)
     clientTargetLanguages.set(ws, targetLangsArray);
     clientTextBuffers.set(ws, { text: '', lastEndTimeMs: 0 });
 
@@ -219,14 +222,7 @@ function handleWebSocketConnection(ws, req, heartbeat) {
 
     // Connection close handler
     ws.on('close', async () => {
-        // TODO: Add room cleanup logic when participants disconnect
-        // TODO: Handle host disconnection and room closure
-        // TODO: Notify remaining participants when someone leaves
-        // TODO: Save room state to Redis for persistence
         console.log('[WebSocket] Client disconnected');
-        
-        // DISABLED: Room cleanup logic
-        /*
         clearTimeout(joinRoomTimeout);
 
         // Clean up Deepgram streaming session if exists
@@ -247,8 +243,7 @@ function handleWebSocketConnection(ws, req, heartbeat) {
             if (room) {
                 if (isHost) {
                     console.log(`[Room] Host disconnected from room: ${roomCode}`);
-                    room.hostWs = null; // Clear the host reference
-                    console.log(`[Room] Keeping room ${roomCode} open even though host disconnected`);
+                    room.hostWs = null; // Keep room open, allow re-hosting
                     try {
                         await redisService.saveRoom(roomCode, room);
                     } catch (error) {
@@ -257,7 +252,6 @@ function handleWebSocketConnection(ws, req, heartbeat) {
                 } else {
                     console.log(`[Room] Student disconnected from room: ${roomCode}`);
                     room.students = room.students.filter(student => student !== ws);
-                    console.log(`[Room] Room ${roomCode} now has ${room.students.length} student(s)`);
                     try {
                         await redisService.saveRoom(roomCode, room);
                     } catch (error) {
@@ -267,8 +261,7 @@ function handleWebSocketConnection(ws, req, heartbeat) {
             }
             clientRooms.delete(ws);
         }
-        */
-        
+
         // Client cleanup
         clientTextBuffers.delete(ws);
         clientTargetLanguages.delete(ws);

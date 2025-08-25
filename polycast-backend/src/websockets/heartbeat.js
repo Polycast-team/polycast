@@ -1,6 +1,5 @@
 function heartbeat() {
     this.isAlive = true;
-    console.log('Received pong from client');
 }
 
 function setupHeartbeat(wss) {

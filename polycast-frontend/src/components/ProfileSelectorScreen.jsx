@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { PROFILE_LANGUAGE_MAP, getLanguageForProfile } from '../utils/profileLanguageMapping.js';
+import { PROFILE_LANGUAGE_MAP, getLanguageForProfile, validateCredentials } from '../utils/profileLanguageMapping.js';
 
 function ProfileSelectorScreen({ onProfileSelected, userRole }) {
-    const [selectedProfile, setSelectedProfile] = useState('cat');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [loginError, setLoginError] = useState('');
 
-    const handleSubmit = (event) => {
+    const handleLogin = (event) => {
         event.preventDefault();
-        if (selectedProfile) {
-            const language = getLanguageForProfile(selectedProfile);
-            // For hosts, return an array of languages; for students, return array with one language
-            onProfileSelected([language], selectedProfile);
+        setLoginError('');
+        
+        const result = validateCredentials(username, password);
+        if (result.ok) {
+            const language = getLanguageForProfile(result.profileKey);
+            onProfileSelected([language], result.profileKey);
         } else {
-            alert('Please select a profile.');
+            setLoginError(result.error);
         }
-    };
-
-    const handleProfileSelect = (profile) => {
-        setSelectedProfile(profile);
     };
 
     return (
@@ -39,67 +39,90 @@ function ProfileSelectorScreen({ onProfileSelected, userRole }) {
                 maxWidth: 500, 
                 textAlign: 'center' 
             }}>
-                <h2 style={{ color: '#fff', marginBottom: 12 }}>Select Your Profile</h2>
-                <p style={{ color: '#b3b3e7', marginBottom: 24, fontSize: 14 }}>
-                    Each profile corresponds to a target language
-                </p>
+                <h2 style={{ color: '#fff', marginBottom: 12 }}>Welcome to PolyCast</h2>
                 
-                <form onSubmit={handleSubmit}>
-                    <div style={{ marginBottom: 24 }}>
-                        <div style={{ 
-                            display: 'grid', 
-                            gridTemplateColumns: 'repeat(2, 1fr)', 
-                            gap: 12, 
-                            marginBottom: 16 
-                        }}>
-                            {Object.entries(PROFILE_LANGUAGE_MAP).map(([profile, language]) => (
-                                <button
-                                    key={profile}
-                                    type="button"
-                                    onClick={() => handleProfileSelect(profile)}
-                                    style={{
-                                        padding: '16px 12px',
-                                        fontSize: 14,
-                                        borderRadius: 8,
-                                        border: selectedProfile === profile ? '2px solid #10b981' : '1px solid #444',
-                                        background: selectedProfile === profile ? '#10b981' : '#444',
-                                        color: '#fff',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        gap: 4
-                                    }}
-                                >
-                                    <div style={{ fontWeight: 'bold', textTransform: 'capitalize' }}>
-                                        {profile}
-                                    </div>
-                                    <div style={{ fontSize: 12, opacity: 0.8 }}>
-                                        {language}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
+                {/* Login Form */}
+                <form onSubmit={handleLogin} style={{ marginBottom: 32 }}>
+                    <h3 style={{ fontSize: 18, fontWeight: 500, marginBottom: 16, color: '#fff' }}>
+                        Login
+                    </h3>
+                    
+                    <div style={{ marginBottom: 16 }}>
+                        <input
+                            type="text"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                fontSize: 14,
+                                borderRadius: 8,
+                                border: '1px solid #444',
+                                background: '#333',
+                                color: '#fff',
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                            }}
+                            placeholder="Username"
+                            required
+                        />
                     </div>
+                    
+                    <div style={{ marginBottom: 16 }}>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                fontSize: 14,
+                                borderRadius: 8,
+                                border: '1px solid #444',
+                                background: '#333',
+                                color: '#fff',
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                            }}
+                            placeholder="Password"
+                            required
+                        />
+                    </div>
+                    
+                    {loginError && (
+                        <div style={{ 
+                            color: '#ef4444', 
+                            fontSize: 12, 
+                            marginBottom: 16,
+                            padding: '8px',
+                            backgroundColor: '#2d1b1b',
+                            borderRadius: 6,
+                            border: '1px solid #444'
+                        }}>
+                            {loginError}
+                        </div>
+                    )}
                     
                     <button 
                         type="submit"
                         style={{ 
-                            padding: '12px 32px', 
-                            fontSize: 18, 
-                            fontWeight: 700, 
+                            padding: '12px 24px', 
+                            fontSize: 16, 
+                            fontWeight: 600, 
                             borderRadius: 8, 
                             background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)', 
                             color: '#fff', 
                             border: 'none', 
                             cursor: 'pointer',
-                            width: '100%'
+                            width: '100%',
+                            marginBottom: 16
                         }}
                     >
-                        Continue
+                        Login
                     </button>
                 </form>
+                
+
             </div>
         </div>
     );

@@ -6,27 +6,34 @@ import './App.css'
 
 // Import planned components (will be created next)
 import AudioRecorder from './components/AudioRecorder';
-import Controls from './components/Controls';
+import HostToolbar from './components/HostToolbar';
 
 import TranscriptionDisplay from './components/TranscriptionDisplay';
 import DictionaryTable from './components/DictionaryTable';
 import FlashcardMode from './components/FlashcardMode';
+import FlashcardCalendarModal from './components/shared/FlashcardCalendarModal';
+import { useFlashcardCalendar } from './hooks/useFlashcardCalendar';
+import VideoMode from './components/VideoMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
-import { getLanguageForProfile, getTranslationsForProfile } from './utils/profileLanguageMapping.js';
+import { getLanguageForProfile, getTranslationsForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from './utils/profileLanguageMapping.js';
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
+import { createFlashcardEntry } from './components/FixedCardDefinitions';
+import { extractSentenceWithWord, markClickedWordInSentence } from './utils/wordClickUtils';
+import ModeSelector from './components/ModeSelector';
 
 
 
 // App now receives an array of target languages and room setup as props
-function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onFlashcardModeChange, onProfileChange }) {
+function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onHostRoom, onFlashcardModeChange, onProfileChange }) {
   // Debug logging
   console.log('App component received props:', { targetLanguages, selectedProfile, roomSetup, userRole, studentHomeLanguage });
   
   // Get translations for this profile's language
   const t = getTranslationsForProfile(selectedProfile);
+  const ui = getUITranslationsForProfile(selectedProfile);
   
   // Step 1: Use selectedProfile from props, with fallback to non-saving
   const [internalSelectedProfile, setSelectedProfile] = React.useState(selectedProfile || 'non-saving');
@@ -40,10 +47,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Function to fetch profile data from backend
   const fetchProfileData = useCallback(async (profile) => {
     if (profile === 'non-saving') {
-      // Clear existing data for non-saving mode
-      setWordDefinitions({});
-      setSelectedWords([]);
-      console.log('Switched to non-saving mode. Cleared flashcards and highlighted words.');
+      // In non-saving mode, keep current (localStorage-backed) state as-is
+      console.log('Non-saving mode: using local state/localStorage for dictionary data.');
       return;
     }
     
@@ -51,7 +56,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     // TODO: Generate unique 5-digit room code and store in backend
     // TODO: Create room state management for tracking participants
     // TODO: Handle room persistence across server restarts with Redis
-    showTBA('Profile data is currently unavailable. See non-saving mode for example usage.');
+    // For now, all profiles use localStorage data
     return;
 
     try {
@@ -110,43 +115,40 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // TODO: Add room-specific WebSocket routing: ws://localhost:8080/ws/room/:roomCode with room parameters
   // TODO: Parse room code from roomSetup and validate room exists before connecting
   // TODO: Include targetLangs, roomCode, and isHost parameters in WebSocket URL for room management
-  const socketUrl = roomSetup ? apiService.roomWebSocketUrl(languagesQueryParam, roomSetup.roomCode, roomSetup.isHost) : null;
+  // Always provide a websocket endpoint so students can stream without a room
+  const socketUrl = roomSetup
+    ? apiService.roomWebSocketUrl(languagesQueryParam, roomSetup.roomCode, roomSetup.isHost)
+    : `${apiService.wsBaseUrl}/ws`;
   console.log("Constructed WebSocket URL:", socketUrl);
 
-  const [messageHistory, setMessageHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
   const [fullTranscript, setFullTranscript] = useState('');
   const [currentPartial, setCurrentPartial] = useState(''); 
+  const [transcriptBlocks, setTranscriptBlocks] = useState([]); // [{speaker:'host'|'student', lines: string[], partial: string}]
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   const [errorMessages, setErrorMessages] = useState([]); 
-  const [showLiveTranscript, setShowLiveTranscript] = useState(true); 
-  const [showTranslation, setShowTranslation] = useState(targetLanguages && targetLanguages.length > 0); 
+  
   // Students start in flashcard mode, hosts start in audio mode
-  const [appMode, setAppMode] = useState(() => {
-    // If student not in a room, start in flashcard mode
-    if (userRole === 'student' && !roomSetup) {
-      return 'flashcard';
-    }
-    // Otherwise start in audio mode (hosts or students in rooms)
-    return 'audio';
-  }); // Options: 'audio', 'dictionary', 'flashcard'
-  const [selectedWords, setSelectedWords] = useState([]); // Selected words for dictionary
-  const [wordDefinitions, setWordDefinitions] = useState({}); // Cache for word definitions
+  const [appMode, setAppMode] = useState('audio'); // Options: 'audio', 'dictionary', 'flashcard', 'video'
+  const [selectedWords, setSelectedWords] = useState([]); // Profile-scoped selected words
+  const [wordDefinitions, setWordDefinitions] = useState({}); // Profile-scoped word definitions
   const [showNotification, setShowNotification] = useState(false);
   const [notificationOpacity, setNotificationOpacity] = useState(1);
+  const [isAddingWordBusy, setIsAddingWordBusy] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [toolbarStats, setToolbarStats] = useState({ newCards: 0, learningCards: 0, reviewCards: 0 });
+  const [signalLog, setSignalLog] = useState([]); // recent signaling/debug events
   // Auto-send functionality removed - using manual Record/Stop button instead
   const notificationTimeoutRef = useRef(null);
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
   const { error: popupError, showError, clearError } = useErrorHandler();
   const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
+  // WebRTC signaling dispatch with queueing to avoid race with VideoMode mount
+  const webrtcSignalHandlerRef = useRef(null);
+  const pendingWebrtcSignalsRef = useRef([]);
 
 
-  // Ensure mutual exclusivity between transcript and translation checkboxes
-  useEffect(() => {
-    if (!showLiveTranscript && !showTranslation) {
-      setShowTranslation(true);
-    }
-  }, [showLiveTranscript, showTranslation]);
+  // Toggle behavior disabled while translation UI is hidden
 
   // Update refs when state changes
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
@@ -171,53 +173,298 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     return () => window.removeEventListener("keydown", handlePageKey);
   }, [roomSetup]); // Reverted dependencies
 
-  // Ensure recording stops if appMode changes from 'audio'
+  // Load and migrate profile-scoped dictionary/flashcards when profile changes
   useEffect(() => {
-    if (appMode !== 'audio' && isRecording) {
+    const profile = selectedProfile || internalSelectedProfile;
+    if (!profile) return;
+    try {
+      const swKey = `pc_selectedWords_${profile}`;
+      const wdKey = `pc_wordDefinitions_${profile}`;
+
+      // Migrate from legacy global keys if present
+      const legacySW = localStorage.getItem('pc_selectedWords');
+      const legacyWD = localStorage.getItem('pc_wordDefinitions');
+
+      if (!localStorage.getItem(swKey) && legacySW) {
+        localStorage.setItem(swKey, legacySW);
+        try { localStorage.removeItem('pc_selectedWords'); } catch {}
+      }
+      if (!localStorage.getItem(wdKey) && legacyWD) {
+        localStorage.setItem(wdKey, legacyWD);
+        try { localStorage.removeItem('pc_wordDefinitions'); } catch {}
+      }
+
+      // Read scoped values
+      const storedSW = localStorage.getItem(swKey);
+      const storedWD = localStorage.getItem(wdKey);
+
+      const parsedSW = storedSW ? JSON.parse(storedSW) : [];
+      const parsedWD = storedWD ? JSON.parse(storedWD) : {};
+
+      // Clean broken entries for safety
+      const cleanedWD = {};
+      Object.entries(parsedWD || {}).forEach(([key, entry]) => {
+        if (!entry || !entry.wordSenseId) return;
+        if (!entry.exampleSentencesGenerated) return;
+        cleanedWD[key] = entry;
+      });
+
+      setSelectedWords(Array.isArray(parsedSW) ? parsedSW : []);
+      setWordDefinitions(cleanedWD);
+
+      // Persist cleaned snapshot back to scoped storage if changed
+      try { localStorage.setItem(wdKey, JSON.stringify(cleanedWD)); } catch {}
+    } catch (e) {
+      console.warn('Failed to load/migrate profile-scoped dictionary data:', e);
+      setSelectedWords([]);
+      setWordDefinitions({});
+    }
+  }, [selectedProfile, internalSelectedProfile]);
+
+  // Persist dictionary state to profile-scoped localStorage
+  useEffect(() => {
+    const profile = selectedProfile || internalSelectedProfile;
+    if (!profile) return;
+    try { localStorage.setItem(`pc_selectedWords_${profile}`, JSON.stringify(selectedWords)); } catch {}
+  }, [selectedWords, selectedProfile, internalSelectedProfile]);
+  useEffect(() => {
+    const profile = selectedProfile || internalSelectedProfile;
+    if (!profile) return;
+    try { localStorage.setItem(`pc_wordDefinitions_${profile}`, JSON.stringify(wordDefinitions)); } catch {}
+  }, [wordDefinitions, selectedProfile, internalSelectedProfile]);
+
+  // Global listener to open/close the flashcard calendar from any mode
+  useEffect(() => {
+    const handler = (e) => {
+      const detail = e && e.detail;
+      if (detail === true) setShowCalendar(true);
+      else if (detail === false) setShowCalendar(false);
+      else setShowCalendar(prev => !prev);
+    };
+    window.addEventListener('toggleFlashcardCalendar', handler);
+    return () => window.removeEventListener('toggleFlashcardCalendar', handler);
+  }, []);
+
+  // Listen for live toolbar stats from FlashcardMode
+  useEffect(() => {
+    const onStats = (e) => {
+      if (e && e.detail) {
+        const { newCards = 0, learningCards = 0, reviewCards = 0 } = e.detail;
+        setToolbarStats({ newCards, learningCards, reviewCards });
+      }
+    };
+    window.addEventListener('updateToolbarStats', onStats);
+    return () => window.removeEventListener('updateToolbarStats', onStats);
+  }, []);
+
+  // One-time cleanup: remove any flashcard entries missing exampleSentencesGenerated
+  useEffect(() => {
+    try {
+      const entries = wordDefinitions || {};
+      const hasBroken = Object.values(entries).some(e => e && e.inFlashcards && !e.exampleSentencesGenerated);
+      if (!hasBroken) return;
+      const cleaned = {};
+      Object.entries(entries).forEach(([key, entry]) => {
+        if (entry && (!entry.inFlashcards || entry.exampleSentencesGenerated)) {
+          cleaned[key] = entry;
+        }
+      });
+      setWordDefinitions(cleaned);
+      const uniqueWords = Array.from(new Set(Object.values(cleaned).filter(e => e && e.inFlashcards).map(e => e.word)));
+      setSelectedWords(uniqueWords);
+    } catch {}
+  }, []);
+
+  // Local handler to add a word to dictionary (flashcard entry in local state)
+  const handleAddWord = useCallback(async (word) => {
+    const wordLower = (word || '').toLowerCase();
+    const nativeLanguage = getNativeLanguageForProfile(selectedProfile || internalSelectedProfile);
+    const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
+    
+    // Extract sentence and mark the word with tildes
+    const sentence = extractSentenceWithWord(fullTranscript || '', wordLower);
+    // For Add Word flow, we mark the first occurrence since user is adding from menu
+    const sentenceWithMarkedWord = sentence.replace(
+      new RegExp(`\\b(${wordLower})\\b`, 'i'),
+      '~$1~'
+    );
+
+    console.log(`🎯 [handleAddWord] Using UNIFIED API for word: "${wordLower}"`);
+    console.log(`🎯 [handleAddWord] Sentence with marked word:`, sentenceWithMarkedWord);
+
+    const requestUrl = apiService.getUnifiedWordDataUrl(
+      wordLower,
+      sentenceWithMarkedWord,
+      nativeLanguage,
+      targetLanguage
+    );
+    console.log(`🌐 [handleAddWord] Unified API Request URL:`, requestUrl);
+
+    try {
+      setIsAddingWordBusy(true);
+      
+      // Single unified API call for all word data
+      const unifiedData = await apiService.fetchJson(requestUrl);
+      console.log(`🌐 [handleAddWord] Unified API Response:`, unifiedData);
+
+      // Count existing senses for numbering
+      const existingSenses = Object.values(wordDefinitions).filter(
+        (e) => e && e.inFlashcards && e.word === wordLower
+      );
+      const definitionNumber = existingSenses.length + 1;
+      const wordSenseId = `${wordLower}-${Date.now()}`;
+
+      // Create flashcard entry using unified data
+      const entry = createFlashcardEntry(
+        wordLower,
+        wordSenseId,
+        unifiedData.exampleForDictionary || unifiedData.example || '',
+        unifiedData.definition || wordLower,
+        '',
+        definitionNumber
+      );
+
+      // Enrich with all unified data
+      const enriched = {
+        ...entry,
+        translation: unifiedData.translation || '',
+        example: unifiedData.exampleForDictionary || unifiedData.example || '',
+        contextSentence: unifiedData.exampleForDictionary || unifiedData.example || '', // For compatibility
+        frequency: unifiedData.frequency || 5,
+        exampleSentencesGenerated: unifiedData.exampleSentencesGenerated || ''
+      };
+
+      console.log(`📝 [handleAddWord] Final entry structure from unified API:`, enriched);
+      console.log(`📝 [handleAddWord] Entry has required fields:`, {
+        inFlashcards: !!enriched.inFlashcards,
+        wordSenseId: !!enriched.wordSenseId,
+        word: !!enriched.word
+      });
+
+      setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
+      setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
+      
+      console.log(`✅ [handleAddWord] Successfully added word using unified API: ${wordLower}`);
+      return enriched;
+    } catch (err) {
+      console.error('Unified API failed:', err);
+      showError(`Failed to add word: ${err.message}`);
+      return null;
+    } finally { 
+      setIsAddingWordBusy(false); 
+    }
+  }, [wordDefinitions, fullTranscript, selectedProfile, internalSelectedProfile, showError]);
+
+  // New: add multiple senses at once (from AddWordPopup)
+  const handleAddWordSenses = useCallback((word, senses) => {
+    const wordLower = (word || '').toLowerCase();
+    const nativeLanguage = getNativeLanguageForProfile(selectedProfile || internalSelectedProfile);
+    const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
+    const contextSentence = fullTranscript || '';
+
+    const baseCount = Object.values(wordDefinitions).filter(
+      (e) => e && e.inFlashcards && e.word === wordLower
+    ).length;
+
+    setIsAddingWordBusy(true);
+    const promises = senses.map(async (sense, idx) => {
+      const definitionNumber = baseCount + idx + 1;
+      const wordSenseId = `${wordLower}-${Date.now()}-${idx}`;
+      
+      // Use the unified API to get complete word data including examples
+      const sentenceWithMarkedWord = sense?.example || `~${wordLower}~`;
+      
+      try {
+        const url = apiService.getUnifiedWordDataUrl(
+          wordLower,
+          sentenceWithMarkedWord,
+          nativeLanguage,
+          targetLanguage
+        );
+        
+        const unifiedData = await apiService.fetchJson(url);
+        
+        // Create enriched entry with unified data
+        const entry = createFlashcardEntry(
+          wordLower,
+          wordSenseId,
+          sentenceWithMarkedWord,
+          unifiedData.definition || sense?.definition || wordLower,
+          '',
+          definitionNumber
+        );
+        
+        const enriched = {
+          ...entry,
+          translation: unifiedData.translation || sense?.translation || '',
+          example: unifiedData.exampleForDictionary || sense?.example || '',
+          contextSentence: sentenceWithMarkedWord,
+          frequency: unifiedData.frequency || Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
+          exampleSentencesGenerated: unifiedData.exampleSentencesGenerated || ''
+        };
+        
+        setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
+      } catch (err) {
+        console.error('Failed to get unified word data for sense:', err);
+        // Fallback to basic entry without examples
+        const entry = createFlashcardEntry(
+          wordLower,
+          wordSenseId,
+          sense?.example || '',
+          sense?.definition || wordLower,
+          '',
+          definitionNumber
+        );
+        
+        const enriched = {
+          ...entry,
+          translation: sense?.translation || '',
+          example: sense?.example || '',
+          contextSentence: sense?.example || '',
+          frequency: Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
+          exampleSentencesGenerated: ''
+        };
+        
+        setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
+      }
+    });
+    
+    setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
+    Promise.allSettled(promises).finally(() => setIsAddingWordBusy(false));
+  }, [wordDefinitions, fullTranscript, selectedProfile, internalSelectedProfile]);
+
+  // Ensure recording stops when leaving modes that support streaming
+  useEffect(() => {
+    if (appMode !== 'audio' && appMode !== 'video' && isRecording) {
       setIsRecording(false);
     }
   }, [appMode, isRecording]);
 
-  // Auto-switch modes for students based on room status
+  // Auto-unmute when entering Video mode (host only)
   useEffect(() => {
-    if (userRole === 'student') {
-      if (roomSetup) {
-        // Student joined a room → switch to audio mode (transcript view)
-        if (appMode === 'flashcard') {
-          setAppMode('audio');
-        }
-      } else {
-        // Student not in a room → switch to flashcard mode
-        if (appMode === 'audio') {
-          setAppMode('flashcard');
-        }
-      }
+    if (appMode === 'video' && roomSetup && roomSetup.isHost) {
+      const id = setTimeout(() => setIsRecording(true), 50);
+      return () => clearTimeout(id);
+    } else if (appMode === 'video' && roomSetup && !roomSetup.isHost) {
+      // Ensure students are muted on entry
+      setIsRecording(false);
     }
-  }, [roomSetup, userRole, appMode]);
+  }, [appMode, roomSetup]);
+
+  // No role-based auto mode switching
 
   // Join Room handler for students
   const handleJoinRoom = async () => {
-    // TODO: Add room code validation via GET /api/check-room/:code
-    // TODO: Validate room exists and is accepting new students
-    // TODO: Handle room joining with proper error handling and state management
-    // TODO: Update app state to join room and switch to student mode
-    // TODO: Establish WebSocket connection to specific room
-    
-    setJoinRoomError('Room joining functionality will be added in a future update');
-    return;
-    
-    // DISABLED: Room joining logic
-    /*
     const cleanedRoomCode = joinRoomCode.replace(/[^0-9]/g, '').trim();
-    
+
     if (cleanedRoomCode.length !== 5) {
       setJoinRoomError(t.enterRoomCode + ' (5 digits)');
       return;
     }
-    
+
     setIsJoiningRoom(true);
     setJoinRoomError('');
-    
+
     try {
       const data = await apiService.fetchJson(apiService.checkRoomUrl(cleanedRoomCode));
       console.log('Join room response:', data);
@@ -225,8 +472,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       if (!data.exists) {
         throw new Error(data.message || 'Room not found');
       }
-      
-      // Join the room by updating the app state
+
       if (onJoinRoom) {
         onJoinRoom(cleanedRoomCode);
         setShowJoinRoomModal(false);
@@ -238,9 +484,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     } catch (error) {
       console.error('Error joining room:', error);
       setJoinRoomError(`Failed to join room: ${error.message}`);
+    } finally {
       setIsJoiningRoom(false);
     }
-    */
   };
 
   // Track reconnection attempts and invalid room state
@@ -253,6 +499,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     skip: !socketUrl,
     onOpen: () => {
       console.log('WebSocket connection opened with URL:', socketUrl);
+      setSignalLog(prev => [`ws: open ${socketUrl}`, ...prev].slice(0, 10));
       // Reset reconnection attempts on successful connection
       setReconnectAttempts(0);
       
@@ -263,9 +510,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     },
     onClose: () => {
       console.log('WebSocket connection closed');
+      setSignalLog(prev => ['ws: close', ...prev].slice(0, 10));
     },
     onError: (event) => {
       console.error('WebSocket error:', event);
+      setSignalLog(prev => [`ws: error ${event?.type || ''}`, ...prev].slice(0, 10));
       setErrorMessages(prev => [...prev, `WebSocket error: ${event.type}`]);
     },
     // Only reconnect if we haven't exceeded max attempts and the room is not invalid
@@ -326,19 +575,36 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             fullLength: parsedData.text?.length
           });
           
+          const speaker = parsedData.speaker || 'host';
+
+          // Maintain grouped transcript blocks by speaker
+          setTranscriptBlocks(prev => {
+            const blocks = [...prev];
+            const last = blocks[blocks.length - 1];
+            if (!last || last.speaker !== speaker) {
+              blocks.push({ speaker, lines: [], partial: '' });
+            }
+            const idx = blocks.length - 1;
+            if (parsedData.isInterim) {
+              blocks[idx].partial = parsedData.text || '';
+            } else {
+              const text = parsedData.text || '';
+              if (text.trim()) blocks[idx].lines.push(text);
+              blocks[idx].partial = '';
+            }
+            return blocks.slice(-100); // cap history
+          });
+
+          // Keep legacy concatenated transcript for compatibility
           if (parsedData.isInterim) {
-            // Update partial transcript with interim results
             setCurrentPartial(parsedData.text);
           } else {
-            // Append finalized text and clear partial
             setFullTranscript(prev => {
               const newText = prev + (prev && !prev.endsWith(' ') ? ' ' : '') + parsedData.text;
               console.log('[Frontend] Updated full transcript, new length:', newText.length);
               return newText;
             });
             setCurrentPartial('');
-            
-            // For students: generate their own translation when receiving host's final transcript
             if (userRole === 'student' && studentHomeLanguage && parsedData.text) {
               console.log(`Student generating ${studentHomeLanguage} translation for: "${parsedData.text}"`);
               generateStudentTranslation(parsedData.text, studentHomeLanguage);
@@ -358,7 +624,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           setTimeout(() => onReset(), 1000); // Go back to home screen after 1 second
         } else if (parsedData.type === 'info') {
           console.log('Backend Info:', parsedData.message);
-          // Optionally display info messages somewhere
+          setSignalLog(prev => [`info: ${parsedData.message}`, ...prev].slice(0, 10));
         } else if (parsedData.type === 'translation') {
           // Handle single translation (non-batch)
           setTranslations(prevTranslations => {
@@ -390,6 +656,23 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             }
             return newTranslations;
           });
+        } else if (
+          parsedData.type === 'webrtc_offer' ||
+          parsedData.type === 'webrtc_answer' ||
+          parsedData.type === 'webrtc_ice'
+        ) {
+          const handler = webrtcSignalHandlerRef.current;
+          try {
+            const summary = parsedData.type === 'webrtc_ice'
+              ? `ice: ${parsedData?.candidate?.candidate?.slice(0, 28) || 'candidate'}`
+              : `${parsedData.type.replace('webrtc_', '')}`;
+            setSignalLog(prev => [`rtc: ${summary}`, ...prev].slice(0, 10));
+          } catch (_) {}
+          if (handler) {
+            try { handler(parsedData); } catch (e) { console.warn('Failed to handle webrtc signal via handler:', e); }
+          } else {
+            pendingWebrtcSignalsRef.current.push(parsedData);
+          }
         } else {
             console.warn('Received unknown message type:', parsedData.type);
         }
@@ -400,20 +683,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         // setMessageHistory((prev) => prev.concat(lastMessage));
       }
     }
-  }, [lastMessage, showLiveTranscript]); // Update dependency array
+  }, [lastMessage]); // Update dependency array
 
-  // Listen for toggleLiveTranscript event from Controls
-  useEffect(() => {
-    function handler(e) { setShowLiveTranscript(!!e.detail); }
-    window.addEventListener('toggleLiveTranscript', handler);
-    return () => window.removeEventListener('toggleLiveTranscript', handler);
-  }, []);
-
-  // Provide a global getter for Controls to read the toggle state
-  useEffect(() => {
-    window.showLiveTranscript = () => showLiveTranscript;
-    return () => { delete window.showLiveTranscript; };
-  }, [showLiveTranscript]);
+  
 
   // Handlers for recording controls (passed down to components that need to send audio)
   const handleStartRecording = useCallback(() => {
@@ -448,6 +720,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Handle app mode changes from dropdown menu
   const handleAppModeChange = useCallback((newMode) => {
     console.log(`Mode change requested: ${appMode} → ${newMode}`);
+    
+    // Automatically stop recording when switching modes
+    if (isRecording && newMode !== 'audio' && newMode !== 'video') {
+      console.log('Automatically stopping recording due to mode change');
+      setIsRecording(false);
+    }
+    
     if (newMode === 'dictionary') {
       // Just update local state for dictionary mode
       console.log('Setting mode to dictionary (local only)');
@@ -460,8 +739,12 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       // Just update local state for audio mode
       console.log('Setting mode to audio (local only)');
       setAppMode('audio');
+    } else if (newMode === 'video') {
+      // Update to video mode
+      console.log('Setting mode to video (local only)');
+      setAppMode('video');
     }
-  }, [appMode]);
+  }, [appMode, isRecording]);
 
   // Get connection status string
   const connectionStatus = {
@@ -481,8 +764,78 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     };
   }, []);
 
+  // Calendar queue (available globally so it works in both dictionary and flashcard modes)
+  const { queue, reorderQueue } = useFlashcardCalendar(
+    [],
+    wordDefinitions,
+    [],
+    selectedProfile || internalSelectedProfile,
+    [],
+    0
+  );
+
+  // Open join modal when classroom tapped from toolbar
+  useEffect(() => {
+    const open = () => setShowJoinRoomModal(true);
+    window.addEventListener('openJoinRoom', open);
+    return () => window.removeEventListener('openJoinRoom', open);
+  }, []);
+
+  // Track bottom toolbar height to keep transcript 10px above it
+  useEffect(() => {
+    const el = () => document.getElementById('pc-bottom-toolbar');
+    function updateVar() {
+      const h = el()?.offsetHeight || 72;
+      document.documentElement.style.setProperty('--bottom-toolbar-h', `${h}px`);
+    }
+    updateVar();
+    window.addEventListener('resize', updateVar);
+    const mo = new MutationObserver(updateVar);
+    const node = el();
+    if (node) mo.observe(node, { attributes: true, childList: true, subtree: true });
+    const id = setInterval(updateVar, 250);
+    return () => { window.removeEventListener('resize', updateVar); mo.disconnect(); clearInterval(id); };
+  }, []);
+
   return (
     <div className="App">
+      {/* Debug overlay removed */}
+      {/* Fullscreen button - upper left corner for all modes */}
+      <button
+        onClick={() => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+          } else {
+            document.exitFullscreen();
+          }
+        }}
+        style={{
+          position: 'fixed',
+          top: '20px',
+          left: '20px',
+          zIndex: 1001,
+          background: 'rgba(35, 35, 58, 0.9)',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          width: 44,
+          height: 44,
+          fontSize: 20,
+          fontWeight: 700,
+          cursor: 'pointer',
+          transition: 'background 0.2s',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+        }}
+        aria-label="Toggle Full Screen"
+        title="Full Screen (F11)"
+      >
+        <span>⛶</span>
+      </button>
+
       {/* Header container with logo and room code */}
       <div style={{
         display: 'flex',
@@ -515,168 +868,127 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           Polycast
         </h1>
         
-        {/* Right side - room code or spacer */}
-        <div style={{ width: '200px', display: 'flex', justifyContent: 'flex-end' }}>
-          {roomSetup && (
-            <div 
-              className="room-info-display" 
-              style={{
-                color: '#fff',
-                fontSize: '1rem',
-                fontWeight: 600,
-                padding: '8px 16px',
-                borderRadius: '8px',
-                background: roomSetup.isHost ? 'rgba(59, 130, 246, 0.6)' : 'rgba(16, 185, 129, 0.6)',
-              }}
-            >
-              {roomSetup?.isHost ? `Room: ${roomSetup?.roomCode || 'Not Connected'}` : `Student • Room: ${roomSetup?.roomCode || 'Not Connected'}`}
-            </div>
-          )}
-        </div>
+        {/* Right side spacer only; colored room pill moved to top-right header */}
+        <div style={{ width: '200px' }} />
       </div>
-      <div className="controls-container" style={{ marginBottom: 4 }}>
-        {/* Main Toolbar */}
-        <div className="main-toolbar" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch', marginBottom: 0 }}>
-          {/* Recording indicator for audio mode */}
-          {appMode === 'audio' && isRecording && (
-            <div style={{
-              position: 'absolute',
-              top: 100,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              color: '#ff5733',
-              fontWeight: 'bold',
-              fontSize: '1.1rem',
-              textShadow: '0 1px 3px #fff',
-              pointerEvents: 'none',
-              letterSpacing: 0.2,
-              opacity: 0.98,
-              zIndex: 2,
-            }}>
-              Recording...
-            </div>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            {/* Audio recorder for hosts in audio mode */}
-            {appMode === 'audio' && roomSetup && roomSetup.isHost && (
+      {/* Top toolbar: show in audio mode (available pre-room too) */}
+      {appMode === 'audio' && (
+        <div className="controls-container" style={{ marginBottom: 4 }}>
+          <div className="main-toolbar" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch', marginBottom: 0 }}>
+            {isRecording && (
+              <div style={{
+                position: 'absolute',
+                top: 100,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                color: '#ff5733',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                textShadow: '0 1px 3px #fff',
+                pointerEvents: 'none',
+                letterSpacing: 0.2,
+                opacity: 0.98,
+                zIndex: 2,
+              }}>
+                {ui.recording}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
               <AudioRecorder
                 sendMessage={sendMessage}
                 isRecording={isRecording}
                 onAudioSent={onAudioSent}
               />
-            )}
-          </div>
-          <Controls
-            showTBA={showTBA}
-            readyState={readyState}
-            isRecording={isRecording}
-            onStartRecording={roomSetup && roomSetup.isHost ? handleStartRecording : null}
-            onStopRecording={roomSetup && roomSetup.isHost ? handleStopRecording : null}
-            appMode={appMode}
-            setAppMode={handleAppModeChange}
-            showLiveTranscript={showLiveTranscript}
-            setShowLiveTranscript={(checked) => {
-              setShowLiveTranscript(checked);
-              if (!checked && !showTranslation) setShowTranslation(true);
-            }}
-            showTranslation={showTranslation}
-            setShowTranslation={(checked) => {
-              setShowTranslation(checked);
-              if (!checked && !showLiveTranscript) setShowLiveTranscript(true);
-            }}
-            roomSetup={roomSetup}
-            selectedProfile={selectedProfile || internalSelectedProfile}
-            setSelectedProfile={profile => {
-              console.log('Profile switched to:', profile);
-              if (onProfileChange) {
-                onProfileChange(profile);
-              } else {
-                // Fallback for when no callback is provided
-                setSelectedProfile(profile);
-              }
-            }}
-            userRole={userRole}
-          />
-          {/* User instructions for hosts in audio mode - removed */}
-          {/* User instructions for students in audio mode */}
-          {appMode === 'audio' && roomSetup && !roomSetup.isHost && (
-            <div style={{
-              marginTop: -45,
-              marginBottom: 0,
-              width: '100%',
-              textAlign: 'center',
-              color: '#10b981',
-              fontWeight: 600,
-              fontSize: '1.05rem',
-              letterSpacing: 0.1,
-              textShadow: '0 1px 2px #2228',
-              opacity: 0.96,
-              userSelect: 'none',
-            }}>
-              Viewing host's transcription in real-time • <span style={{ color: '#ffb84d' }}>Click words to add to dictionary</span>
             </div>
-          )}
-        </div>
-      </div>
-      
-      {/* Header with room buttons - positioned above toolbar */}
-      <div style={{ 
-        position: 'absolute', 
-        top: '20px', 
-        right: '20px', 
-        zIndex: 100,
-        display: 'flex',
-        gap: '8px',
-        alignItems: 'center'
-      }}>
-        {/* Show role indicator only for students */}
-        {roomSetup && !roomSetup.isHost && (
-          <div style={{ 
-            fontSize: 14, 
-            color: '#fff', 
-            marginRight: 16,
-            background: 'rgba(0,0,0,0.3)',
-            padding: '8px 12px',
-            borderRadius: 4
-          }}>
-            <span>Student</span>
+            <HostToolbar
+              showTBA={showTBA}
+              readyState={readyState}
+              isRecording={isRecording}
+              onStartRecording={handleStartRecording}
+              onStopRecording={handleStopRecording}
+              appMode={appMode}
+              setAppMode={handleAppModeChange}
+              toolbarStats={toolbarStats}
+              showLiveTranscript={true}
+              setShowLiveTranscript={() => {}}
+              showTranslation={false}
+              setShowTranslation={() => {}}
+              roomSetup={roomSetup}
+              selectedProfile={selectedProfile || internalSelectedProfile}
+              setSelectedProfile={profile => {
+                console.log('Profile switched to:', profile);
+                if (onProfileChange) {
+                  onProfileChange(profile);
+                } else {
+                  setSelectedProfile(profile);
+                }
+              }}
+              userRole={userRole}
+            />
           </div>
+        </div>
+      )}
+
+      {/* Student guidance in audio mode (no toolbar) */}
+      {appMode === 'audio' && roomSetup && !roomSetup.isHost && (
+        <div style={{
+          marginTop: -45,
+          marginBottom: 0,
+          width: '100%',
+          textAlign: 'center',
+          color: '#10b981',
+          fontWeight: 600,
+          fontSize: '1.05rem',
+          letterSpacing: 0.1,
+          textShadow: '0 1px 2px #2228',
+          opacity: 0.96,
+          userSelect: 'none',
+        }}>
+          Viewing host's transcription in real-time • <span style={{ color: '#ffb84d' }}>Click words to add to dictionary</span>
+        </div>
+      )}
+      
+      {/* Header right: host/join controls and role indicator (video or audio modes) */}
+      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
+        {(appMode === 'video' || appMode === 'audio') && !roomSetup && (
+          <>
+            <button
+              onClick={async () => {
+                // Preserve current mode; ask parent to host and update props in place
+                try { await onHostRoom?.(); }
+                catch (e) { alert('Failed to create room: ' + (e?.message || e)); }
+              }}
+              style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#3b82f6', color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              Host call
+            </button>
+            <button
+              onClick={() => setShowJoinRoomModal(true)}
+              style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              Join call
+            </button>
+          </>
         )}
-        
-        {/* Join Room button - only for students not in a room */}
-        {userRole === 'student' && !roomSetup && (
-          <button 
-            onClick={() => setShowJoinRoomModal(true)}
-            style={{
-              padding: '8px 16px',
-              fontSize: 14,
-              borderRadius: 4,
-              background: '#10b981',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            {t.joinRoom}
-          </button>
-        )}
-        
-        {/* Exit Room button - only for students in a room */}
-        {roomSetup && !roomSetup.isHost && (
-          <button 
-            onClick={onReset}
-            style={{
-              padding: '8px 16px',
-              fontSize: 14,
-              borderRadius: 4,
-              background: '#444',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            Exit Room
-          </button>
+
+        {appMode === 'video' && roomSetup && (
+          <>
+            <div 
+              className="room-info-display" 
+              style={{
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+                padding: '8px 12px',
+                borderRadius: 8,
+                background: roomSetup.isHost ? 'rgba(59, 130, 246, 0.6)' : 'rgba(16, 185, 129, 0.6)',
+                marginRight: 8,
+              }}
+            >
+              {roomSetup.isHost ? `${ui.room}: ${roomSetup.roomCode}` : `${ui.student} • ${ui.room}: ${roomSetup.roomCode}`}
+            </div>
+            <button onClick={onReset} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>End call</button>
+          </>
         )}
       </div>
       
@@ -699,6 +1011,10 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         {appMode === 'dictionary' ? (
           <DictionaryTable 
             wordDefinitions={wordDefinitions}
+            selectedProfile={selectedProfile || internalSelectedProfile}
+            isAddingWordBusy={isAddingWordBusy}
+            toolbarStats={toolbarStats}
+            onAddWordSenses={handleAddWordSenses}
             onRemoveWord={(wordSenseId, word) => {
               console.log(`Removing word from dictionary: ${word} (${wordSenseId})`);
               try {
@@ -752,97 +1068,16 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                   console.log(`Kept '${wordLower}' in selectedWords as other senses remain`);
                 }
                 
-                // Save the updated state to the backend
-                if (selectedProfile !== 'non-saving') {
-                  setTimeout(async () => {
-                    try {
-                      
-                      // Save the updated flashcards to the backend
-                      // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${selectedProfile}/words`, {
-                      //   method: 'POST',
-                      //   headers: { 'Content-Type': 'application/json' },
-                      //   body: JSON.stringify({ 
-                      //     flashcards: wordDefinitions, 
-                      //     selectedWords: updatedSelectedWords 
-                      //   })
-                      // });
-                      
-                      if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`Server responded with status: ${response.status}. ${errorText}`);
-                      }
-                      
-                      console.log(`Saved updated flashcards to profile: ${selectedProfile}`);
-                    } catch (error) {
-                      console.error(`Error saving profile data: ${error.message}`);
-                      
-                      // Revert frontend state if backend save failed
-                      console.log('Backend save failed, reverting deletion...');
-                      setWordDefinitions(prev => ({
-                        ...prev,
-                        [wordSenseId]: wordEntry // Restore the deleted entry
-                      }));
-                      
-                      // Restore word to selectedWords if needed
-                      if (isLastSenseOfWord) {
-                        setSelectedWords(prev => [...prev, word]);
-                      }
-                      
-                      // Show user-friendly error
-                      showError(`Failed to delete "${word}" from dictionary. Please check your connection and try again.`);
-                    }
-                  }, 100);
-                }
+                // Save to backend disabled (local-only).
+                // Re-enable when Firebase persistence is implemented.
               } catch (error) {
                 console.error(`Error removing word from dictionary: ${error}`);
                 showError(`Failed to delete "${word}" from dictionary. Please try again.`);
               }
             }}
-            onAddWord={async (word) => {
-              console.log(`Adding word to dictionary: ${word}`);
-              try {
-                // Use the profile-specific add-word endpoint
-                const currentProfile = selectedProfile || internalSelectedProfile;
-                // const response = await fetch(`https://polycast-server.onrender.com/api/profile/${currentProfile}/add-word`, {
-                //   method: 'POST',
-                //   headers: {
-                //     'Content-Type': 'application/json'
-                //   },
-                //   body: JSON.stringify({ word: word })
-                // });
-                
-                if (response.status === 409) {
-                  // Duplicate word
-                  const errorData = await response.json();
-                  throw new Error(errorData.message || `"${word}" is already in your dictionary!`);
-                }
-                
-                if (!response.ok) {
-                  const errorData = await response.json();
-                  throw new Error(errorData.details || `Failed to add "${word}"`);
-                }
-                
-                const data = await response.json();
-                console.log(`Successfully added "${word}" to profile ${currentProfile}:`, data);
-                
-                // Add to wordDefinitions
-                setWordDefinitions(prev => ({
-                  ...prev,
-                  [data.wordSenseId]: data
-                }));
-                
-                // Add to selectedWords
-                setSelectedWords(prev => {
-                  if (!prev.includes(word)) {
-                    return [...prev, word];
-                  }
-                  return prev;
-                });
-                
-              } catch (error) {
-                console.error(`Error adding word "${word}":`, error);
-                throw error; // Re-throw to let DictionaryTable handle the error display
-              }
+            onAddWord={(word) => {
+              console.log(`Adding word to dictionary (local): ${word}`);
+              handleAddWord(word);
             }}
           />
         ) : appMode === 'flashcard' ? (
@@ -854,6 +1089,37 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             targetLanguages={effectiveLanguages}
             selectedProfile={selectedProfile || internalSelectedProfile}
           />
+        ) : appMode === 'video' ? (
+          <VideoMode
+            sendMessage={sendMessage}
+            isRecording={isRecording}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+            roomSetup={roomSetup}
+            fullTranscript={fullTranscript}
+            currentPartial={currentPartial}
+            transcriptBlocks={transcriptBlocks}
+            translations={translations}
+            targetLanguages={effectiveLanguages}
+            selectedProfile={selectedProfile || internalSelectedProfile}
+            studentHomeLanguage={studentHomeLanguage}
+            selectedWords={selectedWords}
+            setSelectedWords={setSelectedWords}
+            wordDefinitions={wordDefinitions}
+            setWordDefinitions={setWordDefinitions}
+            onAddWord={(word) => {
+              console.log(`Add from popup (video mode): ${word}`);
+              handleAddWord(word);
+            }}
+            showTBA={showTBA}
+            registerWebrtcSignalHandler={(handler) => {
+              webrtcSignalHandlerRef.current = handler;
+              const q = pendingWebrtcSignalsRef.current;
+              pendingWebrtcSignalsRef.current = [];
+              q.forEach((msg) => { try { handler(msg); } catch (e) { console.warn('Failed delivering pending signal:', e); } });
+            }}
+            unregisterWebrtcSignalHandler={() => { webrtcSignalHandlerRef.current = null; }}
+          />
         ) : (
           <TranscriptionDisplay 
             showTBA={showTBA}
@@ -861,8 +1127,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             currentPartial={currentPartial}
             translations={translations} 
             targetLanguages={effectiveLanguages} 
-            showLiveTranscript={showLiveTranscript}
-            showTranslation={showTranslation}
+            showLiveTranscript={true}
+            showTranslation={false}
             isStudentMode={roomSetup && !roomSetup.isHost}
             studentHomeLanguage={studentHomeLanguage}
             selectedWords={selectedWords}
@@ -870,6 +1136,10 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             wordDefinitions={wordDefinitions}
             setWordDefinitions={setWordDefinitions}
             selectedProfile={selectedProfile}
+            onAddWord={(word) => {
+              console.log(`Add from popup (local): ${word}`);
+              handleAddWord(word);
+            }}
           />
         )}
       </div>
@@ -896,16 +1166,16 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             textAlign: 'center',
             boxShadow: '0 4px 18px 0 rgba(60, 60, 90, 0.2)'
           }}>
-            <h2 style={{ color: '#fff', marginBottom: 24 }}>{t.joinRoom}</h2>
+            <h2 style={{ color: '#fff', marginBottom: 24 }}>{ui.joinRoom}</h2>
             <p style={{ color: '#b3b3e7', marginBottom: 24, fontSize: 14 }}>
-              {t.enterRoomCode}
+              {ui.enterRoomCode}
             </p>
             
             <input
               type="text"
               value={joinRoomCode}
               onChange={(e) => setJoinRoomCode(e.target.value)}
-              placeholder={t.roomCode}
+              placeholder={ui.roomCode}
               maxLength={5}
               style={{
                 width: '100%',
@@ -945,7 +1215,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                   cursor: 'pointer'
                 }}
               >
-                Cancel
+                {ui.cancel}
               </button>
               <button
                 onClick={handleJoinRoom}
@@ -960,7 +1230,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                   cursor: 'pointer'
                 }}
               >
-                {isJoiningRoom ? t.joinButton + '...' : t.joinButton}
+                {isJoiningRoom ? ui.joinButton + '...' : ui.joinButton}
               </button>
             </div>
           </div>
@@ -969,7 +1239,23 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
       {/* Error Popup */}
       <ErrorPopup error={popupError} onClose={clearError} />
+      {/* Flashcard Calendar Modal (global) */}
+      <FlashcardCalendarModal
+        showCalendar={showCalendar}
+        setShowCalendar={setShowCalendar}
+        queue={queue}
+        onReorder={reorderQueue}
+      />
       <TBAPopup tba={popupTBA} onClose={clearTBA} />
+
+      {/* Mode Selector */}
+      <ModeSelector
+        appMode={appMode}
+        onModeChange={handleAppModeChange}
+        userRole={userRole}
+        roomSetup={roomSetup}
+        selectedProfile={selectedProfile || internalSelectedProfile}
+      />
 
     </div>
   )
@@ -983,9 +1269,10 @@ App.propTypes = {
         isHost: PropTypes.bool.isRequired,
         roomCode: PropTypes.string.isRequired
     }), // Made optional for students not in a room
-    userRole: PropTypes.oneOf(['host', 'student']),
+    userRole: PropTypes.oneOf(['host', null]),
     studentHomeLanguage: PropTypes.string,
     onJoinRoom: PropTypes.func,
+    onHostRoom: PropTypes.func,
     onFlashcardModeChange: PropTypes.func
 };
 

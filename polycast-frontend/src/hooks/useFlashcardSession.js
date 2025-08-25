@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getDueCards } from '../utils/srsAlgorithm';
 import { getSRSSettings } from '../utils/srsSettings';
-import { getHardcodedCards } from '../utils/hardcodedCards';
 
 /**
  * Shared hook for managing flashcard session state
@@ -35,14 +34,7 @@ export function useFlashcardSession(selectedProfile, wordDefinitions) {
   
   // Process the wordDefinitions to extract all word senses and initialize SRS data
   const availableCards = useMemo(() => {
-    // For non-saving mode, use hardcoded cards
-    if (selectedProfile === 'non-saving') {
-      const hardcodedCards = getHardcodedCards();
-      console.log(`[DEBUG] Non-saving mode: ${hardcodedCards.length} hardcoded cards available`);
-      return hardcodedCards;
-    }
-
-    // For other profiles, process actual wordDefinitions
+    // Process actual wordDefinitions (non-saving mode will be empty until user adds)
     const cards = [];
     const totalWords = Object.keys(wordDefinitions).length;
     let wordsWithFlashcards = 0;
@@ -61,6 +53,7 @@ export function useFlashcardSession(selectedProfile, wordDefinitions) {
       if (value && value.wordSenseId) {
         // Initialize SRS data if it doesn't exist
         const cardWithSRS = { ...value, key };
+        // Do not synthesize example sentences here (strict removal)
         
         // Ensure frequency field exists (use wordFrequency if available)
         if (!cardWithSRS.frequency && cardWithSRS.wordFrequency) {
@@ -108,16 +101,9 @@ export function useFlashcardSession(selectedProfile, wordDefinitions) {
   useEffect(() => {
     const initializeDailyLimits = async () => {
       const today = new Date().toDateString();
-      
-      if (selectedProfile === 'non-saving') {
-        // Non-saving mode: don't persist daily limits at all
-        setTodaysNewCards(0);
-      } else {
-        // Profile mode: temporarily disable database calls until endpoints are deployed
-        // TODO: Re-enable when SRS daily endpoints are deployed to production
-        console.log('[SRS Daily] Database endpoints not deployed yet, using local storage fallback');
-        setTodaysNewCards(0);
-      }
+      // Persistence disabled for now; set local counters only.
+      // TODO: Integrate Firebase and re-enable per-profile daily limits.
+      setTodaysNewCards(0);
     };
     
     initializeDailyLimits();

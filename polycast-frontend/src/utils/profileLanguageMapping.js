@@ -1,17 +1,49 @@
 // Profile to language mapping
 export const PROFILE_LANGUAGE_MAP = {
-  'non-saving': 'English',
   'cat': 'Spanish',
   'dog': 'French', 
   'mouse': 'German',
   'horse': 'Italian',
   'lizard': 'Portuguese',
-  'shirley': 'Chinese'
+  'shirley': 'Chinese',
+  // Target language per profile (what they are learning)
+  'joshua': 'English',
+  'tyson': 'English'
+};
+
+// Profile credentials (password for each profile)
+export const PROFILE_CREDENTIALS = {
+  'cat': 'password',
+  'dog': 'password',
+  'mouse': 'password',
+  'horse': 'password',
+  'lizard': 'password',
+  'shirley': 'password',
+  'joshua': 'password',
+  'tyson': 'password'
+};
+
+// Native language per profile (their L1)
+export const PROFILE_NATIVE_LANGUAGE_MAP = {
+  // Native languages per profile (controls overall UI language)
+  'cat': 'Spanish',
+  'dog': 'French',
+  'mouse': 'German',
+  'horse': 'Italian',
+  'lizard': 'Portuguese',
+  'shirley': 'Chinese',
+  'joshua': 'Spanish', // Joshua is a native Spanish speaker
+  'tyson': 'English'
 };
 
 // Get language for a profile
 export const getLanguageForProfile = (profile) => {
   return PROFILE_LANGUAGE_MAP[profile] || 'English';
+};
+
+// Get native language for a profile
+export const getNativeLanguageForProfile = (profile) => {
+  return PROFILE_NATIVE_LANGUAGE_MAP[profile] || 'English';
 };
 
 // Get all available profiles
@@ -25,6 +57,195 @@ export const isValidProfile = (profile) => {
 };
 
 // Translations for flashcard interface
+// UI strings for general interface (native language)
+export const UI_STRINGS = {
+  'English': {
+    profile: 'Profile',
+    mode: 'Mode',
+    transcript: 'Transcript',
+    classroomMode: 'Classroom',
+    video: 'Video',
+    dictionaryMode: 'Dictionary',
+    flashcardMode: 'Study',
+    record: 'Record',
+    stopRecording: 'Stop Recording',
+    recording: 'Recording...',
+    backToMain: '← Back to Main',
+    calendar: '📅 Calendar',
+    room: 'Room',
+    student: 'Student',
+    joinRoom: 'Join Room',
+    exitRoom: 'Exit Room',
+    roomCode: 'Room Code',
+    enterRoomCode: 'Enter room code',
+    joinButton: 'Join',
+    cancel: 'Cancel',
+    transcriptHeader: 'Transcript',
+    translationDisabled: 'Translation temporarily disabled for streaming mode',
+    studentLanguage: 'Student Language',
+    joinRoomFirst: 'You have to join a room first!',
+    new: 'New', learning: 'Learning', review: 'Review',
+    // Empty state (localized in native language)
+    noFlashcardsTitle: 'No Flashcards Available',
+    noFlashcardsMessage: "You haven't added any words to study yet.",
+    instructionsTitle: 'How to add words:',
+    methodDictionary: 'From Dictionary: Go to 📚 Dictionary Mode → type English word → click "+ Add Word"',
+    methodTranscript: 'From Transcript: Click 🏫 "Join Room" → join a room → click on words in live transcript',
+    methodReturn: 'Return here to start studying your collected words',
+  },
+  'Spanish': {
+    profile: 'Perfil',
+    mode: 'Modo',
+    transcript: 'Transcripción',
+    classroomMode: 'Aula',
+    video: 'Video',
+    dictionaryMode: 'Diccionario',
+    flashcardMode: 'Estudio',
+    record: 'Grabar',
+    stopRecording: 'Detener',
+    recording: 'Grabando...',
+    backToMain: '← Regresar al Inicio',
+    calendar: '📅 Calendario',
+    room: 'Sala',
+    student: 'Estudiante',
+    joinRoom: 'Unirse al Aula',
+    exitRoom: 'Salir',
+    roomCode: 'Código del Aula',
+    enterRoomCode: 'Introduce el código del aula',
+    joinButton: 'Unirse',
+    cancel: 'Cancelar',
+    transcriptHeader: 'Transcripción',
+    translationDisabled: 'Traducción temporalmente desactivada en modo streaming',
+    studentLanguage: 'Idioma del estudiante',
+    joinRoomFirst: '¡Primero tienes que unirte a una sala!',
+    new: 'Nuevas', learning: 'Aprendiendo', review: 'Repasar',
+    noFlashcardsTitle: 'No Hay Tarjetas Disponibles',
+    noFlashcardsMessage: 'Aún no has agregado palabras para estudiar.',
+    instructionsTitle: 'Cómo agregar palabras:',
+    methodDictionary: 'Desde Diccionario: Ve a 📚 Modo Diccionario → escribe palabra en inglés → haz clic en "+ Agregar Palabra"',
+    methodTranscript: 'Desde Transcripción: Haz clic en 🏫 "Unirse al Aula" → únete a un aula → haz clic en palabras en la transcripción en vivo',
+    methodReturn: 'Regresa aquí para comenzar a estudiar tus palabras recolectadas',
+  },
+  'Chinese': {
+    profile: '配置文件',
+    mode: '模式',
+    transcript: '转录',
+    classroomMode: '教室',
+    video: '视频',
+    dictionaryMode: '词典',
+    flashcardMode: '学习',
+    record: '开始录音',
+    stopRecording: '停止录音',
+    recording: '录音中...',
+    backToMain: '← 返回主页',
+    calendar: '📅 日历',
+    room: '教室',
+    student: '学生',
+    joinRoom: '加入教室',
+    exitRoom: '退出',
+    roomCode: '教室代码',
+    enterRoomCode: '输入教室代码',
+    joinButton: '加入',
+    cancel: '取消',
+    transcriptHeader: '转录',
+    translationDisabled: '流式模式下暂时禁用翻译',
+    studentLanguage: '学生语言',
+    joinRoomFirst: '您必须先加入教室！',
+    new: '新卡片', learning: '学习中', review: '复习',
+    noFlashcardsTitle: '没有可用的卡片',
+    noFlashcardsMessage: '您还没有添加要学习的单词。',
+    instructionsTitle: '如何添加单词：',
+    methodDictionary: '从词典：转到 📚 词典模式 → 输入英语单词 → 点击"+ 添加单词"',
+    methodTranscript: '从转录：点击 🏫 "加入教室" → 加入房间 → 点击实时转录中的单词',
+    methodReturn: '返回这里开始学习您收集的单词',
+  },
+  'French': {
+    profile: 'Profil',
+    mode: 'Mode',
+    transcript: 'Transcription',
+    classroomMode: 'Classe',
+    video: 'Vidéo',
+    dictionaryMode: 'Dictionnaire',
+    flashcardMode: 'Étude',
+    record: 'Enregistrer',
+    stopRecording: 'Arrêter',
+    recording: 'Enregistrement...',
+    backToMain: '← Retour au Menu',
+    calendar: '📅 Calendrier',
+    room: 'Salle',
+    student: 'Élève',
+    joinRoom: 'Rejoindre la Salle',
+    exitRoom: 'Quitter',
+    roomCode: 'Code de Salle',
+    enterRoomCode: 'Entrez le code de la salle',
+    joinButton: 'Rejoindre',
+    cancel: 'Annuler',
+    transcriptHeader: 'Transcription',
+    translationDisabled: 'Traduction temporairement désactivée en mode diffusion',
+    studentLanguage: "Langue de l'élève",
+    joinRoomFirst: 'Vous devez d\'abord rejoindre une salle!',
+    new: 'Nouvelles', learning: 'Apprentissage', review: 'Révision',
+    noFlashcardsTitle: 'Aucune Carte Disponible',
+    noFlashcardsMessage: "Vous n'avez pas encore ajouté de mots à étudier.",
+    instructionsTitle: 'Comment ajouter des mots :',
+    methodDictionary: 'Depuis le Dictionnaire : Allez au 📚 Mode Dictionnaire → tapez un mot anglais → cliquez sur "+ Ajouter Mot"',
+    methodTranscript: 'Depuis la Transcription : Cliquez sur 🏫 "Rejoindre Salle" → rejoignez une salle → cliquez sur les mots dans la transcription en direct',
+    methodReturn: 'Revenez ici pour commencer à étudier vos mots collectés',
+  },
+  'German': {
+    profile: 'Profil', mode: 'Modus', transcript: 'Transkript', classroomMode: 'Klassenzimmer', video: 'Video',
+    dictionaryMode: 'Wörterbuch', flashcardMode: 'Studium',
+    record: 'Aufnehmen', stopRecording: 'Stopp', recording: 'Aufnahme...',
+    backToMain: '← Zurück zum Hauptmenü', calendar: '📅 Kalender',
+    room: 'Raum', student: 'Schüler', joinRoom: 'Raum Beitreten', exitRoom: 'Verlassen',
+    roomCode: 'Raumcode', enterRoomCode: 'Raumcode eingeben', joinButton: 'Beitreten', cancel: 'Abbrechen',
+    transcriptHeader: 'Transkript', translationDisabled: 'Übersetzung im Streaming-Modus vorübergehend deaktiviert', studentLanguage: 'Schülersprache',
+    joinRoomFirst: 'Sie müssen zuerst einem Raum beitreten!',
+    new: 'Neu', learning: 'Lernen', review: 'Wiederholen',
+    noFlashcardsTitle: 'Keine Karten Verfügbar',
+    noFlashcardsMessage: 'Sie haben noch keine Wörter zum Lernen hinzugefügt.',
+    instructionsTitle: 'Wörter hinzufügen:',
+    methodDictionary: 'Aus Wörterbuch: Gehen Sie zu 📚 Wörterbuch-Modus → englisches Wort eingeben → auf "+ Wort Hinzufügen" klicken',
+    methodTranscript: 'Aus Transkript: Klicken Sie auf 🏫 "Raum Beitreten" → einem Raum beitreten → auf Wörter im Live-Transkript klicken',
+    methodReturn: 'Kehren Sie hierher zurück, um Ihre gesammelten Wörter zu lernen',
+  },
+  'Italian': {
+    profile: 'Profilo', mode: 'Modalità', transcript: 'Trascrizione', classroomMode: 'Aula', video: 'Video',
+    dictionaryMode: 'Dizionario', flashcardMode: 'Studio',
+    record: 'Registra', stopRecording: 'Ferma', recording: 'Registrazione...',
+    backToMain: '← Torna al Menu', calendar: '📅 Calendario',
+    room: 'Stanza', student: 'Studente', joinRoom: 'Unisciti alla Stanza', exitRoom: 'Esci',
+    roomCode: 'Codice Stanza', enterRoomCode: 'Inserisci il codice della stanza', joinButton: 'Unisciti', cancel: 'Annulla',
+    transcriptHeader: 'Trascrizione', translationDisabled: 'Traduzione temporaneamente disabilitata in modalità streaming', studentLanguage: 'Lingua dello studente',
+    joinRoomFirst: 'Devi prima unirti a una stanza!',
+    new: 'Nuove', learning: 'Apprendimento', review: 'Ripasso',
+    noFlashcardsTitle: 'Nessuna Carta Disponibile',
+    noFlashcardsMessage: 'Non hai ancora aggiunto parole da studiare.',
+    instructionsTitle: 'Come aggiungere parole:',
+    methodDictionary: 'Dal Dizionario: Vai a 📚 Modalità Dizionario → digita parola inglese → clicca "+ Aggiungi Parola"',
+    methodTranscript: 'Dalla Trascrizione: Clicca 🏫 "Unisciti Stanza" → unisciti a una stanza → clicca sulle parole nella trascrizione dal vivo',
+    methodReturn: 'Torna qui per iniziare a studiare le tue parole raccolte',
+  },
+  'Portuguese': {
+    profile: 'Perfil', mode: 'Modo', transcript: 'Transcrição', classroomMode: 'Sala de Aula', video: 'Vídeo',
+    dictionaryMode: 'Dicionário', flashcardMode: 'Estudo',
+    record: 'Gravar', stopRecording: 'Parar', recording: 'Gravando...',
+    backToMain: '← Voltar ao Menu', calendar: '📅 Calendário',
+    room: 'Sala', student: 'Aluno', joinRoom: 'Entrar na Sala', exitRoom: 'Sair',
+    roomCode: 'Código da Sala', enterRoomCode: 'Digite o código da sala', joinButton: 'Entrar', cancel: 'Cancelar',
+    transcriptHeader: 'Transcrição', translationDisabled: 'Tradução temporariamente desativada no modo streaming', studentLanguage: 'Idioma do aluno',
+    joinRoomFirst: 'Você deve entrar em uma sala primeiro!',
+    new: 'Novos', learning: 'Aprendendo', review: 'Revisar',
+    noFlashcardsTitle: 'Nenhum Cartão Disponível',
+    noFlashcardsMessage: 'Você ainda não adicionou palavras para estudar.',
+    instructionsTitle: 'Como adicionar palavras:',
+    methodDictionary: 'Do Dicionário: Vá para 📚 Modo Dicionário → digite palavra em inglês → clique em "+ Adicionar Palavra"',
+    methodTranscript: 'Da Transcrição: Clique em 🏫 "Entrar Sala" → entre em uma sala → clique nas palavras na transcrição ao vivo',
+    methodReturn: 'Volte aqui para começar a estudar suas palavras coletadas',
+  }
+};
+
+// Flashcard-specific instructional strings (kept for compatibility; keyed by target language)
 export const FLASHCARD_TRANSLATIONS = {
   'English': {
     noFlashcardsTitle: 'No Flashcards Available',
@@ -256,4 +477,25 @@ export const FLASHCARD_TRANSLATIONS = {
 export const getTranslationsForProfile = (profile) => {
   const language = getLanguageForProfile(profile);
   return FLASHCARD_TRANSLATIONS[language] || FLASHCARD_TRANSLATIONS['English'];
+};
+
+// General UI strings in native language
+export const getUITranslationsForProfile = (profile) => {
+  const native = getNativeLanguageForProfile(profile);
+  return UI_STRINGS[native] || UI_STRINGS['English'];
+};
+
+// Validate user credentials
+export const validateCredentials = (username, password) => {
+  const profileKey = username.toLowerCase();
+  
+  if (!PROFILE_LANGUAGE_MAP[profileKey]) {
+    return { ok: false, error: 'Invalid username' };
+  }
+  
+  if (PROFILE_CREDENTIALS[profileKey] !== password) {
+    return { ok: false, error: 'Invalid password' };
+  }
+  
+  return { ok: true, profileKey };
 };
