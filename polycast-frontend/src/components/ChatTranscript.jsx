@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
-import { getLanguageForProfile, getNativeLanguageForProfile } from '../utils/profileLanguageMapping';
+import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import apiService from '../services/apiService.js';
 import { extractSentenceWithWord } from '../utils/wordClickUtils';
 
@@ -25,6 +25,7 @@ function ChatTranscript({
   const [fontSize, setFontSize] = useState(20);
   const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
   const [loadingDefinition, setLoadingDefinition] = useState(false);
+  const ui = getUITranslationsForProfile(selectedProfile);
 
   // Phase 1 speaker inference: host streams audio; students view host text
   const speaker = useMemo(() => {
@@ -186,6 +187,18 @@ function ChatTranscript({
           overflow: 'hidden',
         }}
       >
+        <span style={{ 
+          letterSpacing: 0.5, 
+          textAlign: 'center', 
+          fontWeight: 800, 
+          fontSize: 20, 
+          margin: '18px 0 10px 0', 
+          color: '#b3b3e7', 
+          textTransform: 'uppercase', 
+          opacity: 0.92 
+        }}>
+          {ui.transcriptHeader}
+        </span>
         {/* Scrollable transcript body with grouped headers */}
         <div
           ref={scrollContainerRef}
