@@ -15,4 +15,5 @@ env:
     secret: geminiApiKey
   - variable: DEEPGRAM_API_KEY
     secret: deepgramApiKey
-
+  - variable: REDIS_URL
+    secret: redisUrl
