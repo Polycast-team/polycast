@@ -26,17 +26,8 @@ async function handleWebSocketMessage(ws, message, clientData) {
         return false;
     }
 
-    // Allow signaling from students; block only non-signaling submissions from students
-    if (isInRoom && !isRoomHost && !isSignalingPayload(message)) {
-        console.log(`[Room] Rejected non-signaling message from student in room ${clientRoom.roomCode}`);
-        try {
-            ws.send(JSON.stringify({
-                type: 'error',
-                message: 'Students cannot send audio or text for transcription'
-            }));
-        } catch {}
-        return;
-    }
+    // Previously blocked student audio; now allow students to send audio for transcription
+    // Keep allowing signaling payloads as before
 
     if (Buffer.isBuffer(message)) {
         try {
@@ -175,12 +166,13 @@ async function handleAudioMessage(ws, message, clientData) {
                 const response = {
                     type: 'streaming_transcript',
                     text: transcript,
-                    isInterim: isInterim
+                    isInterim: isInterim,
+                    speaker: isRoomHost ? 'host' : 'student'
                 };
                 console.log('[Transcript] Sending to client:', { text: transcript.substring(0, 50), isInterim });
                 ws.send(JSON.stringify(response));
                 
-                // Broadcast to students if host
+                // Broadcast to peer(s)
                 if (isRoomHost) {
                     const room = activeRooms.get(clientRoom.roomCode);
                     if (room) {
@@ -199,6 +191,12 @@ async function handleAudioMessage(ws, message, clientData) {
                             redisService.updateTranscript(clientRoom.roomCode, room.transcript)
                                 .catch(err => console.error(`[Redis] Failed to update transcript:`, err));
                         }
+                    }
+                } else {
+                    // Student speaking → forward to host
+                    const room = activeRooms.get(clientRoom.roomCode);
+                    if (room && room.hostWs && room.hostWs.readyState === WebSocket.OPEN) {
+                        room.hostWs.send(JSON.stringify(response));
                     }
                 }
                 

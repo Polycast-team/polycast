@@ -574,22 +574,29 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             fullLength: parsedData.text?.length
           });
           
-          if (parsedData.isInterim) {
-            // Update partial transcript with interim results
-            setCurrentPartial(parsedData.text);
-          } else {
-            // Append finalized text and clear partial
-            setFullTranscript(prev => {
-              const newText = prev + (prev && !prev.endsWith(' ') ? ' ' : '') + parsedData.text;
-              console.log('[Frontend] Updated full transcript, new length:', newText.length);
-              return newText;
-            });
-            setCurrentPartial('');
-            
-            // For students: generate their own translation when receiving host's final transcript
-            if (userRole === 'student' && studentHomeLanguage && parsedData.text) {
-              console.log(`Student generating ${studentHomeLanguage} translation for: "${parsedData.text}"`);
-              generateStudentTranslation(parsedData.text, studentHomeLanguage);
+          // Respect speaker if provided: only consume when it matches our role
+          const speaker = parsedData.speaker; // 'host' | 'student' or undefined
+          const amHost = !!(roomSetup && roomSetup.isHost);
+          const shouldConsume = speaker ? ((speaker === 'host' && amHost) || (speaker === 'student' && !amHost)) : true;
+
+          if (shouldConsume) {
+            if (parsedData.isInterim) {
+              // Update partial transcript with interim results
+              setCurrentPartial(parsedData.text);
+            } else {
+              // Append finalized text and clear partial
+              setFullTranscript(prev => {
+                const newText = prev + (prev && !prev.endsWith(' ') ? ' ' : '') + parsedData.text;
+                console.log('[Frontend] Updated full transcript, new length:', newText.length);
+                return newText;
+              });
+              setCurrentPartial('');
+              
+              // For students: generate their own translation when receiving host's final transcript
+              if (userRole === 'student' && studentHomeLanguage && parsedData.text) {
+                console.log(`Student generating ${studentHomeLanguage} translation for: "${parsedData.text}"`);
+                generateStudentTranslation(parsedData.text, studentHomeLanguage);
+              }
             }
           }
         } else if (parsedData.type === 'error') {
