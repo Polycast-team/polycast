@@ -781,17 +781,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
   return (
     <div className="App">
-      {/* Signaling/WS overlay */}
-      {roomSetup && (
-        <div style={{ position: 'fixed', right: 16, top: 76, zIndex: 1200, width: 360, pointerEvents: 'none' }}>
-          <div style={{ background: 'rgba(17, 24, 39, 0.82)', color: '#d1d5db', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 10, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, textAlign: 'left' }}>
-            <div style={{ marginBottom: 6, fontWeight: 700 }}>WS: {socketUrl}</div>
-            {signalLog.slice(0, 8).map((line, i) => (
-              <div key={i} style={{ opacity: i === 0 ? 1 : 0.9 - i * 0.08 }}>{line}</div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Debug overlay removed */}
       {/* Fullscreen button - upper left corner for all modes */}
       <button
         onClick={() => {
@@ -860,24 +850,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           Polycast
         </h1>
         
-        {/* Right side - room code or spacer */}
-        <div style={{ width: '200px', display: 'flex', justifyContent: 'flex-end' }}>
-          {roomSetup && (
-            <div 
-              className="room-info-display" 
-              style={{
-                color: '#fff',
-                fontSize: '1rem',
-                fontWeight: 600,
-                padding: '8px 16px',
-                borderRadius: '8px',
-                background: roomSetup.isHost ? 'rgba(59, 130, 246, 0.6)' : 'rgba(16, 185, 129, 0.6)',
-              }}
-            >
-              {roomSetup?.isHost ? `${ui.room}: ${roomSetup?.roomCode || '—'}` : `${ui.student} • ${ui.room}: ${roomSetup?.roomCode || '—'}`}
-            </div>
-          )}
-        </div>
+        {/* Right side spacer only; colored room pill moved to top-right header */}
+        <div style={{ width: '200px' }} />
       </div>
       {/* Top toolbar: show in audio mode (available pre-room too) */}
       {appMode === 'audio' && (
@@ -981,8 +955,19 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
         {appMode === 'video' && roomSetup && (
           <>
-            <div style={{ fontSize: 14, color: '#fff', marginRight: 8, background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: 4 }}>
-              {roomSetup.isHost ? `Host • ${ui.room}: ${roomSetup.roomCode}` : `${ui.student} • ${ui.room}: ${roomSetup.roomCode}`}
+            <div 
+              className="room-info-display" 
+              style={{
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+                padding: '8px 12px',
+                borderRadius: 8,
+                background: roomSetup.isHost ? 'rgba(59, 130, 246, 0.6)' : 'rgba(16, 185, 129, 0.6)',
+                marginRight: 8,
+              }}
+            >
+              {roomSetup.isHost ? `${ui.room}: ${roomSetup.roomCode}` : `${ui.student} • ${ui.room}: ${roomSetup.roomCode}`}
             </div>
             <button onClick={onReset} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>End call</button>
           </>

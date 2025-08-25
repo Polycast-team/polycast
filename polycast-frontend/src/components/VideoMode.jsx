@@ -194,7 +194,7 @@ function VideoMode({
   // No transcript font size handling here; ChatTranscript manages its own font size
 
   const isHost = !!(roomSetup && roomSetup.isHost);
-  const allowMic = !roomSetup || isHost; // allow local mic when not in a room, or when hosting
+  const allowMic = true; // allow mic for both host and students
   const inRoom = !!(roomSetup && roomSetup.roomCode);
 
   // WebRTC setup

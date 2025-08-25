@@ -29,9 +29,9 @@ function ChatTranscript({
   const speaker = useMemo(() => {
     const isHost = !!(roomSetup && roomSetup.isHost);
     return {
-      id: isHost ? 'me' : 'host',
-      displayName: isHost ? selectedProfile : 'Host',
-      isLocal: isHost,
+      id: 'me',
+      displayName: selectedProfile || 'You',
+      isLocal: true,
     };
   }, [roomSetup, selectedProfile]);
 
