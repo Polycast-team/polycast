@@ -383,15 +383,16 @@ function VideoMode({
             display: 'flex',
             flexDirection: 'column',
             height: '100%',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            justifyContent: 'flex-start'
           }}
         >
           <div
-            style={{ position: 'relative', background: 'transparent', borderRadius: 0, overflow: 'visible', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ position: 'relative', background: 'transparent', borderRadius: 0, overflow: 'visible', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}
           >
             {/* 16:10 aspect wrapper - no absolute box, scales with width */}
-            <div style={{ width: '100%', padding: 12, boxSizing: 'border-box', display: 'flex', justifyContent: 'center' }}>
-              <div style={{ width: '100%', aspectRatio: '16 / 10', background: '#111827', borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{ width: '100%', padding: 12, boxSizing: 'border-box', display: 'flex', justifyContent: 'center', position: 'relative' }}>
+              <div style={{ width: '100%', aspectRatio: '16 / 10', background: '#111827', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
                 {mainParticipant && mainParticipant.id === 'me' ? (
                   <video
                     ref={mainVideoRef}
@@ -414,35 +415,27 @@ function VideoMode({
                     {remoteAttachError || 'Waiting for remote video…'}
                   </div>
                 )}
-              </div>
-            </div>
-
-            {videoError && (
-              <div style={{ position: 'absolute', inset: 0, color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
-                {videoError}
-              </div>
-            )}
-
-            {/* Hover toolbar - always visible when mic allowed */}
-            {allowMic && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: 12,
-                  right: 12,
-                  bottom: 12,
-                  background: 'rgba(0, 0, 0, 0.45)',
-                  borderRadius: 10,
-                  padding: '8px 12px',
-                  display: 'flex',
-                  gap: 10,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: 1,
-                  transform: 'translateY(0)',
-                  pointerEvents: 'auto'
-                }}
-              >
+                
+                {/* Hover toolbar - always visible when mic allowed */}
+                {allowMic && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 12,
+                      right: 12,
+                      bottom: 12,
+                      background: 'rgba(0, 0, 0, 0.45)',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      gap: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: 1,
+                      transform: 'translateY(0)',
+                      pointerEvents: 'auto'
+                    }}
+                  >
                 <button
                   onClick={isRecording ? (onStopRecording || (() => {})) : (onStartRecording || (() => {}))}
                   title={isRecording ? 'Mute' : 'Unmute'}
@@ -462,6 +455,14 @@ function VideoMode({
                 </button>
               </div>
             )}
+              </div>
+            </div>
+
+            {videoError && (
+              <div style={{ position: 'absolute', inset: 0, color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
+                {videoError}
+              </div>
+            )}
           </div>
 
           {/* Hidden audio pipeline - allow when hosting or not in room */}
@@ -475,7 +476,7 @@ function VideoMode({
           <div
             style={{
               position: 'relative',
-              marginTop: 10,
+              marginTop: 0,
               height: 120,
               borderRadius: 10,
               background: 'transparent',
