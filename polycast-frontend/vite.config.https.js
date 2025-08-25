@@ -16,8 +16,8 @@ export default defineConfig({
     host: true,
     https: {
       // Update these paths to your certificate files
-      key: fs.readFileSync('./192.168.4.202-key.pem'),
-      cert: fs.readFileSync('./192.168.4.202.pem')
+      key: fs.readFileSync(process.env.SSL_KEY_PATH || './default-key.pem'),
+      cert: fs.readFileSync(process.env.SSL_CERT_PATH || './default-cert.pem')
     },
     allowedHosts: [
         'localhost', 
