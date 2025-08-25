@@ -11,6 +11,7 @@ const tokenizeText = (text) => text.match(/([\p{L}\p{M}\d']+|[.,!?;:]+|\s+)/gu) 
 function ChatTranscript({
   fullTranscript = '',
   currentPartial = '',
+  transcriptBlocks = [],
   selectedProfile = 'joshua',
   roomSetup,
   selectedWords = [],
@@ -138,6 +139,24 @@ function ChatTranscript({
     );
   };
 
+  const renderHeader = (speakerKey) => {
+    const amHost = !!(roomSetup && roomSetup.isHost);
+    const isLocal = (speakerKey === 'host' && amHost) || (speakerKey === 'student' && !amHost);
+    const displayName = isLocal ? selectedProfile : (speakerKey === 'host' ? 'Host' : 'Student');
+    return (
+      <div style={{ padding: '12px 16px 8px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#7c62ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+            <span style={{ fontSize: 12 }}>{(displayName || 'U').slice(0,1).toUpperCase()}</span>
+          </div>
+          <div style={{ fontWeight: 800, fontSize: 18, color: '#b3b3e7' }}>
+            {displayName}{isLocal ? ' (you)' : ''}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {popupInfo.visible && (
@@ -167,19 +186,7 @@ function ChatTranscript({
           overflow: 'hidden',
         }}
       >
-        {/* Header */}
-        <div style={{ padding: '16px 16px 8px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#7c62ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-              <span style={{ fontSize: 12 }}>{(speaker.displayName || 'U').slice(0,1).toUpperCase()}</span>
-            </div>
-            <div style={{ fontWeight: 800, fontSize: 18, color: '#b3b3e7' }}>
-              {speaker.displayName || 'User'}{speaker.isLocal ? ' (you)' : ''}
-            </div>
-          </div>
-        </div>
-
-        {/* Scrollable chat body */}
+        {/* Scrollable transcript body with grouped headers */}
         <div
           ref={scrollContainerRef}
           className="pc-transcript-scroll"
@@ -188,17 +195,40 @@ function ChatTranscript({
           onTouchMove={(e) => e.stopPropagation()}
         >
           <div style={{ fontSize, lineHeight: 1.6 }}>
-            {/* Finalized text as flowing paragraphs; keep clickable tokens */}
-            {fullTranscript && (
-              <div style={{ marginBottom: 10 }}>
-                {tokenizeText(fullTranscript).map((t, idx) => renderClickableWord(t, `f-${idx}`))}
-              </div>
-            )}
-            {/* Interim text appended in green */}
-            {currentPartial && (
-              <div style={{ marginBottom: 10 }}>
-                {tokenizeText(currentPartial).map((t, idx) => renderClickableWord(t, `p-${idx}`, true))}
-              </div>
+            {transcriptBlocks.length > 0 ? (
+              transcriptBlocks.map((blk, i) => (
+                <div key={i} style={{ marginBottom: 12 }}>
+                  {renderHeader(blk.speaker)}
+                  <div style={{ padding: '8px 2px 0 2px' }}>
+                    {blk.lines.map((line, j) => (
+                      <div key={j} style={{ marginBottom: 10 }}>
+                        {tokenizeText(line).map((t, k) => renderClickableWord(t, `b${i}-l${j}-t${k}`))}
+                      </div>
+                    ))}
+                    {blk.partial && (
+                      <div style={{ marginBottom: 10 }}>
+                        {tokenizeText(blk.partial).map((t, k) => renderClickableWord(t, `b${i}-p-${k}`, true))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <>
+                {renderHeader('host')}
+                <div style={{ padding: '8px 2px 0 2px' }}>
+                  {fullTranscript && (
+                    <div style={{ marginBottom: 10 }}>
+                      {tokenizeText(fullTranscript).map((t, idx) => renderClickableWord(t, `f-${idx}`))}
+                    </div>
+                  )}
+                  {currentPartial && (
+                    <div style={{ marginBottom: 10 }}>
+                      {tokenizeText(currentPartial).map((t, idx) => renderClickableWord(t, `p-${idx}`, true))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
             <div style={{ height: 1 }} />
           </div>
@@ -211,6 +241,7 @@ function ChatTranscript({
 ChatTranscript.propTypes = {
   fullTranscript: PropTypes.string,
   currentPartial: PropTypes.string,
+  transcriptBlocks: PropTypes.array,
   selectedProfile: PropTypes.string,
   roomSetup: PropTypes.object,
   selectedWords: PropTypes.array,

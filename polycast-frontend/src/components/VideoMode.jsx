@@ -12,6 +12,7 @@ function VideoMode({
   // transcript props
   fullTranscript,
   currentPartial,
+  transcriptBlocks,
   selectedProfile,
   studentHomeLanguage,
   // dictionary state from App
@@ -643,6 +644,7 @@ function VideoMode({
             <ChatTranscript
               fullTranscript={fullTranscript}
               currentPartial={currentPartial}
+              transcriptBlocks={transcriptBlocks}
               selectedProfile={selectedProfile}
               roomSetup={roomSetup}
               selectedWords={selectedWords}

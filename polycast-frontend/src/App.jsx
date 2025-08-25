@@ -124,6 +124,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [isRecording, setIsRecording] = useState(false);
   const [fullTranscript, setFullTranscript] = useState('');
   const [currentPartial, setCurrentPartial] = useState(''); 
+  const [transcriptBlocks, setTranscriptBlocks] = useState([]); // [{speaker:'host'|'student', lines: string[], partial: string}]
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   const [errorMessages, setErrorMessages] = useState([]); 
   
@@ -574,29 +575,39 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             fullLength: parsedData.text?.length
           });
           
-          // Respect speaker if provided: only consume when it matches our role
-          const speaker = parsedData.speaker; // 'host' | 'student' or undefined
-          const amHost = !!(roomSetup && roomSetup.isHost);
-          const shouldConsume = speaker ? ((speaker === 'host' && amHost) || (speaker === 'student' && !amHost)) : true;
+          const speaker = parsedData.speaker || 'host';
 
-          if (shouldConsume) {
+          // Maintain grouped transcript blocks by speaker
+          setTranscriptBlocks(prev => {
+            const blocks = [...prev];
+            const last = blocks[blocks.length - 1];
+            if (!last || last.speaker !== speaker) {
+              blocks.push({ speaker, lines: [], partial: '' });
+            }
+            const idx = blocks.length - 1;
             if (parsedData.isInterim) {
-              // Update partial transcript with interim results
-              setCurrentPartial(parsedData.text);
+              blocks[idx].partial = parsedData.text || '';
             } else {
-              // Append finalized text and clear partial
-              setFullTranscript(prev => {
-                const newText = prev + (prev && !prev.endsWith(' ') ? ' ' : '') + parsedData.text;
-                console.log('[Frontend] Updated full transcript, new length:', newText.length);
-                return newText;
-              });
-              setCurrentPartial('');
-              
-              // For students: generate their own translation when receiving host's final transcript
-              if (userRole === 'student' && studentHomeLanguage && parsedData.text) {
-                console.log(`Student generating ${studentHomeLanguage} translation for: "${parsedData.text}"`);
-                generateStudentTranslation(parsedData.text, studentHomeLanguage);
-              }
+              const text = parsedData.text || '';
+              if (text.trim()) blocks[idx].lines.push(text);
+              blocks[idx].partial = '';
+            }
+            return blocks.slice(-100); // cap history
+          });
+
+          // Keep legacy concatenated transcript for compatibility
+          if (parsedData.isInterim) {
+            setCurrentPartial(parsedData.text);
+          } else {
+            setFullTranscript(prev => {
+              const newText = prev + (prev && !prev.endsWith(' ') ? ' ' : '') + parsedData.text;
+              console.log('[Frontend] Updated full transcript, new length:', newText.length);
+              return newText;
+            });
+            setCurrentPartial('');
+            if (userRole === 'student' && studentHomeLanguage && parsedData.text) {
+              console.log(`Student generating ${studentHomeLanguage} translation for: "${parsedData.text}"`);
+              generateStudentTranslation(parsedData.text, studentHomeLanguage);
             }
           }
         } else if (parsedData.type === 'error') {
@@ -1087,6 +1098,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             roomSetup={roomSetup}
             fullTranscript={fullTranscript}
             currentPartial={currentPartial}
+            transcriptBlocks={transcriptBlocks}
             translations={translations}
             targetLanguages={effectiveLanguages}
             selectedProfile={selectedProfile || internalSelectedProfile}
