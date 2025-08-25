@@ -1,11 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import AudioRecorder from './AudioRecorder';
-import TranscriptionDisplay from './TranscriptionDisplay';
-import WordDefinitionPopup from './WordDefinitionPopup';
-import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
-import apiService from '../services/apiService.js';
-import { extractSentenceWithWord } from '../utils/wordClickUtils';
+import ChatTranscript from './ChatTranscript';
 
 function VideoMode({
   sendMessage,
@@ -16,8 +12,6 @@ function VideoMode({
   // transcript props
   fullTranscript,
   currentPartial,
-  translations,
-  targetLanguages,
   selectedProfile,
   studentHomeLanguage,
   // dictionary state from App
@@ -38,16 +32,13 @@ function VideoMode({
   const [remoteAttachError, setRemoteAttachError] = useState('');
   const [videoError, setVideoError] = useState('');
   const [videoReady, setVideoReady] = useState(false);
-  const [fontSize, setFontSize] = useState(20);
-  const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
   const [isHoveringVideo, setIsHoveringVideo] = useState(false);
   const containerRef = useRef(null);
   const [splitRatio, setSplitRatio] = useState(0.5); // 50/50 split
   const [dragging, setDragging] = useState(false);
   const [dividerHover, setDividerHover] = useState(false);
   const clamp = (v, min = 0.2, max = 0.8) => Math.min(max, Math.max(min, v));
-  
-  const ui = getUITranslationsForProfile(selectedProfile);
+
   const pcRef = useRef(null);
   const remoteStreamRef = useRef(null);
 
@@ -200,13 +191,7 @@ function VideoMode({
     };
   }, [dragging]);
 
-  useEffect(() => {
-    const handleFontSizeChange = (e) => {
-      setFontSize(prev => Math.max(12, Math.min(60, prev + e.detail)));
-    };
-    window.addEventListener('changeFontSize', handleFontSizeChange);
-    return () => window.removeEventListener('changeFontSize', handleFontSizeChange);
-  }, []);
+  // No transcript font size handling here; ChatTranscript manages its own font size
 
   const isHost = !!(roomSetup && roomSetup.isHost);
   const allowMic = !roomSetup || isHost; // allow local mic when not in a room, or when hosting
@@ -335,49 +320,7 @@ function VideoMode({
     };
   }, [inRoom, isHost, sendMessage]);
   
-  const handleWordClick = async (word, event) => {
-    try {
-      const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
-      const targetLanguage = getLanguageForProfile(selectedProfile);
-      const sentence = extractSentenceWithWord(fullTranscript, word);
-      const sentenceWithMarkedWord = sentence.replace(
-        new RegExp(`\\b(${word})\\b`, 'i'),
-        '~$1~'
-      );
-      const url = apiService.getUnifiedWordDataUrl(
-        word,
-        sentenceWithMarkedWord,
-        nativeLanguage,
-        targetLanguage
-      );
-      const unifiedData = await apiService.fetchJson(url);
-      setWordDefinitions(prev => ({
-        ...prev,
-        [word.toLowerCase()]: {
-          ...unifiedData,
-          word: word,
-          translation: unifiedData.translation || word,
-          contextualExplanation: unifiedData.definition || 'Definition unavailable',
-          definition: unifiedData.definition || 'Definition unavailable',
-          example: unifiedData.exampleForDictionary || unifiedData.example || '',
-          frequency: unifiedData.frequency || 5
-        }
-      }));
-      setPopupInfo({ visible: true, word: word, position: { x: event.clientX, y: event.clientY } });
-    } catch (err) {
-      setWordDefinitions(prev => ({
-        ...prev,
-        [word.toLowerCase()]: {
-          word: word,
-          translation: word,
-          contextualExplanation: 'Definition unavailable',
-          definition: 'Definition unavailable',
-          example: `~${word}~`
-        }
-      }));
-      setPopupInfo({ visible: true, word: word, position: { x: event.clientX, y: event.clientY } });
-    }
-  };
+  // Word definition popup is handled within ChatTranscript
 
   const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 900);
   useEffect(() => {
@@ -444,8 +387,6 @@ function VideoMode({
         >
           <div
             style={{ position: 'relative', background: 'transparent', borderRadius: 0, overflow: 'visible', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onMouseEnter={() => setIsHoveringVideo(true)}
-            onMouseLeave={() => setIsHoveringVideo(false)}
           >
             {/* 16:10 aspect wrapper - no absolute box, scales with width */}
             <div style={{ width: '100%', padding: 12, boxSizing: 'border-box', display: 'flex', justifyContent: 'center' }}>
@@ -699,40 +640,22 @@ function VideoMode({
           }}
         >
           <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <TranscriptionDisplay
-              showTBA={showTBA}
+            <ChatTranscript
               fullTranscript={fullTranscript}
               currentPartial={currentPartial}
-              targetLanguages={targetLanguages}
-              translations={translations}
-              showLiveTranscript={true}
-              showTranslation={false}
+              selectedProfile={selectedProfile}
+              roomSetup={roomSetup}
               selectedWords={selectedWords}
               setSelectedWords={setSelectedWords}
               wordDefinitions={wordDefinitions}
               setWordDefinitions={setWordDefinitions}
-              isStudentMode={roomSetup && !roomSetup.isHost}
-              studentHomeLanguage={studentHomeLanguage}
-              selectedProfile={selectedProfile}
               onAddWord={onAddWord}
             />
           </div>
         </div>
       </div>
       
-      {popupInfo.visible && (
-        <WordDefinitionPopup
-          word={popupInfo.word}
-          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
-          position={popupInfo.position}
-          isInDictionary={Object.values(wordDefinitions).some(e => e && e.inFlashcards && e.word === (popupInfo.word || '').toLowerCase())}
-          onAddToDictionary={() => onAddWord && onAddWord(popupInfo.word)}
-          onRemoveFromDictionary={() => {}}
-          onClose={() => setPopupInfo({ visible: false, word: '', position: { x: 0, y: 0 } })}
-          loading={false}
-          nativeLanguage={getNativeLanguageForProfile(selectedProfile)}
-        />
-      )}
+      {/* Word definition popup is now managed inside ChatTranscript */}
     </div>
   );
 }
