@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest --roots src"
+    "test": "jest --roots src",
+    "db:inspect": "node src/profile-data/inspect_db.js"
   },
   "keywords": [],
   "author": "",
