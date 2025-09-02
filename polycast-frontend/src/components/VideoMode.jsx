@@ -702,8 +702,6 @@ VideoMode.propTypes = {
   roomSetup: PropTypes.object,
   fullTranscript: PropTypes.string,
   currentPartial: PropTypes.string,
-  translations: PropTypes.object,
-  targetLanguages: PropTypes.array,
   selectedProfile: PropTypes.string.isRequired,
   studentHomeLanguage: PropTypes.string
 };

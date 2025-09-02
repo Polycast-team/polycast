@@ -45,7 +45,7 @@ function StudentLanguageSelector({ onLanguageSelected }) {
             }}>
                 <h2 style={{ color: '#fff', marginBottom: 12 }}>Select Your Home Language</h2>
                 <p style={{ color: '#b3b3e7', marginBottom: 24, fontSize: 14 }}>
-                    This will be used for your flashcards and translations
+                    This will be used for your flashcards
                 </p>
                 
                 <form onSubmit={handleSubmit}>

@@ -69,22 +69,8 @@ function handleWebSocketConnection(ws, req, heartbeat) {
         }
     }, 60000);
 
-    // Parse target languages
+    // Target languages removed
     let targetLangsArray = [];
-    try {
-        if (query && query.targetLangs) {
-            targetLangsArray = query.targetLangs
-                .split(',')
-                .map(lang => decodeURIComponent(lang.trim()))
-                .filter(lang => lang.length > 0 && lang.length < 50);
-            console.log(`Client connected. Target languages from URL: ${targetLangsArray.join(', ')}`);
-        } else {
-            console.log(`Client connected. No targetLangs in URL, no languages set`);
-        }
-    } catch (e) {
-        console.error('Error parsing connection URL for target languages:', e);
-        targetLangsArray = []; // Fallback to empty array
-    }
 
     // Room handling logic - supports both query (?roomCode=) and path (/ws/room/:roomCode)
     const roomCodeFromPath = (pathParts[0] === 'ws' && pathParts[1] === 'room' && pathParts[2]) ? pathParts[2] : null;

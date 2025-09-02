@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import apiService from '../services/apiService.js';
-import config from '../config/config.js';
 import { extractSentenceWithWord } from '../utils/wordClickUtils';
 
 // Helper function to tokenize text into words and punctuation
@@ -62,10 +61,7 @@ const TranscriptionDisplay = ({
   showTBA,
   fullTranscript = '',
   currentPartial = '',
-  targetLanguages = [], 
-  translations = {}, 
   showLiveTranscript = true, 
-  showTranslation = true, 
   defaultFontSize,
   compactLines = false,
   selectedWords = [],
@@ -367,11 +363,7 @@ const TranscriptionDisplay = ({
     );
   };
 
-  const colorSchemes = [
-    { bg: '#2d2a3a', fg: '#fff', accent: '#7c62ff' },
-    { bg: '#1b3a4b', fg: '#fff', accent: '#4ad991' },
-    { bg: '#4a2c2a', fg: '#fff', accent: '#ffb86b' },
-  ];
+  // Translation color schemes removed
 
   return (
     <div
@@ -405,7 +397,7 @@ const TranscriptionDisplay = ({
       
       {/* Transcript Box */}
       {showLiveTranscript && (
-        <div style={{ width: '100%', flex: showTranslation ? '0 0 33.5%' : '1 1 100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ width: '100%', flex: '1 1 100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div
             style={{
               width: '100%',
@@ -456,63 +448,7 @@ const TranscriptionDisplay = ({
         </div>
       )}
       
-      {/* Translation Boxes (showing disabled message) */}
-      {showTranslation && (
-        <div
-          style={{
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'center',
-            flex: '1 1 66.5%',
-            alignItems: 'stretch',
-            minHeight: 0,
-            gap: 24,
-            boxSizing: 'border-box',
-            marginTop: 24,
-          }}
-        >
-          {targetLanguages.map((lang, idx) => {
-            const scheme = colorSchemes[(idx + 1) % colorSchemes.length];
-            return (
-              <div
-                key={lang}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  minHeight: 0,
-                  maxHeight: '100%',
-                  overflow: 'hidden',
-                  background: scheme.bg,
-                  color: scheme.fg,
-                  borderTop: `4px solid ${scheme.accent}`,
-                  borderRadius: 12,
-                  boxShadow: '0 2px 12px 0 rgba(124, 98, 255, 0.07)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: 20,
-                }}
-              >
-                <span style={{
-                  letterSpacing: 0.5,
-                  fontWeight: 800,
-                  fontSize: 20,
-                  color: scheme.accent + 'cc',
-                  textTransform: 'uppercase',
-                  opacity: 0.92,
-                  marginBottom: 20,
-                }}>
-                  {isStudentMode ? (studentHomeLanguage || ui.studentLanguage) : lang}
-                </span>
-                <p style={{ fontSize: 16, opacity: 0.7, textAlign: 'center' }}>
-                  {ui.translationDisabled}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Translation boxes removed */}
     </div>
   );
 };
@@ -521,10 +457,7 @@ TranscriptionDisplay.propTypes = {
   showTBA: PropTypes.func,
   fullTranscript: PropTypes.string,
   currentPartial: PropTypes.string,
-  targetLanguages: PropTypes.arrayOf(PropTypes.string),
-  translations: PropTypes.object,
   showLiveTranscript: PropTypes.bool,
-  showTranslation: PropTypes.bool,
   defaultFontSize: PropTypes.number,
   compactLines: PropTypes.bool,
   selectedWords: PropTypes.array,

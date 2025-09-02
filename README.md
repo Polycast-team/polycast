@@ -125,10 +125,9 @@ Polycast is a full-stack language learning platform designed for immersive learn
 - **Services**: OpenAI Whisper (transcription), DeepL (translation)
 
 ### 2. Intelligent Dictionary System
-- **Comprehensive Database**: 26 JSON files (a-z.json) containing detailed word definitions
-- **AI Enhancement**: Gemini API provides frequency ratings (1-10 scale) and example sentences
-- **Smart Lookup**: Clickable words in transcriptions with instant definitions
-- **Definition Sources**: Primary dictionary JSON, fallback to AI generation
+- **On-demand AI generation**: Gemini produces definitions, translations, frequency (1-10), and example sentences
+- **Smart Lookup**: Clickable words in transcriptions call the unified backend endpoint
+- **Unified Endpoints**: `/api/dictionary/unified` and `/api/dictionary/senses`
 
 ### 3. Spaced Repetition System (SRS)
 - **Algorithm**: Customized SRS with 9 interval levels
@@ -173,7 +172,6 @@ polycast-main/
     │   ├── llmService.js       # AI text processing
     │   ├── redisService.js     # Session management
     │   └── audioConvertService.js # Audio format handling
-    ├── dictionary-data/        # Word definition JSON files
     └── config/                 # Environment configuration
 ```
 
@@ -264,8 +262,8 @@ npm start
 
 ### Word Addition Process
 1. User clicks word in transcription
-2. Dictionary JSON lookup for definition
-3. Gemini API call for frequency + examples
+2. Backend `/api/dictionary/unified` generates definition, translation, frequency, and example sentences
+3. Receive unified data and create card entry
 4. Card creation with SRS data structure
 5. Addition to user's flashcard deck
 

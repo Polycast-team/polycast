@@ -101,10 +101,6 @@ async function handleTextSubmit(ws, data, clientData) {
 
     const translateThis = data.text;
     const sourceLang = data.lang;
-    const targetLangs = clientTargetLanguages.get(ws) || [];
-    const allLangs = Array.from(new Set(['English', ...targetLangs]));
-
-    const translations = await llmService.translateTextBatch(translateThis, allLangs, sourceLang);
 
     const hostResponse = {
         type: 'recognized',
@@ -124,20 +120,11 @@ async function handleTextSubmit(ws, data, clientData) {
             room.students.forEach(student => {
                 if (student.readyState === WebSocket.OPEN) {
                     student.send(JSON.stringify(hostResponse));
-                    for (const lang of allLangs) {
-                        if (lang !== sourceLang) {
-                            student.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
-                        }
-                    }
                 }
             });
         }
     }
-    for (const lang of allLangs) {
-        if (lang !== sourceLang) {
-            ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
-        }
-    }
+    // Translation messages removed
 }
 
 async function handleAudioMessage(ws, message, clientData) {
@@ -200,14 +187,7 @@ async function handleAudioMessage(ws, message, clientData) {
                     }
                 }
                 
-                // Translation calls are commented out for now
-                // if (!isInterim) {
-                //     const targetLangs = clientTargetLanguages.get(ws) || [];
-                //     const translations = await llmService.translateTextBatch(transcript, targetLangs);
-                //     for (const lang of targetLangs) {
-                //         ws.send(JSON.stringify({ type: 'translation', lang, data: translations[lang] }));
-                //     }
-                // }
+                // Translation calls removed
             },
             (error) => {
                 console.error('[Deepgram] Streaming error:', error.message || error);

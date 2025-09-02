@@ -4,11 +4,86 @@ const redisService = require('../services/redisService');
 const llmService = require('../services/llmService');
 const { generateTextWithGemini } = require('../services/llmService');
 const popupGeminiService = require('../services/popupGeminiService');
+const dictService = require('../profile-data/dictionaryService');
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+const authService = require('../services/authService');
+const authMiddleware = require('./middleware/auth');
 
 const ttsClient = new TextToSpeechClient();
 
 const router = express.Router();
+// Auth
+router.post('/auth/register', async (req, res) => {
+    try {
+        const { username, password, nativeLanguage = 'English', targetLanguage = 'English' } = req.body || {};
+        if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
+        const existing = await authService.findUserByUsername(username);
+        if (existing) return res.status(409).json({ error: 'Username already exists' });
+        const profile = await authService.createUser({ username, password, nativeLanguage, targetLanguage });
+        const token = authService.issueToken(profile);
+        return res.status(201).json({ token, profile });
+    } catch (e) {
+        console.error('[Auth] register error:', e);
+        res.status(500).json({ error: 'Failed to register' });
+    }
+});
+
+router.post('/auth/login', async (req, res) => {
+    try {
+        const { username, password } = req.body || {};
+        if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
+        const user = await authService.findUserByUsername(username);
+        if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+        const ok = await authService.verifyPassword(password, user.password_hash);
+        if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+        const token = authService.issueToken(user);
+        const profile = {
+            id: user.id,
+            username: user.username,
+            native_language: user.native_language,
+            target_language: user.target_language,
+        };
+        return res.json({ token, profile });
+    } catch (e) {
+        console.error('[Auth] login error:', e);
+        res.status(500).json({ error: 'Failed to login' });
+    }
+});
+
+router.get('/auth/me', authMiddleware, async (req, res) => {
+    try {
+        const profile = await authService.getProfileById(req.user.id);
+        if (!profile) return res.status(404).json({ error: 'Not found' });
+        return res.json(profile);
+    } catch (e) {
+        console.error('[Auth] me error:', e);
+        res.status(500).json({ error: 'Failed to load profile' });
+    }
+});
+
+// Profile
+router.get('/profiles/me', authMiddleware, async (req, res) => {
+    try {
+        const profile = await authService.getProfileById(req.user.id);
+        if (!profile) return res.status(404).json({ error: 'Not found' });
+        return res.json(profile);
+    } catch (e) {
+        console.error('[Profiles] get me error:', e);
+        res.status(500).json({ error: 'Failed to load profile' });
+    }
+});
+
+router.put('/profiles/me', authMiddleware, async (req, res) => {
+    try {
+        const { nativeLanguage, targetLanguage } = req.body || {};
+        if (!nativeLanguage || !targetLanguage) return res.status(400).json({ error: 'nativeLanguage and targetLanguage are required' });
+        const updated = await authService.updateProfileLanguages(req.user.id, { nativeLanguage, targetLanguage });
+        return res.json(updated);
+    } catch (e) {
+        console.error('[Profiles] update me error:', e);
+        res.status(500).json({ error: 'Failed to update profile' });
+    }
+});
 
 // Room Management API Endpoints
 router.post('/create-room', async (req, res) => {
@@ -59,17 +134,7 @@ router.get('/check-room/:roomCode', async (req, res) => {
     }
 });
 
-// Translation API
-router.get('/translate/:language/:text', async (req, res) => {
-    try {
-        const { language, text } = req.params;
-        const translatedText = await llmService.translateText(decodeURIComponent(text), language);
-        res.json({ translation: translatedText });
-    } catch (error) {
-        console.error("Translation API error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
+// Translation API removed
 
 // Sense Candidates API (for Add Word flow) - MUST be before /dictionary/:word
 router.get('/dictionary/senses', async (req, res) => {
@@ -110,6 +175,51 @@ router.get('/dictionary/unified', async (req, res) => {
     } catch (error) {
         console.error('[Unified API] Error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Dictionary (persisted) - auth required
+router.get('/dictionary', authMiddleware, async (req, res) => {
+    try {
+        const rows = await dictService.listEntries(req.user.id);
+        res.json(rows);
+    } catch (e) {
+        console.error('[Dictionary] list error:', e);
+        res.status(500).json({ error: 'Failed to list dictionary entries' });
+    }
+});
+
+router.post('/dictionary', authMiddleware, async (req, res) => {
+    try {
+        const { word, wordSenseId, translation, definition, frequency, exampleSentencesGenerated, exampleForDictionary, contextualExplanation, rawUnifiedJson, inFlashcards } = req.body || {};
+        if (!word || !wordSenseId) return res.status(400).json({ error: 'word and wordSenseId are required' });
+        const saved = await dictService.createEntry(req.user.id, {
+            word,
+            wordSenseId,
+            translation,
+            definition,
+            frequency,
+            exampleSentencesGenerated,
+            exampleForDictionary,
+            contextualExplanation,
+            rawUnifiedJson,
+            inFlashcards,
+        });
+        res.status(201).json(saved);
+    } catch (e) {
+        console.error('[Dictionary] create error:', e);
+        res.status(500).json({ error: 'Failed to create dictionary entry' });
+    }
+});
+
+router.delete('/dictionary/:id', authMiddleware, async (req, res) => {
+    try {
+        const ok = await dictService.deleteEntry(req.user.id, req.params.id);
+        if (!ok) return res.status(404).json({ error: 'Not found' });
+        res.json({ ok: true });
+    } catch (e) {
+        console.error('[Dictionary] delete error:', e);
+        res.status(500).json({ error: 'Failed to delete dictionary entry' });
     }
 });
 

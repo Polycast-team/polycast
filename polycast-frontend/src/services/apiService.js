@@ -21,7 +21,6 @@ class ApiService {
   createRoomUrl = () => `${this.baseUrl}/api/create-room`;
   checkRoomUrl = roomCode => `${this.baseUrl}/api/check-room/${roomCode}`;
   generateAudioUrl = () => `${this.baseUrl}/api/generate-audio`;
-  getTranslationUrl = (language, text) => `${this.baseUrl}/api/translate/${encodeURIComponent(language)}/${encodeURIComponent(text)}`;
 
   // Sense candidates for Add Word flow
   getSenseCandidatesUrl = (word, nativeLanguage, targetLanguage) => {
