@@ -321,8 +321,18 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         exampleSentencesGenerated: unifiedData.exampleSentencesGenerated || '',
         exampleForDictionary: unifiedData.exampleForDictionary || '',
         contextualExplanation: unifiedData.definition || '',
+        rawUnifiedJson: unifiedData,
         inFlashcards: true,
       });
+
+      // Ensure a flashcard exists for this dictionary entry (stores study interval fields)
+      try {
+        if (saved?.id) {
+          await apiService.postJson(`${apiService.baseUrl}/api/flashcards/from-dictionary/${saved.id}`, {});
+        }
+      } catch (e) {
+        console.warn('Ensure flashcard failed:', e);
+      }
 
       setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: { ...enriched, dbId: saved?.id } }));
       setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
