@@ -312,15 +312,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       });
 
       // Persist to server, then update local state with dbId
-      console.log('📤 [AddWord] POST /api/dictionary payload preview:', {
-        word: wordLower,
-        wordSenseId,
-        hasTranslation: !!(unifiedData.translation),
-        hasDefinition: !!(unifiedData.definition),
-        frequency: unifiedData.frequency || 5,
-        hasExampleSentencesGenerated: !!(unifiedData.exampleSentencesGenerated),
-        hasExampleForDictionary: !!(unifiedData.exampleForDictionary)
-      });
+      console.log('sending');
       const saved = await apiService.postJson(`${apiService.baseUrl}/api/dictionary`, {
         word: wordLower,
         wordSenseId,
@@ -333,13 +325,21 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         rawUnifiedJson: unifiedData,
         inFlashcards: true,
       });
-      console.log('✅ [AddWord] Saved dictionary entry:', saved);
+      try {
+        const all = await apiService.fetchJson(`${apiService.baseUrl}/api/dictionary`);
+        console.log('server dictionary after save:', all);
+      } catch (e) {
+        console.warn('failed to fetch server dictionary after save:', e);
+      }
 
       // Ensure a flashcard exists for this dictionary entry (stores study interval fields)
       try {
         if (saved?.id) {
-          const fc = await apiService.postJson(`${apiService.baseUrl}/api/flashcards/from-dictionary/${saved.id}`, {});
-          console.log('✅ [AddWord] Ensured flashcard:', fc?.id || fc);
+          await apiService.postJson(`${apiService.baseUrl}/api/flashcards/from-dictionary/${saved.id}`, {});
+          try {
+            const due = await apiService.fetchJson(`${apiService.baseUrl}/api/flashcards/due`);
+            console.log('server flashcards due after ensure:', due);
+          } catch (e) { console.warn('failed to fetch flashcards due after ensure:', e); }
         }
       } catch (e) {
         console.warn('Ensure flashcard failed:', e);
