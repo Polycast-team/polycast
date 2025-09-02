@@ -40,6 +40,16 @@ class ApiService {
   async fetchJson(url, options = {}) {
     const token = authClient.getToken?.();
     const auth = token ? { Authorization: `Bearer ${token}` } : {};
+    const method = (options.method || 'GET').toUpperCase();
+    try {
+      if (method !== 'GET') {
+        // Log request summary for debugging
+        const previewBody = typeof options.body === 'string' ? options.body.slice(0, 300) : undefined;
+        console.log('[API] Request', { method, url, hasToken: !!token, contentType: 'application/json', previewBody });
+      } else {
+        console.log('[API] Request', { method, url, hasToken: !!token });
+      }
+    } catch (_) {}
     const response = await fetch(url, {
       mode: 'cors',
       headers: {
@@ -52,6 +62,7 @@ class ApiService {
     });
     
     if (!response.ok) {
+      try { console.log('[API] Response', { method, url, status: response.status }); } catch (_) {}
       try {
         const data = await response.json();
         const message = data?.error || data?.message || `HTTP ${response.status}`;
@@ -66,10 +77,12 @@ class ApiService {
       }
     }
     
+    try { console.log('[API] Response', { method, url, status: response.status }); } catch (_) {}
     return response.json();
   }
 
   async postJson(url, data) {
+    try { console.log('[API] POST payload', { url, data }); } catch (_) {}
     return this.fetchJson(url, {
       method: 'POST',
       body: JSON.stringify(data)

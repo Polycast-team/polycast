@@ -312,6 +312,15 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       });
 
       // Persist to server, then update local state with dbId
+      console.log('📤 [AddWord] POST /api/dictionary payload preview:', {
+        word: wordLower,
+        wordSenseId,
+        hasTranslation: !!(unifiedData.translation),
+        hasDefinition: !!(unifiedData.definition),
+        frequency: unifiedData.frequency || 5,
+        hasExampleSentencesGenerated: !!(unifiedData.exampleSentencesGenerated),
+        hasExampleForDictionary: !!(unifiedData.exampleForDictionary)
+      });
       const saved = await apiService.postJson(`${apiService.baseUrl}/api/dictionary`, {
         word: wordLower,
         wordSenseId,
@@ -324,11 +333,13 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         rawUnifiedJson: unifiedData,
         inFlashcards: true,
       });
+      console.log('✅ [AddWord] Saved dictionary entry:', saved);
 
       // Ensure a flashcard exists for this dictionary entry (stores study interval fields)
       try {
         if (saved?.id) {
-          await apiService.postJson(`${apiService.baseUrl}/api/flashcards/from-dictionary/${saved.id}`, {});
+          const fc = await apiService.postJson(`${apiService.baseUrl}/api/flashcards/from-dictionary/${saved.id}`, {});
+          console.log('✅ [AddWord] Ensured flashcard:', fc?.id || fc);
         }
       } catch (e) {
         console.warn('Ensure flashcard failed:', e);
