@@ -494,6 +494,35 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     }
   }, [currentMode, dueCards, preGenerateAudioForSession]);
 
+  // Prefetch audio for the currently visible card as soon as it appears
+  useEffect(() => {
+    if (!currentCard) return;
+
+    let textToPrefetch = '';
+    if (currentCard.exampleSentencesGenerated) {
+      const parts = currentCard.exampleSentencesGenerated.split('//').map(s => s.trim()).filter(s => s.length > 0);
+      const srsInterval = currentCard?.srsData?.SRS_interval || 1;
+      const sentenceIndex = ((srsInterval - 1) % 5) * 2;
+      textToPrefetch = parts[sentenceIndex] || parts[0] || '';
+    } else if (currentCard.example) {
+      textToPrefetch = currentCard.example;
+    } else if (currentCard.word) {
+      textToPrefetch = currentCard.word;
+    }
+
+    const cacheKey = getSentenceCacheKey(currentCard);
+    if (!textToPrefetch || !cacheKey) return;
+    if (audioCache.current.has(cacheKey)) return;
+
+    (async () => {
+      try {
+        await generateAudioForSentence(textToPrefetch, cacheKey);
+      } catch (_) {
+        // Ignore prefetch failures; playback path will retry on demand
+      }
+    })();
+  }, [currentCard, getSentenceCacheKey, generateAudioForSentence]);
+
   // Auto-play audio when card is flipped (with correct sentence)
   useEffect(() => {
     if (isFlipped && currentCard && !hasAutoPlayedThisFlip && !autoPlayLockRef.current && !audioGenerationLockRef.current) {
