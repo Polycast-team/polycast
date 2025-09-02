@@ -50,7 +50,18 @@ class ApiService {
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      try {
+        const data = await response.json();
+        const message = data?.error || data?.message || `HTTP ${response.status}`;
+        throw new Error(message);
+      } catch (_) {
+        try {
+          const text = await response.text();
+          throw new Error(text || `HTTP ${response.status}`);
+        } catch (e2) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      }
     }
     
     return response.json();

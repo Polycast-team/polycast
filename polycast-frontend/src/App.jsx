@@ -934,7 +934,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       {/* Header right: logout + host/join controls */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
         <button
-          onClick={() => { try { authClient.clearToken(); } catch {}; window.location.assign('/login'); }}
+          onClick={() => { try { authClient.clearToken(); } catch {}; window.location.assign('/'); }}
           style={{ padding: '8px 12px', fontSize: 14, borderRadius: 4, background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}
           title="Logout"
         >
