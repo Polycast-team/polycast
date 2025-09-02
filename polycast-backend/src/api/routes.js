@@ -196,6 +196,7 @@ router.get('/dictionary', authMiddleware, async (req, res) => {
 
 router.post('/dictionary', authMiddleware, async (req, res) => {
     try {
+        console.log('sending');
         console.log('[Dictionary] create hit. userId=', req.user?.id, 'body keys=', Object.keys(req.body || {}));
         const { word, wordSenseId, translation, definition, frequency, exampleSentencesGenerated, exampleForDictionary, contextualExplanation, rawUnifiedJson, inFlashcards } = req.body || {};
         if (!word || !wordSenseId) return res.status(400).json({ error: 'word and wordSenseId are required' });
@@ -212,6 +213,12 @@ router.post('/dictionary', authMiddleware, async (req, res) => {
             inFlashcards,
         });
         console.log('[Dictionary] create saved id=', saved?.id, 'word=', saved?.word, 'sense=', saved?.word_sense_id);
+        try {
+            const afterRows = await dictService.listEntries(req.user.id);
+            console.log('[Dictionary] current entries for profile', req.user.id, ':', afterRows);
+        } catch (e2) {
+            console.warn('[Dictionary] failed to list after save:', e2?.message || e2);
+        }
         res.status(201).json(saved);
     } catch (e) {
         console.error('[Dictionary] create error:', e);
