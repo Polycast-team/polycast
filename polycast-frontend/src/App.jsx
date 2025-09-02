@@ -181,17 +181,28 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         const rows = await apiService.fetchJson(`${apiService.baseUrl}/api/dictionary`);
         const map = {};
         (rows || []).forEach(r => {
-          map[r.word_sense_id] = {
+          // Reconstruct display fields from gemini_unified_json if available
+          const u = r.gemini_unified_json || {};
+          map[r.sense_key] = {
             dbId: r.id,
             word: r.word,
-            wordSenseId: r.word_sense_id,
-            translation: r.translation || '',
-            definition: r.definition || '',
-            frequency: r.frequency || 5,
-            exampleSentencesGenerated: r.example_sentences_generated || '',
-            exampleForDictionary: r.example_for_dictionary || '',
-            contextualExplanation: r.contextual_explanation || '',
-            inFlashcards: r.in_flashcards !== false,
+            wordSenseId: r.sense_key,
+            translation: u.translation || '',
+            definition: u.definition || '',
+            frequency: u.frequency || 5,
+            exampleSentencesGenerated: u.exampleSentencesGenerated || '',
+            exampleForDictionary: u.exampleForDictionary || '',
+            contextualExplanation: u.definition || '',
+            inFlashcards: true,
+            srsData: {
+              // Map DB SRS to client shape; nextReviewDate aligns with due_at
+              status: 'new',
+              isNew: true,
+              gotWrongThisSession: false,
+              SRS_interval: r.study_interval_level || 1,
+              dueDate: r.due_at || new Date().toISOString(),
+              nextReviewDate: r.due_at || new Date().toISOString(),
+            }
           };
         });
         setWordDefinitions(map);
@@ -315,15 +326,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       console.log('sending');
       const saved = await apiService.postJson(`${apiService.baseUrl}/api/dictionary`, {
         word: wordLower,
-        wordSenseId,
-        translation: unifiedData.translation || '',
-        definition: unifiedData.definition || '',
-        frequency: unifiedData.frequency || 5,
-        exampleSentencesGenerated: unifiedData.exampleSentencesGenerated || '',
-        exampleForDictionary: unifiedData.exampleForDictionary || '',
-        contextualExplanation: unifiedData.definition || '',
-        rawUnifiedJson: unifiedData,
-        inFlashcards: true,
+        senseKey: wordSenseId,
+        geminiUnifiedText: unifiedData.rawText || '',
+        geminiUnifiedJson: unifiedData || null,
+        studyIntervalLevel: 1,
+        dueAt: null,
       });
       try {
         const all = await apiService.fetchJson(`${apiService.baseUrl}/api/dictionary`);
@@ -332,18 +339,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         console.warn('failed to fetch server dictionary after save:', e);
       }
 
-      // Ensure a flashcard exists for this dictionary entry (stores study interval fields)
-      try {
-        if (saved?.id) {
-          await apiService.postJson(`${apiService.baseUrl}/api/flashcards/from-dictionary/${saved.id}`, {});
-          try {
-            const due = await apiService.fetchJson(`${apiService.baseUrl}/api/flashcards/due`);
-            console.log('server flashcards due after ensure:', due);
-          } catch (e) { console.warn('failed to fetch flashcards due after ensure:', e); }
-        }
-      } catch (e) {
-        console.warn('Ensure flashcard failed:', e);
-      }
+      // No separate flashcards; SRS fields live on the wordsense row now
 
       setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: { ...enriched, dbId: saved?.id } }));
       setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
@@ -398,13 +394,29 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           definitionNumber
         );
         
+        // Persist to server
+        let saved = null;
+        try {
+          saved = await apiService.postJson(`${apiService.baseUrl}/api/dictionary`, {
+            word: wordLower,
+            senseKey: wordSenseId,
+            geminiUnifiedText: unifiedData.rawText || '',
+            geminiUnifiedJson: unifiedData || null,
+            studyIntervalLevel: 1,
+            dueAt: null,
+          });
+        } catch (e) {
+          console.warn('Failed to persist wordsense:', e);
+        }
+
         const enriched = {
           ...entry,
           translation: unifiedData.translation || sense?.translation || '',
           example: unifiedData.exampleForDictionary || sense?.example || '',
           contextSentence: sentenceWithMarkedWord,
           frequency: unifiedData.frequency || Math.max(1, Math.min(10, Number(sense?.frequency) || 5)),
-          exampleSentencesGenerated: unifiedData.exampleSentencesGenerated || ''
+          exampleSentencesGenerated: unifiedData.exampleSentencesGenerated || '',
+          dbId: saved?.id
         };
         
         setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));

@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import apiService from '../services/apiService';
 import { calculateNextReview, formatNextReviewTime, getDueCards } from '../utils/srsAlgorithm';
 import { getSRSSettings } from '../utils/srsSettings';
 
@@ -152,6 +153,22 @@ export function useFlashcardSRS(
       setCalendarUpdateTrigger(prev => prev + 1); // Force calendar re-render
     }
     
+    // Persist SRS changes to backend if we have a dbId
+    try {
+      if (currentCard.dbId) {
+        await apiService.fetchJson(`${apiService.baseUrl}/api/dictionary/${currentCard.dbId}/srs`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            studyIntervalLevel: updatedSrsData.SRS_interval,
+            dueAt: updatedSrsData.dueDate
+          }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    } catch (e) {
+      console.warn('[SRS] Failed to persist SRS update:', e);
+    }
+
     // Batch all state updates together to prevent UI flashing
     setWordDefinitions(prev => ({
       ...prev,

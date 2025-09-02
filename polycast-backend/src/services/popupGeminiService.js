@@ -73,14 +73,18 @@ Rules:
 
 No extra text, no commentary, no code fences, exactly 7 lines starting with the labels shown.`;
 
-      console.log('[UnifiedWordData] Full prompt sent to Gemini:');
-      console.log(prompt);
+      if (process.env.LOG_GEMINI === 'true') {
+        console.log('[UnifiedWordData] Full prompt sent to Gemini:');
+        console.log(prompt);
+      }
 
       const result = await this.model.generateContent(prompt);
       const text = (await result.response.text()).trim();
 
-      console.log('[UnifiedWordData] Full response from Gemini:');
-      console.log(text);
+      if (process.env.LOG_GEMINI === 'true') {
+        console.log('[UnifiedWordData] Full response from Gemini:');
+        console.log(text);
+      }
 
       // Parse the structured response
       const lines = text.split('\n').map(line => line.trim()).filter(line => line);
@@ -130,7 +134,8 @@ No extra text, no commentary, no code fences, exactly 7 lines starting with the 
         exampleForDictionary: examples[0]?.target || `~${word}~`,
         // Additional fields for compatibility
         contextualExplanation: definition,
-        example: examples[0]?.target || `~${word}~`
+        example: examples[0]?.target || `~${word}~`,
+        rawText: text
       };
 
     } catch (error) {

@@ -7,11 +7,9 @@ const pool = require('./pool');
 async function run() {
   const client = await pool.connect();
   try {
-    console.warn('[RESET] About to TRUNCATE tables: flashcards, dictionary_entries, profiles');
+    console.warn('[RESET] About to TRUNCATE tables: word_senses, profiles');
     await client.query('BEGIN');
-    // Order doesn’t matter with CASCADE, but list children first for clarity
-    await client.query('TRUNCATE TABLE flashcards RESTART IDENTITY CASCADE');
-    await client.query('TRUNCATE TABLE dictionary_entries RESTART IDENTITY CASCADE');
+    await client.query('TRUNCATE TABLE word_senses RESTART IDENTITY CASCADE');
     await client.query('TRUNCATE TABLE profiles RESTART IDENTITY CASCADE');
     await client.query('COMMIT');
     console.log('[RESET] Done. All profile-related data cleared.');
