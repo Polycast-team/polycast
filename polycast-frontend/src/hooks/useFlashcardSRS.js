@@ -34,7 +34,7 @@ export function useFlashcardSRS(
   const srsSettings = getSRSSettings();
 
   // Card marking function
-  const markCard = useCallback((answer) => {
+  const markCard = useCallback(async (answer) => {
     if (!dueCards[currentDueIndex]) return;
     if (processingCardRef.current) return;
     
