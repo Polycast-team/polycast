@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import AppRouter from './AppRouter.jsx'
 import MobileShell from './components/MobileShell.jsx'
-import ProfileSelectorScreen from './components/ProfileSelectorScreen.jsx';
+// import ProfileSelectorScreen from './components/ProfileSelectorScreen.jsx';
 import LanguageSelectorScreen from './components/LanguageSelectorScreen.jsx';
 import { shouldUseMobileApp } from './utils/deviceDetection.js';
 import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
@@ -57,18 +57,7 @@ function Main() {
     } catch {}
   }, [roomSetup]);
 
-  // Show login/profile selection first
-  if (!selectedProfile) {
-    return (
-      <ProfileSelectorScreen
-        onProfileSelected={(languages, profile) => {
-          setSelectedLanguages(languages);
-          setSelectedProfile(profile);
-        }}
-        userRole="student"
-      />
-    );
-  }
+  // Route-based auth flow now handles login/register; always render AppRouter
 
   // Always render the main app; users can host or join from within modes
 
