@@ -5,6 +5,7 @@ const llmService = require('../services/llmService');
 const { generateTextWithGemini } = require('../services/llmService');
 const popupGeminiService = require('../services/popupGeminiService');
 const dictService = require('../profile-data/dictionaryService');
+const flashcardsService = require('../profile-data/flashcardsService');
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
 const authService = require('../services/authService');
 const authMiddleware = require('./middleware/auth');
@@ -220,6 +221,47 @@ router.delete('/dictionary/:id', authMiddleware, async (req, res) => {
     } catch (e) {
         console.error('[Dictionary] delete error:', e);
         res.status(500).json({ error: 'Failed to delete dictionary entry' });
+    }
+});
+
+// Flashcards
+router.get('/flashcards/due', authMiddleware, async (req, res) => {
+    try {
+        const rows = await flashcardsService.listDue(req.user.id);
+        res.json(rows);
+    } catch (e) {
+        console.error('[Flashcards] listDue error:', e);
+        res.status(500).json({ error: 'Failed to load due flashcards' });
+    }
+});
+
+router.post('/flashcards/from-dictionary/:dictionaryEntryId', authMiddleware, async (req, res) => {
+    try {
+        const saved = await flashcardsService.ensureFlashcard(req.user.id, req.params.dictionaryEntryId);
+        res.status(201).json(saved);
+    } catch (e) {
+        console.error('[Flashcards] ensure error:', e);
+        res.status(500).json({ error: 'Failed to ensure flashcard' });
+    }
+});
+
+router.put('/flashcards/:id/study-interval', authMiddleware, async (req, res) => {
+    try {
+        const updated = await flashcardsService.updateStudyInterval(
+            req.params.id,
+            req.user.id,
+            {
+                studyIntervalLevel: req.body?.studyIntervalLevel,
+                dueAt: req.body?.dueAt,
+                correct: req.body?.correct ? 1 : 0,
+                incorrect: req.body?.incorrect ? 1 : 0,
+            }
+        );
+        if (!updated) return res.status(404).json({ error: 'Not found' });
+        res.json(updated);
+    } catch (e) {
+        console.error('[Flashcards] update interval error:', e);
+        res.status(500).json({ error: 'Failed to update flashcard' });
     }
 });
 

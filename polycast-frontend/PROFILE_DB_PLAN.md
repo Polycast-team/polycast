@@ -141,13 +141,16 @@ Move all profile-related data out of localStorage into a PostgreSQL 16 database 
 - [ ] Frontend: set `VITE_API_BASE_URL`, `VITE_WS_BASE_URL`
 
 ## Rollout Plan (Phases)
-- [ ] Phase 1: Backend DB bootstrap
-  - DB pool, migrations for `profiles`
-  - Auth (register/login/me), JWT middleware
-  - Profile settings API (GET/PUT native/target language)
-- [ ] Phase 2: Dictionary persistence
-  - Tables for `dictionary_entries`
-  - CRUD endpoints; integrate unified Gemini save-on-create
+- [x] Phase 1: Backend DB bootstrap (COMPLETED)
+  - [x] DB pool
+  - [x] Migrations for `profiles` (idempotent patch to existing table, add UUID PK)
+  - [x] Auth (register/login/me), JWT middleware
+  - [x] Profile settings API (GET/PUT native/target language)
+- [x] Phase 2: Dictionary persistence (SERVER DONE)
+  - [x] Table `dictionary_entries` with FK → `profiles(id)`
+  - [x] CRUD endpoints (GET list, POST create/upsert, DELETE)
+  - [x] Keep unified Gemini endpoint; client can generate then persist
+  - [ ] Frontend integration (replace localStorage reads/writes with server calls)
 - [ ] Phase 3: Flashcards persistence
   - `flashcards` table, study interval rename
   - Due cards + update study interval endpoints
@@ -159,5 +162,15 @@ Move all profile-related data out of localStorage into a PostgreSQL 16 database 
 - Passwords are never stored in plaintext; use bcrypt.
 - Consider `raw_unified_json` (jsonb) to preserve full Gemini data for future evolution.
 - Keep changes isolated in new files; minimize edits in large components.
+
+## Next Actions
+- Backend
+  - [ ] Add unique constraint on `profiles.username` if not present
+  - [ ] Phase 3 migrations and endpoints for `flashcards`
+- Frontend
+  - [ ] Add auth client (login/register/me) and persist token
+  - [ ] Implement server-backed dictionary hook (list/create/delete)
+  - [ ] Swap add-word flow to: call unified → POST `/api/dictionary` → refresh list
+  - [ ] Rename UI labels from “interval” → “study interval” (Phase 3)
 
 
