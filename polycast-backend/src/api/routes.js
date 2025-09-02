@@ -3,11 +3,14 @@ const { generateRoomCode, activeRooms } = require('../utils/room');
 const redisService = require('../services/redisService');
 const popupGeminiService = require('../services/popupGeminiService');
 const dictService = require('../profile-data/dictionaryService');
-const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+const axios = require('axios');
+const config = require('../config/config');
 const authService = require('../services/authService');
 const authMiddleware = require('./middleware/auth');
 
-const ttsClient = new TextToSpeechClient();
+// OpenAI TTS configuration
+const OPENAI_TTS_MODEL = 'gpt-4o-mini-tts';
+const DEFAULT_OPENAI_VOICE = 'alloy';
 
 const router = express.Router();
 // Auth
@@ -269,31 +272,39 @@ router.post('/generate-audio', async (req, res) => {
 
         // Strip tildes from text before synthesis
         const cleanText = text.trim().replace(/~/g, '');
-        
-        // Randomly choose between natural male and female voices
-        const voices = ['en-US-Neural2-J', 'en-US-Neural2-F']; // J=male, F=female
-        const randomVoice = voices[Math.floor(Math.random() * voices.length)];
 
-        const request = {
-            input: { text: cleanText },
-            voice: {
-                languageCode: (voice && voice.languageCode) || 'en-US',
-                name: (voice && voice.name) || randomVoice
+        if (!config.openaiApiKey) {
+            return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server' });
+        }
+
+        // Use OpenAI Text-to-Speech (latest model)
+        const model = OPENAI_TTS_MODEL;
+        const selectedVoice = DEFAULT_OPENAI_VOICE; // Frontend sends Google-style voice; ignore and default
+
+        const oaResponse = await axios.post(
+            'https://api.openai.com/v1/audio/speech',
+            {
+                model,
+                input: cleanText,
+                voice: selectedVoice,
+                format: 'mp3'
             },
-            audioConfig: {
-                audioEncoding: 'MP3',
-                speakingRate: speakingRate ?? 1.0,
-                pitch: pitch ?? 0.0
+            {
+                headers: {
+                    Authorization: `Bearer ${config.openaiApiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                responseType: 'arraybuffer'
             }
-        };
+        );
 
-        const [response] = await ttsClient.synthesizeSpeech(request);
-        const base64 = Buffer.from(response.audioContent).toString('base64');
-        
+        const audioBuffer = Buffer.from(oaResponse.data);
+        const base64 = audioBuffer.toString('base64');
         res.json({ audioUrl: `data:audio/mp3;base64,${base64}` });
     } catch (error) {
-        console.error('[TTS] Error:', error);
-        res.status(500).json({ error: error.message });
+        console.error('[TTS] Error (OpenAI):', error?.response?.data || error?.message || error);
+        const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate audio';
+        res.status(500).json({ error: message });
     }
 });
 
@@ -307,35 +318,42 @@ router.post('/tts', async (req, res) => {
 
         // Strip tildes from text before synthesis
         const cleanText = text.trim().replace(/~/g, '');
-        
-        // Randomly choose between natural male and female voices
-        const voices = ['en-US-Neural2-J', 'en-US-Neural2-F']; // J=male, F=female
-        const randomVoice = voices[Math.floor(Math.random() * voices.length)];
 
-        const request = {
-            input: { text: cleanText },
-            voice: {
-                languageCode: (voice && voice.languageCode) || 'en-US',
-                name: (voice && voice.name) || randomVoice
+        if (!config.openaiApiKey) {
+            return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server' });
+        }
+
+        const model = OPENAI_TTS_MODEL;
+        const selectedVoice = DEFAULT_OPENAI_VOICE;
+
+        const oaResponse = await axios.post(
+            'https://api.openai.com/v1/audio/speech',
+            {
+                model,
+                input: cleanText,
+                voice: selectedVoice,
+                format: 'mp3'
             },
-            audioConfig: {
-                audioEncoding: 'MP3',
-                speakingRate: speakingRate ?? 1.0,
-                pitch: pitch ?? 0.0
+            {
+                headers: {
+                    Authorization: `Bearer ${config.openaiApiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                responseType: 'arraybuffer'
             }
-        };
+        );
 
-        const [response] = await ttsClient.synthesizeSpeech(request);
-        
+        const audioBuffer = Buffer.from(oaResponse.data);
         // Return as blob for legacy compatibility
         res.set({
             'Content-Type': 'audio/mpeg',
-            'Content-Length': response.audioContent.length
+            'Content-Length': audioBuffer.length
         });
-        res.send(response.audioContent);
+        res.send(audioBuffer);
     } catch (error) {
-        console.error('[TTS Legacy] Error:', error);
-        res.status(500).json({ error: error.message });
+        console.error('[TTS Legacy] Error (OpenAI):', error?.response?.data || error?.message || error);
+        const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate audio';
+        res.status(500).json({ error: message });
     }
 });
 
