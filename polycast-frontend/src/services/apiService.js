@@ -70,11 +70,8 @@ class ApiService {
   }
 
   async postJson(url, data) {
-    const token = authClient.getToken?.();
-    const auth = token ? { Authorization: `Bearer ${token}` } : {};
     return this.fetchJson(url, {
       method: 'POST',
-      headers: { ...auth },
       body: JSON.stringify(data)
     });
   }

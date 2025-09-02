@@ -31,7 +31,7 @@ function setupExpress(app) {
       credentials: true
     }));
 
-    // Enable JSON body parsing for POST requests
+    // Enable JSON body parsing for POST requests (require application/json on client)
     app.use(express.json());
 }
 
