@@ -15,6 +15,8 @@ const ttsClient = new TextToSpeechClient();
 const router = express.Router();
 // Auth
 router.post('/auth/register', async (req, res) => {
+    console.log('[Auth] register hit. content-type:', req.headers['content-type']);
+    console.log('[Auth] register body:', req.body);
     try {
         const { username, password, nativeLanguage = 'English', targetLanguage = 'English' } = req.body || {};
         if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
@@ -30,6 +32,8 @@ router.post('/auth/register', async (req, res) => {
 });
 
 router.post('/auth/login', async (req, res) => {
+    console.log('[Auth] login hit. content-type:', req.headers['content-type']);
+    console.log('[Auth] login body:', req.body);
     try {
         const { username, password } = req.body || {};
         if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
