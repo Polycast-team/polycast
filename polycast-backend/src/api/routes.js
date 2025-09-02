@@ -196,6 +196,7 @@ router.get('/dictionary', authMiddleware, async (req, res) => {
 
 router.post('/dictionary', authMiddleware, async (req, res) => {
     try {
+        console.log('[Dictionary] create hit. userId=', req.user?.id, 'body keys=', Object.keys(req.body || {}));
         const { word, wordSenseId, translation, definition, frequency, exampleSentencesGenerated, exampleForDictionary, contextualExplanation, rawUnifiedJson, inFlashcards } = req.body || {};
         if (!word || !wordSenseId) return res.status(400).json({ error: 'word and wordSenseId are required' });
         const saved = await dictService.createEntry(req.user.id, {
@@ -210,15 +211,17 @@ router.post('/dictionary', authMiddleware, async (req, res) => {
             rawUnifiedJson,
             inFlashcards,
         });
+        console.log('[Dictionary] create saved id=', saved?.id, 'word=', saved?.word, 'sense=', saved?.word_sense_id);
         res.status(201).json(saved);
     } catch (e) {
         console.error('[Dictionary] create error:', e);
-        res.status(500).json({ error: 'Failed to create dictionary entry' });
+        res.status(500).json({ error: e?.message || 'Failed to create dictionary entry' });
     }
 });
 
 router.delete('/dictionary/:id', authMiddleware, async (req, res) => {
     try {
+        console.log('[Dictionary] delete hit. userId=', req.user?.id, 'id=', req.params?.id);
         const ok = await dictService.deleteEntry(req.user.id, req.params.id);
         if (!ok) return res.status(404).json({ error: 'Not found' });
         res.json({ ok: true });
