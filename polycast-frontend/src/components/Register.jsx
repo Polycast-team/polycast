@@ -16,7 +16,7 @@ function Register() {
     setError('');
     setLoading(true);
     try {
-      await authClient.register(
+      const res = await authClient.register(
         username.trim(),
         password,
         nativeLanguage.trim(),
@@ -36,19 +36,19 @@ function Register() {
       <form onSubmit={onSubmit}>
         <div style={{ marginBottom: 12 }}>
           <label>Username</label>
-          <input value={username} onChange={e => setUsername(e.target.value)} style={{ width: '100%' }} />
+          <input value={username} onChange={e => setUsername(e.target.value)} style={{ width: '100%' }} autoComplete="username" />
         </div>
         <div style={{ marginBottom: 12 }}>
           <label>Password</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%' }} />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%' }} autoComplete="new-password" />
         </div>
         <div style={{ marginBottom: 12 }}>
           <label>Native language</label>
-          <input value={nativeLanguage} onChange={e => setNativeLanguage(e.target.value)} style={{ width: '100%' }} />
+          <input value={nativeLanguage} onChange={e => setNativeLanguage(e.target.value)} style={{ width: '100%' }} autoComplete="off" />
         </div>
         <div style={{ marginBottom: 12 }}>
           <label>Target language</label>
-          <input value={targetLanguage} onChange={e => setTargetLanguage(e.target.value)} style={{ width: '100%' }} />
+          <input value={targetLanguage} onChange={e => setTargetLanguage(e.target.value)} style={{ width: '100%' }} autoComplete="off" />
         </div>
         {error && <div style={{ color: '#f87171', marginBottom: 8 }}>{error}</div>}
         <button type="submit" disabled={loading}>Create account</button>

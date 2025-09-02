@@ -41,8 +41,10 @@ class ApiService {
     const token = authClient.getToken?.();
     const auth = token ? { Authorization: `Bearer ${token}` } : {};
     const response = await fetch(url, {
+      mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         ...auth,
         ...options.headers
       },
