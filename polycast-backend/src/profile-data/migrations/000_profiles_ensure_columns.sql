@@ -23,6 +23,9 @@ BEGIN
   END IF;
 END$$;
 
+-- Ensure id is unique even if an existing PK is on another column
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_id_uniq_idx ON profiles(id);
+
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS native_language TEXT;
