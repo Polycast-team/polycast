@@ -1,4 +1,5 @@
 import config from '../config/config.js';
+import authClient from './authClient.js';
 
 /**
  * API Service Layer
@@ -37,9 +38,12 @@ class ApiService {
 
   // Helper methods for common API patterns
   async fetchJson(url, options = {}) {
+    const token = authClient.getToken?.();
+    const auth = token ? { Authorization: `Bearer ${token}` } : {};
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
+        ...auth,
         ...options.headers
       },
       ...options
@@ -53,8 +57,11 @@ class ApiService {
   }
 
   async postJson(url, data) {
+    const token = authClient.getToken?.();
+    const auth = token ? { Authorization: `Bearer ${token}` } : {};
     return this.fetchJson(url, {
       method: 'POST',
+      headers: { ...auth },
       body: JSON.stringify(data)
     });
   }

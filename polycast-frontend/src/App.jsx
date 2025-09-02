@@ -20,6 +20,7 @@ import { getLanguageForProfile, getTranslationsForProfile, getNativeLanguageForP
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
+import authClient from './services/authClient.js';
 import { createFlashcardEntry } from './components/FixedCardDefinitions';
 import { extractSentenceWithWord, markClickedWordInSentence } from './utils/wordClickUtils';
 import ModeSelector from './components/ModeSelector';
@@ -173,65 +174,34 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     return () => window.removeEventListener("keydown", handlePageKey);
   }, [roomSetup]); // Reverted dependencies
 
-  // Load and migrate profile-scoped dictionary/flashcards when profile changes
+  // Load dictionary from server after login (no localStorage)
   useEffect(() => {
-    const profile = selectedProfile || internalSelectedProfile;
-    if (!profile) return;
-    try {
-      const swKey = `pc_selectedWords_${profile}`;
-      const wdKey = `pc_wordDefinitions_${profile}`;
-
-      // Migrate from legacy global keys if present
-      const legacySW = localStorage.getItem('pc_selectedWords');
-      const legacyWD = localStorage.getItem('pc_wordDefinitions');
-
-      if (!localStorage.getItem(swKey) && legacySW) {
-        localStorage.setItem(swKey, legacySW);
-        try { localStorage.removeItem('pc_selectedWords'); } catch {}
+    async function loadServerDictionary() {
+      try {
+        const rows = await apiService.fetchJson(`${apiService.baseUrl}/api/dictionary`);
+        const map = {};
+        (rows || []).forEach(r => {
+          map[r.word_sense_id] = {
+            dbId: r.id,
+            word: r.word,
+            wordSenseId: r.word_sense_id,
+            translation: r.translation || '',
+            definition: r.definition || '',
+            frequency: r.frequency || 5,
+            exampleSentencesGenerated: r.example_sentences_generated || '',
+            exampleForDictionary: r.example_for_dictionary || '',
+            contextualExplanation: r.contextual_explanation || '',
+            inFlashcards: r.in_flashcards !== false,
+          };
+        });
+        setWordDefinitions(map);
+        setSelectedWords(Array.from(new Set((rows || []).map(r => r.word))));
+      } catch (e) {
+        console.error('Failed to load server dictionary:', e);
       }
-      if (!localStorage.getItem(wdKey) && legacyWD) {
-        localStorage.setItem(wdKey, legacyWD);
-        try { localStorage.removeItem('pc_wordDefinitions'); } catch {}
-      }
-
-      // Read scoped values
-      const storedSW = localStorage.getItem(swKey);
-      const storedWD = localStorage.getItem(wdKey);
-
-      const parsedSW = storedSW ? JSON.parse(storedSW) : [];
-      const parsedWD = storedWD ? JSON.parse(storedWD) : {};
-
-      // Clean broken entries for safety
-      const cleanedWD = {};
-      Object.entries(parsedWD || {}).forEach(([key, entry]) => {
-        if (!entry || !entry.wordSenseId) return;
-        if (!entry.exampleSentencesGenerated) return;
-        cleanedWD[key] = entry;
-      });
-
-      setSelectedWords(Array.isArray(parsedSW) ? parsedSW : []);
-      setWordDefinitions(cleanedWD);
-
-      // Persist cleaned snapshot back to scoped storage if changed
-      try { localStorage.setItem(wdKey, JSON.stringify(cleanedWD)); } catch {}
-    } catch (e) {
-      console.warn('Failed to load/migrate profile-scoped dictionary data:', e);
-      setSelectedWords([]);
-      setWordDefinitions({});
     }
-  }, [selectedProfile, internalSelectedProfile]);
-
-  // Persist dictionary state to profile-scoped localStorage
-  useEffect(() => {
-    const profile = selectedProfile || internalSelectedProfile;
-    if (!profile) return;
-    try { localStorage.setItem(`pc_selectedWords_${profile}`, JSON.stringify(selectedWords)); } catch {}
-  }, [selectedWords, selectedProfile, internalSelectedProfile]);
-  useEffect(() => {
-    const profile = selectedProfile || internalSelectedProfile;
-    if (!profile) return;
-    try { localStorage.setItem(`pc_wordDefinitions_${profile}`, JSON.stringify(wordDefinitions)); } catch {}
-  }, [wordDefinitions, selectedProfile, internalSelectedProfile]);
+    loadServerDictionary();
+  }, []);
 
   // Global listener to open/close the flashcard calendar from any mode
   useEffect(() => {
@@ -341,7 +311,20 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         word: !!enriched.word
       });
 
-      setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: enriched }));
+      // Persist to server, then update local state with dbId
+      const saved = await apiService.postJson(`${apiService.baseUrl}/api/dictionary`, {
+        word: wordLower,
+        wordSenseId,
+        translation: unifiedData.translation || '',
+        definition: unifiedData.definition || '',
+        frequency: unifiedData.frequency || 5,
+        exampleSentencesGenerated: unifiedData.exampleSentencesGenerated || '',
+        exampleForDictionary: unifiedData.exampleForDictionary || '',
+        contextualExplanation: unifiedData.definition || '',
+        inFlashcards: true,
+      });
+
+      setWordDefinitions((prev) => ({ ...prev, [wordSenseId]: { ...enriched, dbId: saved?.id } }));
       setSelectedWords((prev) => (prev.includes(wordLower) ? prev : [...prev, wordLower]));
       
       console.log(`✅ [handleAddWord] Successfully added word using unified API: ${wordLower}`);
@@ -948,8 +931,15 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         </div>
       )}
       
-      {/* Header right: host/join controls and role indicator (video or audio modes) */}
+      {/* Header right: logout + host/join controls */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <button
+          onClick={() => { try { authClient.clearToken(); } catch {}; window.location.assign('/login'); }}
+          style={{ padding: '8px 12px', fontSize: 14, borderRadius: 4, background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}
+          title="Logout"
+        >
+          Logout
+        </button>
         {(appMode === 'video' || appMode === 'audio') && !roomSetup && (
           <>
             <button
@@ -1015,7 +1005,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             isAddingWordBusy={isAddingWordBusy}
             toolbarStats={toolbarStats}
             onAddWordSenses={handleAddWordSenses}
-            onRemoveWord={(wordSenseId, word) => {
+            onRemoveWord={async (wordSenseId, word) => {
               console.log(`Removing word from dictionary: ${word} (${wordSenseId})`);
               try {
                 // Get the word entry from wordSenseId
@@ -1026,6 +1016,12 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                 }
                 
                 const wordLower = wordEntry.word.toLowerCase();
+                // Persist delete if this entry exists in DB
+                if (wordEntry.dbId) {
+                  try {
+                    await apiService.fetchJson(`${apiService.baseUrl}/api/dictionary/${wordEntry.dbId}`, { method: 'DELETE' });
+                  } catch (e) { console.warn('Server delete failed:', e); }
+                }
                 
                 // Only remove the specific wordSenseId that was clicked
                 const senseIdsToRemove = [wordSenseId];
