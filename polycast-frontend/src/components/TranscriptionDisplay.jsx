@@ -167,7 +167,7 @@ const TranscriptionDisplay = ({
       }
     });
     
-    // Use UNIFIED API for fetching definition
+    // Use QUICK API for fast preview
     setLoadingDefinition(true);
     try {
       const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
@@ -190,30 +190,29 @@ const TranscriptionDisplay = ({
         }
       );
       
-      console.log(`[TranscriptionDisplay] Using unified API for word: "${word}", instance: ${wordInstanceIndex}`);
+      console.log(`[TranscriptionDisplay] Using quick API for word: "${word}", instance: ${wordInstanceIndex}`);
       console.log(`[TranscriptionDisplay] Sentence with marked word:`, sentenceWithMarkedWord);
       
-      const url = apiService.getUnifiedWordDataUrl(
+      const url = apiService.getQuickWordDataUrl(
         word,
         sentenceWithMarkedWord,
         nativeLanguage,
         targetLanguage
       );
       
-      const unifiedData = await apiService.fetchJson(url);
+      const quickData = await apiService.fetchJson(url);
       
-      // Store unified data in wordDefinitions for popup display
+      // Store quick data in wordDefinitions for popup display
       setWordDefinitions(prev => ({
         ...prev,
         [word.toLowerCase()]: {
-          ...unifiedData,
           // Ensure compatibility with popup expectations
           word: word,
-          translation: unifiedData.translation || word,
-          contextualExplanation: unifiedData.definition || 'Definition unavailable',
-          definition: unifiedData.definition || 'Definition unavailable',
-          example: unifiedData.exampleForDictionary || unifiedData.example || '',
-          frequency: unifiedData.frequency || 5
+          translation: quickData.translation || word,
+          contextualExplanation: quickData.definition || 'Definition unavailable',
+          definition: quickData.definition || 'Definition unavailable',
+          example: `~${word}~`,
+          frequency: 5
         }
       }));
     } catch (error) {

@@ -17,6 +17,52 @@ class PopupGeminiService {
   }
 
   /**
+   * QUICK LOOKUP: Return a single-line translation + concise explanation for the marked instance
+   * Output format: "TRANSLATION//EXPLANATION"
+   */
+  async getQuickSenseSummary(word, sentenceWithMarkedWord, nativeLanguage = 'English', targetLanguage = 'English') {
+    try {
+      const prompt = `You are helping a language learner quickly understand a word in context.
+
+Inputs:
+- headword: "${word}"
+- sentence with the clicked instance marked: "${sentenceWithMarkedWord}"
+- nativeLanguage: ${nativeLanguage}
+- targetLanguage (language of the sentence/headword): ${targetLanguage}
+
+Task:
+Analyze the ~marked~ instance of the headword in the sentence and return EXACTLY ONE LINE:
+[TRANSLATION in ${nativeLanguage}]//[CONCISE ${nativeLanguage} EXPLANATION of the meaning in THIS SENTENCE (<= 15 words)]
+
+Rules:
+- Focus on the ~marked~ instance only
+- No extra text, no labels, no code fences
+- Output exactly one line with "//" as separator`;
+
+      if (process.env.LOG_GEMINI === 'true') {
+        console.log('[QuickSense] Full prompt sent to Gemini:');
+        console.log(prompt);
+      }
+
+      const result = await this.model.generateContent(prompt);
+      const text = (await result.response.text()).trim();
+
+      if (process.env.LOG_GEMINI === 'true') {
+        console.log('[QuickSense] Full response from Gemini:');
+        console.log(text);
+      }
+
+      const parts = text.split('//').map(s => s.trim());
+      const translation = parts[0] || word;
+      const explanation = parts[1] || '';
+      return { translation, definition: explanation };
+    } catch (error) {
+      console.error('[PopupGeminiService] Error in getQuickSenseSummary:', error);
+      return { translation: word, definition: '' };
+    }
+  }
+
+  /**
    * UNIFIED API: Get complete word data including definition, translation, frequency, and 5 example pairs
    * @param {string} word - The headword to define
    * @param {string} sentenceWithMarkedWord - Sentence with the clicked instance marked with tildes

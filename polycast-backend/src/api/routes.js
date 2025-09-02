@@ -1,8 +1,6 @@
 const express = require('express');
 const { generateRoomCode, activeRooms } = require('../utils/room');
 const redisService = require('../services/redisService');
-const llmService = require('../services/llmService');
-const { generateTextWithGemini } = require('../services/llmService');
 const popupGeminiService = require('../services/popupGeminiService');
 const dictService = require('../profile-data/dictionaryService');
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
@@ -179,6 +177,25 @@ router.get('/dictionary/unified', async (req, res) => {
     } catch (error) {
         console.error('[Unified API] Error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// QUICK LOOKUP - fast preview for transcript click (translation + concise explanation)
+router.get('/dictionary/quick', async (req, res) => {
+    try {
+        const { word, sentenceWithMarkedWord, nativeLanguage = 'English', targetLanguage = 'English' } = req.query || {};
+        if (!word || !word.trim()) return res.status(400).json({ error: 'word is required' });
+        if (!sentenceWithMarkedWord || !sentenceWithMarkedWord.trim()) return res.status(400).json({ error: 'sentenceWithMarkedWord is required' });
+        const quick = await popupGeminiService.getQuickSenseSummary(
+            word.trim(),
+            sentenceWithMarkedWord.trim(),
+            nativeLanguage,
+            targetLanguage
+        );
+        return res.json(quick);
+    } catch (e) {
+        console.error('[Quick API] Error:', e);
+        res.status(500).json({ error: e?.message || 'Failed to get quick summary' });
     }
 });
 

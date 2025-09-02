@@ -36,6 +36,12 @@ class ApiService {
     return `${this.baseUrl}/api/dictionary/unified?${params}`;
   }
 
+  // QUICK LOOKUP - translation + concise explanation only
+  getQuickWordDataUrl = (word, sentenceWithMarkedWord, nativeLanguage, targetLanguage) => {
+    const params = new URLSearchParams({ word, sentenceWithMarkedWord, nativeLanguage, targetLanguage });
+    return `${this.baseUrl}/api/dictionary/quick?${params}`;
+  }
+
   // Helper methods for common API patterns
   async fetchJson(url, options = {}) {
     const token = authClient.getToken?.();

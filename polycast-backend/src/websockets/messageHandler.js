@@ -1,6 +1,5 @@
 const WebSocket = require('ws');
 const { createStreamingSession } = require('../services/deepgramService');
-const llmService = require('../services/llmService');
 const redisService = require('../services/redisService');
 
 async function handleWebSocketMessage(ws, message, clientData) {
