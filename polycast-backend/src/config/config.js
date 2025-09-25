@@ -12,7 +12,7 @@ const config = {
 
     // OpenAI Configuration (used for chat, realtime voice, and TTS)
     openaiApiKey: process.env.OPENAI_API_KEY,
-    openaiChatModel: process.env.OPENAI_CHAT_MODEL || 'gpt-5',
+    openaiChatModel: process.env.OPENAI_CHAT_MODEL || 'gpt-5-mini',
     openaiRealtimeVoiceModel: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime',
     openaiRealtimeVoiceFormat: process.env.OPENAI_REALTIME_AUDIO_FORMAT || 'mp3',
 

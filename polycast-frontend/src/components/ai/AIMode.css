@@ -20,6 +20,47 @@
   padding-right: 4px;
 }
 
+.ai-typing-indicator {
+  align-self: flex-start;
+  display: inline-flex;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(124, 98, 255, 0.25);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.35);
+  margin-left: 0;
+  margin-top: 4px;
+}
+
+.ai-typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c7d2fe;
+  opacity: 0.4;
+  animation: aiTypingBounce 1s infinite ease-in-out;
+}
+
+.ai-typing-indicator span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.ai-typing-indicator span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes aiTypingBounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
 .ai-message {
   max-width: 84%;
   display: flex;

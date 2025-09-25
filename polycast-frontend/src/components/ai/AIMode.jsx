@@ -30,6 +30,7 @@ function AIMode({
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isAwaitingResponse, setIsAwaitingResponse] = useState(false);
   const [error, setError] = useState('');
   const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
   const [loadingDefinition, setLoadingDefinition] = useState(false);
@@ -144,6 +145,7 @@ function AIMode({
     }
 
     setIsSending(true);
+    setIsAwaitingResponse(true);
     setError('');
     const userMessage = { role: 'user', content: trimmed };
     appendMessage(userMessage);
@@ -164,6 +166,7 @@ function AIMode({
       setError(err?.message || 'Failed to get response');
     } finally {
       setIsSending(false);
+      setIsAwaitingResponse(false);
       focusInput();
     }
   }, [appendMessage, conversationForApi, focusInput, inputValue]);
@@ -240,11 +243,11 @@ function AIMode({
       )}
 
       <div className="ai-messages-pane">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`ai-message ai-message-${message.role}`}
-          >
+      {messages.map((message) => (
+        <div
+          key={message.id}
+          className={`ai-message ai-message-${message.role}`}
+        >
             <div className="ai-message-author">
               {message.role === 'assistant' ? 'Polycast AI' : ui.youLabel || 'You'}
             </div>
@@ -252,7 +255,15 @@ function AIMode({
               {renderClickableTokens(message.content, message.id)}
             </div>
           </div>
-        ))}
+      ))}
+
+      {isAwaitingResponse && (
+        <div className="ai-typing-indicator">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      )}
       </div>
 
       {liveVoiceTranscript && (
