@@ -364,15 +364,19 @@ function mapConversationToInput(messages = []) {
             const role = msg.role.toLowerCase();
             return role === 'user' || role === 'assistant';
         })
-        .map((msg) => ({
-            role: msg.role,
-            content: [
-                {
-                    type: 'input_text',
-                    text: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-                },
-            ],
-        }));
+        .map((msg) => {
+            const role = msg.role.toLowerCase();
+            const isAssistant = role === 'assistant';
+            return {
+                role: msg.role,
+                content: [
+                    {
+                        type: isAssistant ? 'output_text' : 'input_text',
+                        text: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+                    },
+                ],
+            };
+        });
 }
 
 // Voice response endpoint leveraging OpenAI realtime voice models
@@ -395,17 +399,6 @@ router.post('/ai/voice/respond', async (req, res) => {
         }
 
         const inputMessages = mapConversationToInput(conversation);
-        if (systemPrompt && typeof systemPrompt === 'string') {
-            inputMessages.unshift({
-                role: 'system',
-                content: [
-                    {
-                        type: 'input_text',
-                        text: systemPrompt,
-                    },
-                ],
-            });
-        }
 
         const payload = {
             model: OPENAI_REALTIME_MODEL,
@@ -417,6 +410,10 @@ router.post('/ai/voice/respond', async (req, res) => {
             input: inputMessages,
             temperature: typeof temperature === 'number' ? temperature : 0.8,
         };
+
+        if (systemPrompt && typeof systemPrompt === 'string') {
+            payload.instructions = systemPrompt;
+        }
 
         const oaResponse = await axios.post(
             'https://api.openai.com/v1/responses',
