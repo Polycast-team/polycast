@@ -276,7 +276,7 @@ router.post('/ai/chat', async (req, res) => {
             messages = [],
             prompt,
             systemPrompt,
-            temperature = 0.8,
+            temperature,
         } = req.body || {};
 
         const conversation = Array.isArray(messages) ? messages : [];
@@ -301,8 +301,11 @@ router.post('/ai/chat', async (req, res) => {
         const payload = {
             model: OPENAI_CHAT_MODEL,
             input: inputMessages,
-            temperature: typeof temperature === 'number' ? temperature : 0.8,
         };
+
+        if (typeof temperature === 'number' && Number.isFinite(temperature)) {
+            payload.temperature = temperature;
+        }
 
         if (systemPrompt && typeof systemPrompt === 'string') {
             payload.instructions = systemPrompt;
@@ -389,7 +392,7 @@ router.post('/ai/voice/respond', async (req, res) => {
         const {
             messages = [],
             voice = DEFAULT_OPENAI_VOICE,
-            temperature = 0.8,
+            temperature,
             systemPrompt,
         } = req.body || {};
 
@@ -408,8 +411,11 @@ router.post('/ai/voice/respond', async (req, res) => {
                 format: OPENAI_REALTIME_AUDIO_FORMAT,
             },
             input: inputMessages,
-            temperature: typeof temperature === 'number' ? temperature : 0.8,
         };
+
+        if (typeof temperature === 'number' && Number.isFinite(temperature)) {
+            payload.temperature = temperature;
+        }
 
         if (systemPrompt && typeof systemPrompt === 'string') {
             payload.instructions = systemPrompt;
