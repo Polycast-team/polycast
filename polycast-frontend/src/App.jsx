@@ -129,8 +129,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [translations, setTranslations] = useState({}); // Structure: { lang: [{ text: string, isNew: boolean }] }
   const [errorMessages, setErrorMessages] = useState([]); 
   
-  // Students start in flashcard mode, hosts start in audio mode
-  const [appMode, setAppMode] = useState('audio'); // Options: 'audio', 'dictionary', 'flashcard', 'video'
+  // Default to dictionary mode for all users
+  const [appMode, setAppMode] = useState('dictionary'); // Options: 'audio', 'dictionary', 'flashcard', 'video'
   const [selectedWords, setSelectedWords] = useState([]); // Profile-scoped selected words
   const [wordDefinitions, setWordDefinitions] = useState({}); // Profile-scoped word definitions
   const [showNotification, setShowNotification] = useState(false);

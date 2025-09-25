@@ -20,26 +20,6 @@ function ModeSelector({
 
   const buttons = [
     {
-      mode: 'audio',
-      label: ui.classroomMode,
-      icon: (
-        // Silhouette (head + torso) icon
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="8" r="4"/>
-          <path d="M5 20c0-4 3-7 7-7s7 3 7 7"/>
-        </svg>
-      ),
-      colorIndex: 0,
-      onClick: () => {
-        if (userRole === 'student' && !roomSetup) {
-          // Open join room modal instead of alert
-          window.dispatchEvent(new CustomEvent('openJoinRoom'));
-          return;
-        }
-        onModeChange('audio');
-      }
-    },
-    {
       mode: 'dictionary',
       label: ui.dictionaryMode,
       icon: (
@@ -54,8 +34,28 @@ function ModeSelector({
           <path d="M16 13 C17 12.7 18 13.3 19 13" strokeWidth="1"/>
         </svg>
       ),
-      colorIndex: 1,
+      colorIndex: 0,
       onClick: () => onModeChange('dictionary')
+    },
+    {
+      mode: 'audio',
+      label: ui.classroomMode,
+      icon: (
+        // Silhouette (head + torso) icon
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M5 20c0-4 3-7 7-7s7 3 7 7"/>
+        </svg>
+      ),
+      colorIndex: 1,
+      onClick: () => {
+        if (userRole === 'student' && !roomSetup) {
+          // Open join room modal instead of alert
+          window.dispatchEvent(new CustomEvent('openJoinRoom'));
+          return;
+        }
+        onModeChange('audio');
+      }
     },
     {
       mode: 'flashcard',
