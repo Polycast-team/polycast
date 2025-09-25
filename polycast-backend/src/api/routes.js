@@ -285,17 +285,6 @@ router.post('/ai/chat', async (req, res) => {
         }
 
         const inputMessages = mapConversationToInput(conversation);
-        if (systemPrompt && typeof systemPrompt === 'string') {
-            inputMessages.unshift({
-                role: 'system',
-                content: [
-                    {
-                        type: 'input_text',
-                        text: systemPrompt,
-                    },
-                ],
-            });
-        }
 
         if (prompt && typeof prompt === 'string') {
             inputMessages.push({
@@ -314,6 +303,10 @@ router.post('/ai/chat', async (req, res) => {
             input: inputMessages,
             temperature: typeof temperature === 'number' ? temperature : 0.8,
         };
+
+        if (systemPrompt && typeof systemPrompt === 'string') {
+            payload.instructions = systemPrompt;
+        }
 
         const oaResponse = await axios.post(
             'https://api.openai.com/v1/responses',
@@ -364,7 +357,13 @@ router.post('/ai/chat', async (req, res) => {
 // Helper to normalize messages for Responses API
 function mapConversationToInput(messages = []) {
     return messages
-        .filter((msg) => msg && typeof msg.role === 'string' && msg.content !== undefined && msg.content !== null)
+        .filter((msg) => {
+            if (!msg || typeof msg.role !== 'string' || msg.content === undefined || msg.content === null) {
+                return false;
+            }
+            const role = msg.role.toLowerCase();
+            return role === 'user' || role === 'assistant';
+        })
         .map((msg) => ({
             role: msg.role,
             content: [
