@@ -265,7 +265,7 @@ router.put('/dictionary/:id/srs', authMiddleware, async (req, res) => {
 });
 
 
-// AI Chat endpoint (GPT-5)
+// AI Chat endpoint (GPT-5 via Responses API)
 router.post('/ai/chat', async (req, res) => {
     if (!config.openaiApiKey) {
         return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server' });
@@ -277,7 +277,6 @@ router.post('/ai/chat', async (req, res) => {
             prompt,
             systemPrompt,
             temperature = 0.8,
-            maxTokens,
         } = req.body || {};
 
         const conversation = Array.isArray(messages) ? messages : [];
@@ -285,35 +284,39 @@ router.post('/ai/chat', async (req, res) => {
             return res.status(400).json({ error: 'messages or prompt is required' });
         }
 
-        const openAiMessages = [];
+        const inputMessages = mapConversationToInput(conversation);
         if (systemPrompt && typeof systemPrompt === 'string') {
-            openAiMessages.push({ role: 'system', content: systemPrompt });
+            inputMessages.unshift({
+                role: 'system',
+                content: [
+                    {
+                        type: 'input_text',
+                        text: systemPrompt,
+                    },
+                ],
+            });
         }
 
-        conversation.forEach((msg) => {
-            if (!msg || typeof msg.role !== 'string' || msg.content === undefined || msg.content === null) {
-                return;
-            }
-            const textContent = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-            openAiMessages.push({ role: msg.role, content: textContent });
-        });
-
         if (prompt && typeof prompt === 'string') {
-            openAiMessages.push({ role: 'user', content: prompt });
+            inputMessages.push({
+                role: 'user',
+                content: [
+                    {
+                        type: 'input_text',
+                        text: prompt,
+                    },
+                ],
+            });
         }
 
         const payload = {
             model: OPENAI_CHAT_MODEL,
-            messages: openAiMessages,
+            input: inputMessages,
             temperature: typeof temperature === 'number' ? temperature : 0.8,
         };
 
-        if (Number.isInteger(maxTokens)) {
-            payload.max_tokens = maxTokens;
-        }
-
         const oaResponse = await axios.post(
-            'https://api.openai.com/v1/chat/completions',
+            'https://api.openai.com/v1/responses',
             payload,
             {
                 headers: {
@@ -323,20 +326,38 @@ router.post('/ai/chat', async (req, res) => {
             }
         );
 
-        const choice = oaResponse.data?.choices?.[0];
-        if (!choice?.message) {
+        const data = oaResponse.data || {};
+        const outputs = Array.isArray(data.output) ? data.output : (Array.isArray(data.outputs) ? data.outputs : []);
+        let assistantText = '';
+
+        outputs.forEach((output) => {
+            const contentPieces = Array.isArray(output?.content) ? output.content : [];
+            contentPieces.forEach((piece) => {
+                if (piece?.type === 'output_text' && typeof piece?.text === 'string') {
+                    assistantText += piece.text;
+                }
+            });
+        });
+
+        if (!assistantText && typeof data?.output_text === 'string') {
+            assistantText = data.output_text;
+        }
+
+        if (!assistantText) {
             return res.status(502).json({ error: 'Language model returned an empty response' });
         }
 
         return res.json({
-            message: choice.message,
-            finishReason: choice.finish_reason,
-            usage: oaResponse.data?.usage || null,
+            message: {
+                role: 'assistant',
+                content: assistantText.trim(),
+            },
+            usage: data?.usage || null,
         });
     } catch (error) {
         console.error('[AI Chat] Error:', error?.response?.data || error?.message || error);
         const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate AI response';
-        return res.status(500).json({ error: message });
+        return res.status(error?.response?.status || 500).json({ error: message });
     }
 });
 
