@@ -8,9 +8,12 @@ const config = require('../config/config');
 const authService = require('../services/authService');
 const authMiddleware = require('./middleware/auth');
 
-// OpenAI TTS configuration
+// OpenAI model configuration
 const OPENAI_TTS_MODEL = 'gpt-4o-mini-tts';
 const DEFAULT_OPENAI_VOICE = 'alloy';
+const OPENAI_CHAT_MODEL = config.openaiChatModel || 'gpt-5';
+const OPENAI_REALTIME_MODEL = config.openaiRealtimeVoiceModel || 'gpt-realtime';
+const OPENAI_REALTIME_AUDIO_FORMAT = config.openaiRealtimeVoiceFormat || 'mp3';
 
 const router = express.Router();
 // Auth
@@ -258,6 +261,196 @@ router.put('/dictionary/:id/srs', authMiddleware, async (req, res) => {
     } catch (e) {
         console.error('[Dictionary] update SRS error:', e);
         res.status(500).json({ error: 'Failed to update SRS' });
+    }
+});
+
+
+// AI Chat endpoint (GPT-5)
+router.post('/ai/chat', async (req, res) => {
+    if (!config.openaiApiKey) {
+        return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server' });
+    }
+
+    try {
+        const {
+            messages = [],
+            prompt,
+            systemPrompt,
+            temperature = 0.8,
+            maxTokens,
+        } = req.body || {};
+
+        const conversation = Array.isArray(messages) ? messages : [];
+        if (!conversation.length && !prompt) {
+            return res.status(400).json({ error: 'messages or prompt is required' });
+        }
+
+        const openAiMessages = [];
+        if (systemPrompt && typeof systemPrompt === 'string') {
+            openAiMessages.push({ role: 'system', content: systemPrompt });
+        }
+
+        conversation.forEach((msg) => {
+            if (!msg || typeof msg.role !== 'string' || msg.content === undefined || msg.content === null) {
+                return;
+            }
+            const textContent = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+            openAiMessages.push({ role: msg.role, content: textContent });
+        });
+
+        if (prompt && typeof prompt === 'string') {
+            openAiMessages.push({ role: 'user', content: prompt });
+        }
+
+        const payload = {
+            model: OPENAI_CHAT_MODEL,
+            messages: openAiMessages,
+            temperature: typeof temperature === 'number' ? temperature : 0.8,
+        };
+
+        if (Number.isInteger(maxTokens)) {
+            payload.max_tokens = maxTokens;
+        }
+
+        const oaResponse = await axios.post(
+            'https://api.openai.com/v1/chat/completions',
+            payload,
+            {
+                headers: {
+                    Authorization: `Bearer ${config.openaiApiKey}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        const choice = oaResponse.data?.choices?.[0];
+        if (!choice?.message) {
+            return res.status(502).json({ error: 'Language model returned an empty response' });
+        }
+
+        return res.json({
+            message: choice.message,
+            finishReason: choice.finish_reason,
+            usage: oaResponse.data?.usage || null,
+        });
+    } catch (error) {
+        console.error('[AI Chat] Error:', error?.response?.data || error?.message || error);
+        const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate AI response';
+        return res.status(500).json({ error: message });
+    }
+});
+
+// Helper to normalize messages for Responses API
+function mapConversationToInput(messages = []) {
+    return messages
+        .filter((msg) => msg && typeof msg.role === 'string' && msg.content !== undefined && msg.content !== null)
+        .map((msg) => ({
+            role: msg.role,
+            content: [
+                {
+                    type: 'input_text',
+                    text: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+                },
+            ],
+        }));
+}
+
+// Voice response endpoint leveraging OpenAI realtime voice models
+router.post('/ai/voice/respond', async (req, res) => {
+    if (!config.openaiApiKey) {
+        return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server' });
+    }
+
+    try {
+        const {
+            messages = [],
+            voice = DEFAULT_OPENAI_VOICE,
+            temperature = 0.8,
+            systemPrompt,
+        } = req.body || {};
+
+        const conversation = Array.isArray(messages) ? messages : [];
+        if (!conversation.length) {
+            return res.status(400).json({ error: 'messages are required to generate a voice response' });
+        }
+
+        const inputMessages = mapConversationToInput(conversation);
+        if (systemPrompt && typeof systemPrompt === 'string') {
+            inputMessages.unshift({
+                role: 'system',
+                content: [
+                    {
+                        type: 'input_text',
+                        text: systemPrompt,
+                    },
+                ],
+            });
+        }
+
+        const payload = {
+            model: OPENAI_REALTIME_MODEL,
+            modalities: ['text', 'audio'],
+            audio: {
+                voice: voice || DEFAULT_OPENAI_VOICE,
+                format: OPENAI_REALTIME_AUDIO_FORMAT,
+            },
+            input: inputMessages,
+            temperature: typeof temperature === 'number' ? temperature : 0.8,
+        };
+
+        const oaResponse = await axios.post(
+            'https://api.openai.com/v1/responses',
+            payload,
+            {
+                headers: {
+                    Authorization: `Bearer ${config.openaiApiKey}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        const data = oaResponse.data || {};
+        const outputs = Array.isArray(data.output) ? data.output : (Array.isArray(data.outputs) ? data.outputs : []);
+
+        let transcript = '';
+        let audioBase64 = '';
+        const segments = [];
+
+        outputs.forEach((output) => {
+            const contentPieces = Array.isArray(output?.content) ? output.content : [];
+            contentPieces.forEach((piece) => {
+                if (piece?.type === 'output_text' && typeof piece?.text === 'string') {
+                    segments.push(piece.text);
+                    transcript += piece.text;
+                }
+                if (piece?.type === 'output_audio' && piece?.audio?.data) {
+                    audioBase64 = piece.audio.data;
+                }
+            });
+        });
+
+        if (!transcript && typeof data?.output_text === 'string') {
+            transcript = data.output_text;
+        }
+        if (!audioBase64 && data?.output_audio?.data) {
+            audioBase64 = data.output_audio.data;
+        }
+
+        if (!audioBase64) {
+            return res.status(502).json({ error: 'Language model response did not include audio data' });
+        }
+
+        return res.json({
+            transcript: transcript.trim(),
+            transcriptSegments: segments,
+            audio: audioBase64,
+            format: OPENAI_REALTIME_AUDIO_FORMAT,
+            usage: data?.usage || null,
+        });
+    } catch (error) {
+        console.error('[AI Voice] Error:', error?.response?.data || error?.message || error);
+        const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate voice response';
+        return res.status(500).json({ error: message });
     }
 });
 

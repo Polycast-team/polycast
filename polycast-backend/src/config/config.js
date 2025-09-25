@@ -10,8 +10,11 @@ const config = {
     // Deepgram Configuration
     deepgramApiKey: process.env.DEEPGRAM_API_KEY,
 
-    // OpenAI Configuration (for TTS only now)
+    // OpenAI Configuration (used for chat, realtime voice, and TTS)
     openaiApiKey: process.env.OPENAI_API_KEY,
+    openaiChatModel: process.env.OPENAI_CHAT_MODEL || 'gpt-5',
+    openaiRealtimeVoiceModel: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime',
+    openaiRealtimeVoiceFormat: process.env.OPENAI_REALTIME_AUDIO_FORMAT || 'mp3',
 
     // Redis Configuration
     redisUrl: process.env.REDIS_URL,

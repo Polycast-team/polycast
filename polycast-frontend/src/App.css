@@ -550,13 +550,24 @@ h1, h2, h3 {
   color: #2563eb;
 }
 
-/* Purple button (Video) */
+/* Teal button (AI) */
 .bottom-toolbar-button.color-3:hover {
+  background: rgba(20, 184, 166, 0.12);
+  color: #14b8a6;
+}
+
+.bottom-toolbar-button.color-3.active {
+  background: rgba(20, 184, 166, 0.18);
+  color: #14b8a6;
+}
+
+/* Purple button (Video) */
+.bottom-toolbar-button.color-4:hover {
   background: rgba(139, 92, 246, 0.1);
   color: #8b5cf6;
 }
 
-.bottom-toolbar-button.color-3.active {
+.bottom-toolbar-button.color-4.active {
   background: rgba(139, 92, 246, 0.15);
   color: #8b5cf6;
 }

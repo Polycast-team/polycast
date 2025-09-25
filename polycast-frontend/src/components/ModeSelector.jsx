@@ -13,8 +13,9 @@ function ModeSelector({
 
   const buttonColors = [
     { base: '#dc2626', hover: '#ef4444', active: '#b91c1c' }, // Red
-    { base: '#16a34a', hover: '#22c55e', active: '#15803d' }, // Green  
+    { base: '#16a34a', hover: '#22c55e', active: '#15803d' }, // Green
     { base: '#2563eb', hover: '#3b82f6', active: '#1d4ed8' }, // Blue
+    { base: '#14b8a6', hover: '#2dd4bf', active: '#0f766e' }, // Teal
     { base: '#8b5cf6', hover: '#a78bfa', active: '#7c3aed' }, // Purple
   ];
 
@@ -71,6 +72,20 @@ function ModeSelector({
       onClick: () => onModeChange('flashcard')
     },
     {
+      mode: 'ai',
+      label: ui.aiMode || 'AI Mode',
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 5h10a4 4 0 0 1 4 4v3a4 4 0 0 1-4 4h-2.5L9 20v-4H7a4 4 0 0 1-4-4V9a4 4 0 0 1 4-4z" />
+          <path d="M9 9h6" strokeWidth="1.6" />
+          <path d="M9 12h4" strokeWidth="1.6" />
+          <path d="M17.5 3.5l.7 1.4 1.5.2-1.1 1.1.3 1.5-1.4-.7-1.4.7.3-1.5-1.1-1.1 1.5-.2z" strokeWidth="1.4" />
+        </svg>
+      ),
+      colorIndex: 3,
+      onClick: () => onModeChange('ai')
+    },
+    {
       mode: 'video',
       label: ui.video,
       icon: (
@@ -79,7 +94,7 @@ function ModeSelector({
           <polygon points="17,10 21,8 21,16 17,14"/>
         </svg>
       ),
-      colorIndex: 3,
+      colorIndex: 4,
       onClick: () => onModeChange('video')
     }
   ];

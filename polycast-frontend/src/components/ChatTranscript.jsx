@@ -4,9 +4,7 @@ import WordDefinitionPopup from './WordDefinitionPopup';
 import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import apiService from '../services/apiService.js';
 import { extractSentenceWithWord } from '../utils/wordClickUtils';
-
-// Tokenize words/punctuation/spaces (same pattern used elsewhere)
-const tokenizeText = (text) => text.match(/([\p{L}\p{M}\d']+|[.,!?;:]+|\s+)/gu) || [];
+import tokenizeText from '../utils/tokenizeText';
 
 function ChatTranscript({
   fullTranscript = '',
@@ -265,5 +263,4 @@ ChatTranscript.propTypes = {
 };
 
 export default ChatTranscript;
-
 

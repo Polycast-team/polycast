@@ -24,6 +24,7 @@ import authClient from './services/authClient.js';
 import { createFlashcardEntry } from './components/FixedCardDefinitions';
 import { extractSentenceWithWord, markClickedWordInSentence } from './utils/wordClickUtils';
 import ModeSelector from './components/ModeSelector';
+import AIMode from './components/ai/AIMode';
 
 
 
@@ -130,7 +131,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   const [errorMessages, setErrorMessages] = useState([]); 
   
   // Default to dictionary mode for all users
-  const [appMode, setAppMode] = useState('dictionary'); // Options: 'audio', 'dictionary', 'flashcard', 'video'
+  const [appMode, setAppMode] = useState('dictionary'); // Options: 'audio', 'dictionary', 'flashcard', 'video', 'ai'
   const [selectedWords, setSelectedWords] = useState([]); // Profile-scoped selected words
   const [wordDefinitions, setWordDefinitions] = useState({}); // Profile-scoped word definitions
   const [showNotification, setShowNotification] = useState(false);
@@ -759,6 +760,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       // Update to video mode
       console.log('Setting mode to video (local only)');
       setAppMode('video');
+    } else if (newMode === 'ai') {
+      console.log('Setting mode to AI chat');
+      setAppMode('ai');
     }
   }, [appMode, isRecording]);
 
@@ -1148,6 +1152,17 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               q.forEach((msg) => { try { handler(msg); } catch (e) { console.warn('Failed delivering pending signal:', e); } });
             }}
             unregisterWebrtcSignalHandler={() => { webrtcSignalHandlerRef.current = null; }}
+          />
+        ) : appMode === 'ai' ? (
+          <AIMode
+            selectedProfile={selectedProfile || internalSelectedProfile}
+            selectedWords={selectedWords}
+            wordDefinitions={wordDefinitions}
+            setWordDefinitions={setWordDefinitions}
+            onAddWord={(word) => {
+              console.log(`Add from popup (AI mode): ${word}`);
+              handleAddWord(word);
+            }}
           />
         ) : (
           <TranscriptionDisplay 
