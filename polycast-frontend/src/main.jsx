@@ -12,8 +12,8 @@ import apiService from './services/apiService.js'
 
 function Main() {
   const [roomSetup, setRoomSetup] = useState(null);
-  const [selectedLanguages, setSelectedLanguages] = useState(null);
-  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedLanguages, setSelectedLanguages] = useState(['English']); // Default language
+  const [selectedProfile, setSelectedProfile] = useState('joshua'); // Default profile
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isMobile, setIsMobile] = useState(false);

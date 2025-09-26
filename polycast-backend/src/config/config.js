@@ -28,8 +28,8 @@ console.log('Config openaiApiKey:', config.openaiApiKey ? 'CONFIGURED' : 'NOT SE
 // Perform validation immediately when the module is loaded
 config.validateKeys = function() {
     console.log('Validating API keys...');
-    const requiredKeys = ['GEMINI_API_KEY', 'DEEPGRAM_API_KEY'];
-    const optionalKeys = ['OPENAI_API_KEY']; // OpenAI now optional (only for TTS)
+    const requiredKeys = ['GEMINI_API_KEY', 'DEEPGRAM_API_KEY', 'OPENAI_API_KEY'];
+    const optionalKeys = []; // All keys are now required
     const missingRequired = requiredKeys.filter(key => !process.env[key]);
     const missingOptional = optionalKeys.filter(key => !process.env[key]);
 
