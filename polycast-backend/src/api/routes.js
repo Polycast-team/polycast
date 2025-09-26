@@ -4,6 +4,7 @@ const redisService = require('../services/redisService');
 const popupGeminiService = require('../services/popupGeminiService');
 const dictService = require('../profile-data/dictionaryService');
 const axios = require('axios');
+const WebSocket = require('ws');
 const config = require('../config/config');
 const authService = require('../services/authService');
 const authMiddleware = require('./middleware/auth');
@@ -401,76 +402,155 @@ router.post('/ai/voice/respond', async (req, res) => {
             return res.status(400).json({ error: 'messages are required to generate a voice response' });
         }
 
-        const inputMessages = mapConversationToInput(conversation);
-
-        const payload = {
-            model: OPENAI_REALTIME_MODEL,
-            response_format: {
-                type: 'audio',
-                audio: {
-                    voice: voice || DEFAULT_OPENAI_VOICE,
-                    format: OPENAI_REALTIME_AUDIO_FORMAT,
-                },
-            },
-            input: inputMessages,
+        const wsHeaders = {
+            Authorization: `Bearer ${config.openaiApiKey}`,
+            'OpenAI-Beta': 'realtime=v1',
         };
 
-        if (typeof temperature === 'number' && Number.isFinite(temperature)) {
-            payload.temperature = temperature;
-        }
-
-        if (systemPrompt && typeof systemPrompt === 'string') {
-            payload.instructions = systemPrompt;
-        }
-
-        const oaResponse = await axios.post(
-            'https://api.openai.com/v1/responses',
-            payload,
-            {
-                headers: {
-                    Authorization: `Bearer ${config.openaiApiKey}`,
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
-
-        const data = oaResponse.data || {};
-        const outputs = Array.isArray(data.output) ? data.output : (Array.isArray(data.outputs) ? data.outputs : []);
-
-        let transcript = '';
-        let audioBase64 = '';
-        const segments = [];
-
-        outputs.forEach((output) => {
-            const contentPieces = Array.isArray(output?.content) ? output.content : [];
-            contentPieces.forEach((piece) => {
-                if (piece?.type === 'output_text' && typeof piece?.text === 'string') {
-                    segments.push(piece.text);
-                    transcript += piece.text;
-                }
-                if (piece?.type === 'output_audio' && piece?.audio?.data) {
-                    audioBase64 = piece.audio.data;
-                }
-            });
+        const ws = new WebSocket(`wss://api.openai.com/v1/realtime?model=${encodeURIComponent(OPENAI_REALTIME_MODEL)}`, {
+            headers: wsHeaders,
         });
 
-        if (!transcript && typeof data?.output_text === 'string') {
-            transcript = data.output_text;
-        }
-        if (!audioBase64 && data?.output_audio?.data) {
-            audioBase64 = data.output_audio.data;
-        }
+        const audioChunks = [];
+        let transcript = '';
+        const transcriptSegments = [];
+        let responseId = null;
+        let settled = false;
 
-        if (!audioBase64) {
-            return res.status(502).json({ error: 'Language model response did not include audio data' });
-        }
+        const cleanup = (err) => {
+            if (!settled) {
+                settled = true;
+                try { ws.close(); } catch (_) {}
+                if (err) {
+                    res.status(err.status || 500).json({ error: err.message || 'Realtime request failed' });
+                }
+            }
+        };
 
-        return res.json({
-            transcript: transcript.trim(),
-            transcriptSegments: segments,
-            audio: audioBase64,
-            format: OPENAI_REALTIME_AUDIO_FORMAT,
-            usage: data?.usage || null,
+        const inputItems = conversation.map((msg) => {
+            const role = (msg.role || 'user').toLowerCase() === 'assistant' ? 'assistant' : 'user';
+            const text = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+            const contentType = role === 'assistant' ? 'output_text' : 'input_text';
+            return {
+                type: 'message',
+                role,
+                content: [
+                    {
+                        type: contentType,
+                        // Realtime input expects `text` for both input/output variants
+                        text,
+                    },
+                ],
+            };
+        });
+
+        const instructions = typeof systemPrompt === 'string' && systemPrompt.trim().length > 0
+            ? systemPrompt.trim()
+            : undefined;
+
+        const sendCreateEvent = () => {
+            const responsePayload = {
+                type: 'response.create',
+                response: {
+                    output_modalities: ['audio', 'text'],
+                    input: inputItems,
+                    audio: {
+                        output: {
+                            voice: voice || DEFAULT_OPENAI_VOICE,
+                            format: OPENAI_REALTIME_AUDIO_FORMAT,
+                        },
+                    },
+                },
+            };
+
+            if (instructions) {
+                responsePayload.response.instructions = instructions;
+            }
+
+            if (typeof temperature === 'number' && Number.isFinite(temperature)) {
+                responsePayload.response.temperature = temperature;
+            }
+
+            ws.send(JSON.stringify(responsePayload));
+        };
+
+        const timeout = setTimeout(() => {
+            cleanup({ status: 504, message: 'Realtime voice request timed out' });
+        }, 30000);
+
+        ws.on('open', () => {
+            sendCreateEvent();
+        });
+
+        ws.on('error', (err) => {
+            clearTimeout(timeout);
+            cleanup({ status: 502, message: err?.message || 'Realtime connection failed' });
+        });
+
+        ws.on('close', () => {
+            clearTimeout(timeout);
+            if (!settled) {
+                cleanup({ status: 500, message: 'Realtime connection closed unexpectedly' });
+            }
+        });
+
+        ws.on('message', (data) => {
+            let event;
+            try {
+                event = JSON.parse(data.toString());
+            } catch (err) {
+                return;
+            }
+
+            switch (event?.type) {
+                case 'response.created':
+                    responseId = event?.response?.id || responseId;
+                    break;
+                case 'response.output_audio.delta':
+                    if (!responseId || event?.response_id === responseId || !event?.response_id) {
+                        if (typeof event?.delta === 'string') {
+                            audioChunks.push(event.delta);
+                        }
+                    }
+                    break;
+                case 'response.output_audio.done':
+                    // no-op; handled on completion
+                    break;
+                case 'response.output_text.delta':
+                    if (typeof event?.delta === 'string') {
+                        transcript += event.delta;
+                        transcriptSegments.push(event.delta);
+                    }
+                    break;
+                case 'response.output_text.done':
+                    break;
+                case 'response.error':
+                    clearTimeout(timeout);
+                    cleanup({ status: 502, message: event?.error?.message || 'Realtime error' });
+                    break;
+                case 'response.completed':
+                case 'response.finalized':
+                case 'response.done':
+                    clearTimeout(timeout);
+                    if (!settled) {
+                        const audioBase64 = audioChunks.join('');
+                        if (!audioBase64) {
+                            cleanup({ status: 502, message: 'Realtime response did not include audio data' });
+                            return;
+                        }
+                        cleanup(null);
+                        res.json({
+                            transcript: transcript.trim(),
+                            transcriptSegments,
+                            audio: audioBase64,
+                            format: OPENAI_REALTIME_AUDIO_FORMAT,
+                            usage: event?.response?.usage || null,
+                        });
+                    }
+                    break;
+                default:
+                    break;
+            }
         });
     } catch (error) {
         console.error('[AI Voice] Error:', error?.response?.data || error?.message || error);
