@@ -416,6 +416,7 @@ router.post('/ai/voice/respond', async (req, res) => {
         const transcriptSegments = [];
         let responseId = null;
         let settled = false;
+        let sessionReady = false;
 
         const cleanup = (err) => {
             if (!settled) {
@@ -449,6 +450,8 @@ router.post('/ai/voice/respond', async (req, res) => {
             : undefined;
 
         const sendCreateEvent = () => {
+            if (!sessionReady || settled) return;
+
             const responsePayload = {
                 type: 'response.create',
                 response: {
@@ -479,7 +482,7 @@ router.post('/ai/voice/respond', async (req, res) => {
         }, 30000);
 
         ws.on('open', () => {
-            sendCreateEvent();
+            // Wait for session.created event before creating the response
         });
 
         ws.on('error', (err) => {
@@ -502,7 +505,25 @@ router.post('/ai/voice/respond', async (req, res) => {
                 return;
             }
 
+            if (event?.type) {
+                console.log('[Realtime] event received:', event.type);
+            }
+
             switch (event?.type) {
+                case 'session.created':
+                    sessionReady = true;
+                    // configure session audio defaults only once
+                    ws.send(JSON.stringify({
+                        type: 'session.update',
+                        session: {
+                            output_modalities: ['audio', 'text'],
+                            voice: voice || DEFAULT_OPENAI_VOICE,
+                            input_audio_format: 'pcm16',
+                            output_audio_format: OPENAI_REALTIME_AUDIO_FORMAT,
+                        },
+                    }));
+                    sendCreateEvent();
+                    break;
                 case 'response.created':
                     responseId = event?.response?.id || responseId;
                     break;

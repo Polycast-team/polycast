@@ -7,6 +7,7 @@ import tokenizeText from '../../utils/tokenizeText';
 import aiService from '../../services/aiService';
 import apiService from '../../services/apiService';
 import './AIMode.css';
+import VoiceMode from './VoiceMode';
 
 const DEFAULT_SYSTEM_PROMPT = 'You are Polycast AI, an encouraging language tutor. Provide clear explanations and short follow-up questions.';
 
@@ -34,12 +35,9 @@ function AIMode({
   const [error, setError] = useState('');
   const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
   const [loadingDefinition, setLoadingDefinition] = useState(false);
-  const [isVoiceLoading, setIsVoiceLoading] = useState(false);
-  const [liveVoiceTranscript, setLiveVoiceTranscript] = useState('');
+  const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
 
   const scrollContainerRef = useRef(null);
-  const voiceTimeoutsRef = useRef([]);
-
   const conversationForApi = useMemo(() => (
     messages.map(({ role, content }) => ({ role, content }))
   ), [messages]);
@@ -58,12 +56,7 @@ function AIMode({
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages, liveVoiceTranscript]);
-
-  useEffect(() => () => {
-    voiceTimeoutsRef.current.forEach(clearTimeout);
-    voiceTimeoutsRef.current = [];
-  }, []);
+  }, [messages]);
 
   const handleWordClick = useCallback(async (word, event, surroundingText = '') => {
     if (!event) return;
@@ -178,48 +171,6 @@ function AIMode({
     }
   };
 
-  const handleVoice = useCallback(async () => {
-    if (isVoiceLoading) return;
-    setIsVoiceLoading(true);
-    setLiveVoiceTranscript('');
-    voiceTimeoutsRef.current.forEach(clearTimeout);
-    voiceTimeoutsRef.current = [];
-
-    try {
-      const response = await aiService.requestVoiceResponse({
-        messages: conversationForApi,
-        systemPrompt: DEFAULT_SYSTEM_PROMPT,
-      });
-
-      const { transcript, transcriptSegments = [], audio, format = 'mp3' } = response || {};
-      if (audio) {
-        const audioUrl = `data:audio/${format};base64,${audio}`;
-        const audioElement = new Audio(audioUrl);
-        audioElement.play().catch((err) => console.warn('Audio playback failed', err));
-      }
-
-      if (transcriptSegments.length) {
-        transcriptSegments.forEach((segment, index) => {
-          const timeoutId = setTimeout(() => {
-            setLiveVoiceTranscript((prev) => `${prev}${prev ? ' ' : ''}${segment}`.trim());
-          }, index * 600);
-          voiceTimeoutsRef.current.push(timeoutId);
-        });
-      } else if (transcript) {
-        setLiveVoiceTranscript(transcript);
-      }
-
-      if (transcript) {
-        appendMessage({ role: 'assistant', content: transcript });
-      }
-    } catch (err) {
-      console.error('[AIMode] voice error', err);
-      setError(err?.message || 'Failed to start voice response');
-    } finally {
-      setIsVoiceLoading(false);
-    }
-  }, [appendMessage, conversationForApi, isVoiceLoading]);
-
   const isWordInDictionary = useCallback((word) => (
     Object.values(wordDefinitions || {}).some(
       (entry) => entry && entry.inFlashcards && entry.word === (word || '').toLowerCase(),
@@ -266,15 +217,6 @@ function AIMode({
       )}
       </div>
 
-      {liveVoiceTranscript && (
-        <div className="ai-voice-transcript">
-          <div className="ai-voice-title">Live voice transcript</div>
-          <div className="ai-voice-content">
-            {renderClickableTokens(liveVoiceTranscript, 'voice')}
-          </div>
-        </div>
-      )}
-
       {error && (
         <div className="ai-error-banner">{error}</div>
       )}
@@ -290,11 +232,10 @@ function AIMode({
         <div className="ai-input-actions">
           <button
             className="ai-voice-button"
-            onClick={handleVoice}
-            disabled={isVoiceLoading}
-            title="Start voice response"
+            onClick={() => setIsVoiceModeOpen(true)}
+            title="Open voice assistant"
           >
-            {isVoiceLoading ? '🔄' : '🎙️'}
+            🎙️
           </button>
           <button
             className="ai-send-button"
@@ -305,6 +246,18 @@ function AIMode({
           </button>
         </div>
       </div>
+
+      {isVoiceModeOpen && (
+        <VoiceMode
+          selectedProfile={selectedProfile}
+          onClose={() => setIsVoiceModeOpen(false)}
+          baseInstructions={DEFAULT_SYSTEM_PROMPT}
+          onAddWord={onAddWord}
+          selectedWords={selectedWords}
+          wordDefinitions={wordDefinitions}
+          setWordDefinitions={setWordDefinitions}
+        />
+      )}
     </div>
   );
 }
