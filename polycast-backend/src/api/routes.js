@@ -395,38 +395,42 @@ router.post('/ai/voice/session', async (req, res) => {
             ? requestedVoice.trim()
             : DEFAULT_OPENAI_VOICE;
 
-        const sessionConfig = {
-            type: 'realtime',
-            model: OPENAI_REALTIME_MODEL,
-            output_modalities: ['audio'],
-            audio: {
-                input: {
-                    transcription: {
-                        model: 'whisper-1',
+        const buildSessionPayload = (modelName) => {
+            const sessionConfig = {
+                type: 'realtime',
+                model: modelName,
+                output_modalities: ['audio'],
+                audio: {
+                    input: {
+                        format: { type: 'audio/pcm', rate: 24000 },
+                        transcription: {
+                            model: 'whisper-1',
+                        },
+                    },
+                    output: {
+                        format: { type: 'audio/pcm', rate: 24000 },
+                        voice: resolvedVoice,
+                        speed: 1,
                     },
                 },
-                output: {
-                    voice: resolvedVoice,
-                    speed: 1,
+                turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.5,
+                    prefix_padding_ms: 200,
+                    silence_duration_ms: 600,
                 },
-            },
-            turn_detection: {
-                type: 'server_vad',
-                threshold: 0.5,
-                prefix_padding_ms: 200,
-                silence_duration_ms: 600,
-            },
+            };
+
+            if (instructions && typeof instructions === 'string' && instructions.trim()) {
+                sessionConfig.instructions = instructions.trim();
+            }
+
+            return { session: sessionConfig };
         };
 
-        if (instructions && typeof instructions === 'string' && instructions.trim()) {
-            sessionConfig.instructions = instructions.trim();
-        }
-
-        const payload = { session: sessionConfig };
-
-        const oaResponse = await axios.post(
+        const requestSession = async (modelName) => axios.post(
             'https://api.openai.com/v1/realtime/client_secrets',
-            payload,
+            buildSessionPayload(modelName),
             {
                 headers: {
                     Authorization: `Bearer ${config.openaiApiKey}`,
@@ -434,6 +438,25 @@ router.post('/ai/voice/session', async (req, res) => {
                 },
             }
         );
+
+        let oaResponse;
+        let modelAttempt = OPENAI_REALTIME_MODEL;
+
+        try {
+            oaResponse = await requestSession(modelAttempt);
+        } catch (primaryError) {
+            const primaryMessage = primaryError?.response?.data?.error?.message || '';
+            const shouldRetryWithDefault = modelAttempt !== 'gpt-realtime'
+                && primaryError?.response?.status === 400
+                && /model/i.test(primaryMessage || '');
+
+            if (!shouldRetryWithDefault) {
+                throw primaryError;
+            }
+
+            modelAttempt = 'gpt-realtime';
+            oaResponse = await requestSession(modelAttempt);
+        }
 
         const data = oaResponse.data || {};
         const clientSecret = data.client_secret || (data.value
@@ -447,7 +470,7 @@ router.post('/ai/voice/session', async (req, res) => {
             client_secret: clientSecret,
             session: data.session || {
                 id: data.id,
-                model: data.model,
+                model: data.model || modelAttempt,
                 output_modalities: data.output_modalities,
                 audio: data.audio,
                 instructions: data.instructions,
