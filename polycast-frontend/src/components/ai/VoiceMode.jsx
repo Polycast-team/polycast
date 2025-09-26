@@ -180,7 +180,6 @@ function VoiceMode({
         });
 
         const clientSecret = session?.client_secret?.value || session?.client_secret || session?.client_secret?.token;
-        const model = session?.session?.model || session?.model || 'gpt-realtime';
         if (!clientSecret) {
           throw new Error('Realtime session token unavailable.');
         }
@@ -272,12 +271,13 @@ function VoiceMode({
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        const sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`, {
+        const sdpResponse = await fetch('https://api.openai.com/v1/realtime', {
           method: 'POST',
           body: offer.sdp,
           headers: {
             Authorization: `Bearer ${clientSecret}`,
             'Content-Type': 'application/sdp',
+            'OpenAI-Beta': 'realtime=v1',
           },
         });
 
