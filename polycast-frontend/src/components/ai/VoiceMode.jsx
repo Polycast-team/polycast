@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import WordDefinitionPopup from '../WordDefinitionPopup';
 import tokenizeText from '../../utils/tokenizeText';
 import { extractSentenceWithWord } from '../../utils/wordClickUtils';
 import { getLanguageForProfile, getNativeLanguageForProfile } from '../../utils/profileLanguageMapping';
 import aiService from '../../services/aiService';
 import apiService from '../../services/apiService';
+import WordDefinitionPopup from '../WordDefinitionPopup';
 import './VoiceMode.css';
 
-const VOICE_DEFAULT_PROMPT = 'Share a short language lesson and ask a quick follow-up question.';
+const ICE_SERVERS = [
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+];
 
 function VoiceMode({
   selectedProfile,
@@ -22,27 +25,44 @@ function VoiceMode({
   const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
   const targetLanguage = getLanguageForProfile(selectedProfile);
 
-  const [promptValue, setPromptValue] = useState('');
-  const [isRequesting, setIsRequesting] = useState(false);
+  const [status, setStatus] = useState('connecting');
   const [error, setError] = useState('');
   const [conversation, setConversation] = useState([]); // [{id, role, content}]
+  const [isClosing, setIsClosing] = useState(false);
   const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
-  const scrollRef = useRef(null);
 
-  const conversationForApi = useMemo(() => conversation.map(({ role, content }) => ({ role, content })), [conversation]);
+  const remoteAudioRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const pcRef = useRef(null);
+  const dataChannelRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const pendingAssistantRef = useRef({});
+  const pendingUserRef = useRef({});
+  const isMountedRef = useRef(true);
+  const hasSentIntroRef = useRef(false);
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [conversation, popupInfo.visible]);
+  const instructions = useMemo(() => (
+    typeof baseInstructions === 'string' && baseInstructions.trim() ? baseInstructions.trim() : undefined
+  ), [baseInstructions]);
 
-  const isWordInDictionary = useCallback((word) => (
-    Object.values(wordDefinitions || {}).some(
-      (entry) => entry && entry.inFlashcards && entry.word === (word || '').toLowerCase(),
-    )
-  ), [wordDefinitions]);
+  const addOrUpdateMessage = useCallback((id, role, text = '', { replace = false } = {}) => {
+    if (!id) return;
+    setConversation((prev) => {
+      const existingIndex = prev.findIndex((entry) => entry.id === id);
+      if (existingIndex === -1) {
+        return [...prev, { id, role, content: text }];
+      }
+      const next = [...prev];
+      const existing = next[existingIndex];
+      next[existingIndex] = {
+        ...existing,
+        content: replace ? text : `${existing.content || ''}${text}`,
+      };
+      return next;
+    });
+  }, []);
+
+  const closePopup = useCallback(() => setPopupInfo((prev) => ({ ...prev, visible: false })), []);
 
   const handleWordClick = useCallback(async (word, event, surroundingText = '') => {
     if (!event) return;
@@ -113,84 +133,339 @@ function VoiceMode({
     });
   }, [handleWordClick, selectedWords]);
 
-  const handleSubmit = useCallback(async () => {
-    if (isRequesting) return;
-    const trimmed = promptValue.trim();
-    if (!trimmed) {
-      setError('Please enter a short request before starting voice mode.');
-      return;
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
     }
-    setError('');
-    setIsRequesting(true);
+  }, [conversation]);
 
-    const userMessage = { id: `voice-user-${Date.now()}`, role: 'user', content: trimmed };
-    setConversation((prev) => [...prev, userMessage]);
-    setPromptValue('');
+  const cleanupConnection = useCallback(() => {
+    if (isClosing) return;
+    setIsClosing(true);
 
     try {
-      const response = await aiService.requestVoiceResponse({
-        messages: [...conversationForApi, { role: 'user', content: trimmed }],
-        systemPrompt: baseInstructions || VOICE_DEFAULT_PROMPT,
-      });
+      dataChannelRef.current?.close?.();
+    } catch (_) {}
+    dataChannelRef.current = null;
 
-      const { transcript, transcriptSegments = [], audio, format = 'mp3' } = response || {};
+    try {
+      pcRef.current?.close?.();
+    } catch (_) {}
+    pcRef.current = null;
 
-      if (audio) {
-        const audioUrl = `data:audio/${format};base64,${audio}`;
-        const audioElement = new Audio(audioUrl);
-        audioElement.play().catch((err) => console.warn('Audio playback failed', err));
-      }
-
-      const assistantText = transcript || transcriptSegments.join(' ');
-      if (assistantText) {
-        setConversation((prev) => [...prev, { id: `voice-assistant-${Date.now()}`, role: 'assistant', content: assistantText }]);
-      }
-    } catch (err) {
-      console.error('[VoiceMode] voice error', err);
-      setError(err?.message || 'Failed to generate voice response');
-    } finally {
-      setIsRequesting(false);
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
     }
-  }, [baseInstructions, conversationForApi, isRequesting, promptValue]);
+
+    hasSentIntroRef.current = false;
+
+    if (isMountedRef.current) {
+      setStatus((prev) => (prev === 'error' ? prev : 'ended'));
+    }
+  }, [isClosing]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    const initialise = async () => {
+      try {
+        setStatus('connecting');
+        setError('');
+
+        const session = await aiService.createVoiceSession({
+          voice: undefined,
+          instructions,
+        });
+
+        const clientSecret = session?.client_secret?.value || session?.client_secret || session?.client_secret?.token;
+        const model = session?.session?.model || session?.model || 'gpt-realtime';
+        if (!clientSecret) {
+          throw new Error('Realtime session token unavailable.');
+        }
+
+        const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+        pcRef.current = pc;
+
+        const remoteStream = new MediaStream();
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remoteStream;
+        }
+
+        pc.ontrack = (event) => {
+          const [remote] = event.streams;
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = remote;
+          }
+        };
+
+        pc.onconnectionstatechange = () => {
+          if (!isMountedRef.current) return;
+          switch (pc.connectionState) {
+            case 'connected':
+              setStatus((prev) => (prev === 'connecting' ? 'ready' : prev));
+              break;
+            case 'failed':
+            case 'disconnected':
+              setError('Realtime connection dropped.');
+              setStatus('error');
+              cleanupConnection();
+              break;
+            default:
+              break;
+          }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+          if (!isMountedRef.current) return;
+          if (pc.iceConnectionState === 'failed') {
+            setError('ICE connection failed.');
+            setStatus('error');
+            cleanupConnection();
+          }
+        };
+
+        let outbound;
+        try {
+          outbound = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (mediaErr) {
+          throw new Error('Microphone permission is required for voice mode.');
+        }
+
+        localStreamRef.current = outbound;
+        outbound.getTracks().forEach((track) => pc.addTrack(track, outbound));
+
+        const setupChannel = (channel) => {
+          dataChannelRef.current = channel;
+          channel.onopen = () => {
+            if (!isMountedRef.current) return;
+            setStatus('ready');
+            if (!hasSentIntroRef.current) {
+              try {
+                channel.send(JSON.stringify({ type: 'response.create' }));
+                hasSentIntroRef.current = true;
+              } catch (sendErr) {
+                console.warn('[VoiceMode] failed to trigger welcome turn', sendErr);
+              }
+            }
+          };
+          channel.onmessage = (event) => {
+            let payload;
+            try {
+              payload = JSON.parse(typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data));
+            } catch (err) {
+              console.debug('[VoiceMode] non-JSON realtime message', event.data);
+              return;
+            }
+            handleRealtimeEvent(payload);
+          };
+        };
+
+        pc.ondatachannel = (event) => {
+          setupChannel(event.channel);
+        };
+
+        const outboundChannel = pc.createDataChannel('oai-events');
+        setupChannel(outboundChannel);
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`, {
+          method: 'POST',
+          body: offer.sdp,
+          headers: {
+            Authorization: `Bearer ${clientSecret}`,
+            'Content-Type': 'application/sdp',
+          },
+        });
+
+        if (!sdpResponse.ok) {
+          const body = await sdpResponse.text();
+          throw new Error(body || `Realtime offer failed with status ${sdpResponse.status}`);
+        }
+
+        const answer = await sdpResponse.text();
+        await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+
+        setStatus('ready');
+      } catch (err) {
+        console.error('[VoiceMode] initialisation error', err);
+        if (!isMountedRef.current) return;
+        setError(err?.message || 'Failed to start realtime voice session.');
+        setStatus('error');
+      }
+    };
+
+    const handleRealtimeEvent = (event) => {
+      if (!event || typeof event !== 'object') return;
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[VoiceMode] event', event.type, event);
+      }
+
+      switch (event.type) {
+        case 'response.output_text.delta': {
+          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
+          const delta = event.delta || '';
+          pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
+          addOrUpdateMessage(id, 'assistant', delta, { replace: false });
+          setStatus((prev) => (prev === 'connecting' ? 'responding' : 'responding'));
+          break;
+        }
+        case 'response.output_text.done': {
+          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
+          const final = pendingAssistantRef.current[id] || '';
+          pendingAssistantRef.current[id] = '';
+          addOrUpdateMessage(id, 'assistant', final, { replace: true });
+          setStatus('ready');
+          break;
+        }
+        case 'response.completed':
+        case 'response.done':
+          setStatus('ready');
+          break;
+        case 'response.error':
+          setError(event?.error?.message || 'Realtime response error');
+          setStatus('error');
+          break;
+        case 'output_audio_buffer.started':
+          setStatus('responding');
+          break;
+        case 'output_audio_buffer.stopped':
+          setStatus('ready');
+          break;
+        case 'conversation.item.created': {
+          const item = event.item;
+          if (!item) break;
+          const id = item.id || `item-${Date.now()}`;
+          if (item.role === 'user') {
+            const contentText = extractContentText(item.content);
+            if (contentText) {
+              addOrUpdateMessage(id, 'user', contentText, { replace: true });
+              pendingUserRef.current[id] = contentText;
+            }
+          }
+          break;
+        }
+        case 'conversation.item.input_audio_transcription.delta': {
+          const id = `${event.item_id || 'user'}-live`;
+          const delta = event.delta || '';
+          pendingUserRef.current[id] = (pendingUserRef.current[id] || '') + delta;
+          addOrUpdateMessage(id, 'user', delta, { replace: false });
+          setStatus('listening');
+          break;
+        }
+        case 'conversation.item.input_audio_transcription.completed': {
+          const id = `${event.item_id || 'user'}-live`;
+          const transcript = event.transcript || pendingUserRef.current[id] || '';
+          pendingUserRef.current[id] = '';
+          addOrUpdateMessage(id, 'user', transcript, { replace: true });
+          setStatus('ready');
+          break;
+        }
+        case 'rate_limits.updated':
+          break;
+        default:
+          break;
+      }
+    };
+
+    initialise();
+
+    return () => {
+      isMountedRef.current = false;
+      cleanupConnection();
+    };
+  }, [instructions, cleanupConnection, addOrUpdateMessage]);
+
+  const extractContentText = (content = []) => {
+    if (!Array.isArray(content)) return '';
+    return content
+      .map((part) => part?.text || part?.transcript || '')
+      .join(' ');
+  };
+
+  const handleEndSession = useCallback(() => {
+    cleanupConnection();
+    onClose?.();
+  }, [cleanupConnection, onClose]);
+
+  const isWordInDictionary = useCallback((word) => (
+    Object.values(wordDefinitions || {}).some(
+      (entry) => entry && entry.inFlashcards && entry.word === (word || '').toLowerCase(),
+    )
+  ), [wordDefinitions]);
+
+  const statusLabel = useMemo(() => {
+    switch (status) {
+      case 'connecting':
+        return 'Connecting to realtime voice…';
+      case 'ready':
+        return 'Listening — start speaking!';
+      case 'listening':
+        return 'Listening…';
+      case 'responding':
+        return 'AI is responding…';
+      case 'ended':
+        return 'Session ended';
+      case 'error':
+        return 'Error';
+      default:
+        return '';
+    }
+  }, [status]);
 
   return (
     <div className="voice-mode-overlay">
-      <div className="voice-mode-panel">
-        <div className="voice-mode-header">
-          <h2>Polycast Voice</h2>
-          <button type="button" className="voice-close-btn" onClick={onClose}>×</button>
-        </div>
+      <div className="voice-mode-surface">
+        <button
+          type="button"
+          className="voice-close-btn"
+          onClick={handleEndSession}
+          aria-label="Close voice mode"
+        >
+          ×
+        </button>
 
-        <div className="voice-mode-body" ref={scrollRef}>
-          {conversation.map((turn) => (
-            <div key={turn.id} className={`voice-turn voice-turn-${turn.role}`}>
-              <div className="voice-turn-label">{turn.role === 'assistant' ? 'Polycast AI' : 'You'}</div>
-              <div className="voice-turn-text">{renderTokens(turn.content, turn.id)}</div>
-            </div>
-          ))}
-        </div>
-
-        {error && <div className="voice-error-banner">{error}</div>}
-
-        <div className="voice-input-bar">
-          <textarea
-            value={promptValue}
-            onChange={(e) => setPromptValue(e.target.value)}
-            placeholder="Describe what you want the AI to say..."
-            rows={3}
-            disabled={isRequesting}
-          />
-          <div className="voice-actions">
-            <button
-              type="button"
-              className="voice-primary-btn"
-              onClick={handleSubmit}
-              disabled={isRequesting}
-            >
-              {isRequesting ? 'Generating…' : 'Speak'}
-            </button>
+        <div className="voice-center">
+          <div className={`voice-orb voice-orb-${status}`}>
+            <span className="voice-orb-ring ring-1" />
+            <span className="voice-orb-ring ring-2" />
+            <span className="voice-orb-ring ring-3" />
+            <div className="voice-orb-core" />
           </div>
+
+          <div className="voice-status-block">
+            <h2>Polycast Voice</h2>
+            <p className="voice-status-text">{statusLabel}</p>
+            {error ? (
+              <p className="voice-status-error">{error}</p>
+            ) : (
+              <p className="voice-status-hint">Speak naturally — Polycast is listening and will respond in real time.</p>
+            )}
+          </div>
+
+          <button type="button" className="voice-end-btn" onClick={handleEndSession}>
+            End Session
+          </button>
         </div>
+
+        <div className="voice-transcript-panel" ref={scrollContainerRef}>
+          {conversation.length === 0 ? (
+            <div className="voice-placeholder">Waiting for the conversation to begin…</div>
+          ) : (
+            conversation.map((turn) => (
+              <div key={turn.id} className={`voice-transcript-turn voice-transcript-${turn.role}`}>
+                <div className="voice-transcript-label">{turn.role === 'assistant' ? 'Polycast AI' : 'You'}</div>
+                <div className="voice-transcript-text">{renderTokens(turn.content, turn.id)}</div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <audio ref={remoteAudioRef} autoPlay playsInline />
       </div>
 
       {popupInfo.visible && (
@@ -203,7 +478,7 @@ function VoiceMode({
           onRemoveFromDictionary={() => {}}
           loading={false}
           nativeLanguage={nativeLanguage}
-          onClose={() => setPopupInfo((prev) => ({ ...prev, visible: false }))}
+          onClose={closePopup}
         />
       )}
     </div>
@@ -221,7 +496,7 @@ VoiceMode.propTypes = {
 };
 
 VoiceMode.defaultProps = {
-  baseInstructions: VOICE_DEFAULT_PROMPT,
+  baseInstructions: undefined,
   onAddWord: undefined,
 };
 

@@ -4,7 +4,6 @@ const redisService = require('../services/redisService');
 const popupGeminiService = require('../services/popupGeminiService');
 const dictService = require('../profile-data/dictionaryService');
 const axios = require('axios');
-const WebSocket = require('ws');
 const config = require('../config/config');
 const authService = require('../services/authService');
 const authMiddleware = require('./middleware/auth');
@@ -383,200 +382,82 @@ function mapConversationToInput(messages = []) {
         });
 }
 
-// Voice response endpoint leveraging OpenAI realtime voice models
-router.post('/ai/voice/respond', async (req, res) => {
+// Create ephemeral Realtime session token for voice mode
+router.post('/ai/voice/session', async (req, res) => {
     if (!config.openaiApiKey) {
         return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server' });
     }
 
     try {
-        const {
-            messages = [],
-            voice = DEFAULT_OPENAI_VOICE,
-            temperature,
-            systemPrompt,
-        } = req.body || {};
+        const { voice: requestedVoice, instructions } = req.body || {};
 
-        const conversation = Array.isArray(messages) ? messages : [];
-        if (!conversation.length) {
-            return res.status(400).json({ error: 'messages are required to generate a voice response' });
-        }
+        const resolvedVoice = typeof requestedVoice === 'string' && requestedVoice.trim()
+            ? requestedVoice.trim()
+            : DEFAULT_OPENAI_VOICE;
 
-        const wsHeaders = {
-            Authorization: `Bearer ${config.openaiApiKey}`,
-            'OpenAI-Beta': 'realtime=v1',
-        };
-
-        const ws = new WebSocket(`wss://api.openai.com/v1/realtime?model=${encodeURIComponent(OPENAI_REALTIME_MODEL)}`, {
-            headers: wsHeaders,
-        });
-
-        const audioChunks = [];
-        let transcript = '';
-        const transcriptSegments = [];
-        let responseId = null;
-        let settled = false;
-        let sessionReady = false;
-
-        const cleanup = (err) => {
-            if (!settled) {
-                settled = true;
-                try { ws.close(); } catch (_) {}
-                if (err) {
-                    res.status(err.status || 500).json({ error: err.message || 'Realtime request failed' });
-                }
-            }
-        };
-
-        const inputItems = conversation.map((msg) => {
-            const role = (msg.role || 'user').toLowerCase() === 'assistant' ? 'assistant' : 'user';
-            const text = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-            const contentType = role === 'assistant' ? 'output_text' : 'input_text';
-            return {
-                type: 'message',
-                role,
-                content: [
-                    {
-                        type: contentType,
-                        // Realtime input expects `text` for both input/output variants
-                        text,
-                    },
-                ],
-            };
-        });
-
-        const instructions = typeof systemPrompt === 'string' && systemPrompt.trim().length > 0
-            ? systemPrompt.trim()
-            : undefined;
-
-        const sendCreateEvent = () => {
-            if (!sessionReady || settled) return;
-
-            const responsePayload = {
-                type: 'response.create',
-                response: {
-                    output_modalities: ['audio', 'text'],
-                    input: inputItems,
-                    audio: {
-                        output: {
-                            voice: voice || DEFAULT_OPENAI_VOICE,
-                            format: OPENAI_REALTIME_AUDIO_FORMAT,
-                        },
+        const sessionConfig = {
+            type: 'realtime',
+            model: OPENAI_REALTIME_MODEL,
+            output_modalities: ['audio'],
+            audio: {
+                input: {
+                    transcription: {
+                        model: 'whisper-1',
                     },
                 },
-            };
-
-            if (instructions) {
-                responsePayload.response.instructions = instructions;
-            }
-
-            if (typeof temperature === 'number' && Number.isFinite(temperature)) {
-                responsePayload.response.temperature = temperature;
-            }
-
-            ws.send(JSON.stringify(responsePayload));
+                output: {
+                    voice: resolvedVoice,
+                    speed: 1,
+                },
+            },
+            turn_detection: {
+                type: 'server_vad',
+                threshold: 0.5,
+                prefix_padding_ms: 200,
+                silence_duration_ms: 600,
+            },
         };
 
-        const timeout = setTimeout(() => {
-            cleanup({ status: 504, message: 'Realtime voice request timed out' });
-        }, 30000);
+        if (instructions && typeof instructions === 'string' && instructions.trim()) {
+            sessionConfig.instructions = instructions.trim();
+        }
 
-        ws.on('open', () => {
-            // Wait for session.created event before creating the response
-        });
+        const payload = { session: sessionConfig };
 
-        ws.on('error', (err) => {
-            clearTimeout(timeout);
-            cleanup({ status: 502, message: err?.message || 'Realtime connection failed' });
-        });
-
-        ws.on('close', () => {
-            clearTimeout(timeout);
-            if (!settled) {
-                cleanup({ status: 500, message: 'Realtime connection closed unexpectedly' });
+        const oaResponse = await axios.post(
+            'https://api.openai.com/v1/realtime/client_secrets',
+            payload,
+            {
+                headers: {
+                    Authorization: `Bearer ${config.openaiApiKey}`,
+                    'Content-Type': 'application/json',
+                },
             }
-        });
+        );
 
-        ws.on('message', (data) => {
-            let event;
-            try {
-                event = JSON.parse(data.toString());
-            } catch (err) {
-                return;
+        const data = oaResponse.data || {};
+        const clientSecret = data.client_secret || (data.value
+            ? {
+                value: data.value,
+                expires_at: data.expires_at,
             }
+            : null);
 
-            if (event?.type) {
-                console.log('[Realtime] event received:', event.type);
-            }
-
-            switch (event?.type) {
-                case 'session.created':
-                    sessionReady = true;
-                    // configure session audio defaults only once
-                    ws.send(JSON.stringify({
-                        type: 'session.update',
-                        session: {
-                            output_modalities: ['audio', 'text'],
-                            voice: voice || DEFAULT_OPENAI_VOICE,
-                            input_audio_format: 'pcm16',
-                            output_audio_format: OPENAI_REALTIME_AUDIO_FORMAT,
-                        },
-                    }));
-                    sendCreateEvent();
-                    break;
-                case 'response.created':
-                    responseId = event?.response?.id || responseId;
-                    break;
-                case 'response.output_audio.delta':
-                    if (!responseId || event?.response_id === responseId || !event?.response_id) {
-                        if (typeof event?.delta === 'string') {
-                            audioChunks.push(event.delta);
-                        }
-                    }
-                    break;
-                case 'response.output_audio.done':
-                    // no-op; handled on completion
-                    break;
-                case 'response.output_text.delta':
-                    if (typeof event?.delta === 'string') {
-                        transcript += event.delta;
-                        transcriptSegments.push(event.delta);
-                    }
-                    break;
-                case 'response.output_text.done':
-                    break;
-                case 'response.error':
-                    clearTimeout(timeout);
-                    cleanup({ status: 502, message: event?.error?.message || 'Realtime error' });
-                    break;
-                case 'response.completed':
-                case 'response.finalized':
-                case 'response.done':
-                    clearTimeout(timeout);
-                    if (!settled) {
-                        const audioBase64 = audioChunks.join('');
-                        if (!audioBase64) {
-                            cleanup({ status: 502, message: 'Realtime response did not include audio data' });
-                            return;
-                        }
-                        cleanup(null);
-                        res.json({
-                            transcript: transcript.trim(),
-                            transcriptSegments,
-                            audio: audioBase64,
-                            format: OPENAI_REALTIME_AUDIO_FORMAT,
-                            usage: event?.response?.usage || null,
-                        });
-                    }
-                    break;
-                default:
-                    break;
-            }
+        res.json({
+            client_secret: clientSecret,
+            session: data.session || {
+                id: data.id,
+                model: data.model,
+                output_modalities: data.output_modalities,
+                audio: data.audio,
+                instructions: data.instructions,
+                expires_at: data.expires_at,
+            },
         });
     } catch (error) {
-        console.error('[AI Voice] Error:', error?.response?.data || error?.message || error);
-        const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate voice response';
-        return res.status(500).json({ error: message });
+        console.error('[AI Voice] session error:', error?.response?.data || error?.message || error);
+        const message = error?.response?.data?.error?.message || error?.message || 'Failed to create realtime session';
+        res.status(error?.response?.status || 500).json({ error: message });
     }
 });
 

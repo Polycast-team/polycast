@@ -17,12 +17,10 @@ export const aiService = {
     });
   },
 
-  requestVoiceResponse: async ({ messages, voice, temperature, systemPrompt }) => {
-    return postAI('/ai/voice/respond', {
-      messages,
+  createVoiceSession: async ({ voice, instructions }) => {
+    return postAI('/ai/voice/session', {
       voice,
-      temperature,
-      systemPrompt,
+      instructions,
     });
   },
 };
