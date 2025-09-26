@@ -405,7 +405,6 @@ router.post('/ai/voice/respond', async (req, res) => {
 
         const payload = {
             model: OPENAI_REALTIME_MODEL,
-            modalities: ['text', 'audio'],
             audio: {
                 voice: voice || DEFAULT_OPENAI_VOICE,
                 format: OPENAI_REALTIME_AUDIO_FORMAT,
