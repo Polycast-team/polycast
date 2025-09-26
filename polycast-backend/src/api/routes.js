@@ -437,28 +437,14 @@ router.post('/ai/voice/session', async (req, res) => {
                 headers: {
                     Authorization: `Bearer ${config.openaiApiKey}`,
                     'Content-Type': 'application/json',
+                    'OpenAI-Beta': 'realtime=v1',
                 },
             }
         );
 
         let oaResponse;
-        let modelAttempt = OPENAI_REALTIME_MODEL;
-
-        try {
-            oaResponse = await requestSession(modelAttempt);
-        } catch (primaryError) {
-            const primaryMessage = primaryError?.response?.data?.error?.message || '';
-            const shouldRetryWithDefault = modelAttempt !== 'gpt-realtime'
-                && primaryError?.response?.status === 400
-                && /model/i.test(primaryMessage || '');
-
-            if (!shouldRetryWithDefault) {
-                throw primaryError;
-            }
-
-            modelAttempt = 'gpt-realtime';
-            oaResponse = await requestSession(modelAttempt);
-        }
+        const modelAttempt = OPENAI_REALTIME_MODEL;
+        oaResponse = await requestSession(modelAttempt);
 
         const data = oaResponse.data || {};
         const clientSecret = data.client_secret || (data.value

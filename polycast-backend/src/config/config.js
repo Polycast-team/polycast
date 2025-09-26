@@ -13,7 +13,7 @@ const config = {
     // OpenAI Configuration (used for chat, realtime voice, and TTS)
     openaiApiKey: process.env.OPENAI_API_KEY,
     openaiChatModel: process.env.OPENAI_CHAT_MODEL || 'gpt-5-nano',
-    openaiRealtimeVoiceModel: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime',
+    openaiRealtimeVoiceModel: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
     openaiRealtimeVoiceFormat: process.env.OPENAI_REALTIME_AUDIO_FORMAT || 'mp3',
 
     // Redis Configuration
@@ -28,8 +28,8 @@ console.log('Config openaiApiKey:', config.openaiApiKey ? 'CONFIGURED' : 'NOT SE
 // Perform validation immediately when the module is loaded
 config.validateKeys = function() {
     console.log('Validating API keys...');
-    const requiredKeys = ['GEMINI_API_KEY', 'DEEPGRAM_API_KEY', 'OPENAI_API_KEY'];
-    const optionalKeys = []; // All keys are now required
+    const requiredKeys = ['GEMINI_API_KEY', 'DEEPGRAM_API_KEY'];
+    const optionalKeys = ['OPENAI_API_KEY']; // OpenAI now optional (only for TTS)
     const missingRequired = requiredKeys.filter(key => !process.env[key]);
     const missingOptional = optionalKeys.filter(key => !process.env[key]);
 

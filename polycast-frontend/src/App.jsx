@@ -177,6 +177,11 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 
   // Load dictionary from server after login (no localStorage)
   useEffect(() => {
+    const token = authClient.getToken && authClient.getToken();
+    if (!token) {
+      // Skip server dictionary fetch if not authenticated to avoid 401 noise
+      return;
+    }
     async function loadServerDictionary() {
       try {
         const rows = await apiService.fetchJson(`${apiService.baseUrl}/api/dictionary`);

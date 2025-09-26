@@ -283,7 +283,8 @@ function VoiceMode({
         });
 
         if (!sdpResponse.ok) {
-          const body = await sdpResponse.text();
+          let body = '';
+          try { body = await sdpResponse.text(); } catch (_) {}
           throw new Error(body || `Realtime offer failed with status ${sdpResponse.status}`);
         }
 
