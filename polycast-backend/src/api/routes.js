@@ -396,6 +396,13 @@ router.post('/ai/voice/session', async (req, res) => {
             : DEFAULT_OPENAI_VOICE;
 
         const buildSessionPayload = (modelName) => {
+            const turnDetectionConfig = {
+                type: 'server_vad',
+                threshold: 0.5,
+                prefix_padding_ms: 200,
+                silence_duration_ms: 600,
+            };
+
             const sessionConfig = {
                 type: 'realtime',
                 model: modelName,
@@ -406,18 +413,13 @@ router.post('/ai/voice/session', async (req, res) => {
                         transcription: {
                             model: 'whisper-1',
                         },
+                        turn_detection: turnDetectionConfig,
                     },
                     output: {
                         format: { type: 'audio/pcm', rate: 24000 },
                         voice: resolvedVoice,
                         speed: 1,
                     },
-                },
-                turn_detection: {
-                    type: 'server_vad',
-                    threshold: 0.5,
-                    prefix_padding_ms: 200,
-                    silence_duration_ms: 600,
                 },
             };
 
