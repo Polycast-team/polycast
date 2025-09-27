@@ -71,8 +71,11 @@ async function callChatCompletion({ messages, model, temperature, maxOutputToken
     model,
     messages,
     temperature,
-    max_output_tokens: maxOutputTokens,
   };
+
+  if (typeof maxOutputTokens === 'number' && Number.isFinite(maxOutputTokens)) {
+    payload.max_output_tokens = maxOutputTokens;
+  }
 
   const response = await axios.post(`${OPENAI_BASE_URL}/chat/completions`, payload, {
     headers: {
@@ -95,7 +98,7 @@ async function callChatCompletion({ messages, model, temperature, maxOutputToken
   };
 }
 
-async function sendChatCompletion({ messages, model = 'gpt-5-mini', maxOutputTokens = 1024, temperature = 0.7 }) {
+async function sendChatCompletion({ messages, model = 'gpt-5-mini', maxOutputTokens, temperature = 0.7 }) {
   ensureApiKey();
   const cleanedMessages = normalizeMessages(messages);
   const modelsToTry = buildFallbackChain(model);

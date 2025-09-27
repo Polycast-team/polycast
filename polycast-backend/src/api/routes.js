@@ -224,7 +224,6 @@ router.post('/ai/chat', async (req, res) => {
             messages: normalizedMessages,
             model: model || 'gpt-5-mini',
             temperature: typeof temperature === 'number' ? temperature : 0.6,
-            maxOutputTokens: maxOutputTokens || 1024,
         });
 
         return res.json({
