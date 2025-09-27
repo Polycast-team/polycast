@@ -22,6 +22,8 @@ class ApiService {
   createRoomUrl = () => `${this.baseUrl}/api/create-room`;
   checkRoomUrl = roomCode => `${this.baseUrl}/api/check-room/${roomCode}`;
   generateAudioUrl = () => `${this.baseUrl}/api/generate-audio`;
+  aiChatUrl = () => `${this.baseUrl}/api/ai/chat`;
+  aiVoiceSessionUrl = () => `${this.baseUrl}/api/ai/voice-session`;
 
   // Sense candidates for Add Word flow
   getSenseCandidatesUrl = (word, nativeLanguage, targetLanguage) => {
@@ -40,6 +42,14 @@ class ApiService {
   getQuickWordDataUrl = (word, sentenceWithMarkedWord, nativeLanguage, targetLanguage) => {
     const params = new URLSearchParams({ word, sentenceWithMarkedWord, nativeLanguage, targetLanguage });
     return `${this.baseUrl}/api/dictionary/quick?${params}`;
+  }
+
+  async sendAiChat(payload) {
+    return this.postJson(this.aiChatUrl(), payload);
+  }
+
+  async createRealtimeVoiceSession(payload = {}) {
+    return this.postJson(this.aiVoiceSessionUrl(), payload);
   }
 
   // Helper methods for common API patterns

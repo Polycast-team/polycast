@@ -2,6 +2,7 @@ const express = require('express');
 const { generateRoomCode, activeRooms } = require('../utils/room');
 const redisService = require('../services/redisService');
 const popupGeminiService = require('../services/popupGeminiService');
+const openaiService = require('../services/openaiService');
 const dictService = require('../profile-data/dictionaryService');
 const axios = require('axios');
 const config = require('../config/config');
@@ -199,6 +200,56 @@ router.get('/dictionary/quick', async (req, res) => {
     } catch (e) {
         console.error('[Quick API] Error:', e);
         res.status(500).json({ error: e?.message || 'Failed to get quick summary' });
+    }
+});
+
+router.post('/ai/chat', async (req, res) => {
+    try {
+        const { messages, systemPrompt, temperature, verbosity, model, maxOutputTokens } = req.body || {};
+        if (!Array.isArray(messages) || messages.length === 0) {
+            return res.status(400).json({ error: 'messages must be a non-empty array' });
+        }
+
+        const chatMessages = Array.isArray(messages) ? [...messages] : [];
+        if (systemPrompt && typeof systemPrompt === 'string') {
+            chatMessages.unshift({ role: 'system', content: systemPrompt });
+        }
+
+        const result = await openaiService.sendChatCompletion({
+            messages: chatMessages,
+            model: model || 'gpt-5-mini',
+            temperature: typeof temperature === 'number' ? temperature : 0.6,
+            maxOutputTokens: maxOutputTokens || 1024,
+            verbosity: verbosity || 'low',
+        });
+
+        return res.json({
+            message: result.text,
+            usage: result.usage,
+            stopReason: result.stopReason,
+        });
+    } catch (error) {
+        console.error('[AI Chat] error:', error);
+        const status = error.statusCode || error.status || 500;
+        res.status(status).json({ error: error.message || 'Failed to generate response' });
+    }
+});
+
+router.post('/ai/voice-session', async (req, res) => {
+    try {
+        const { voice, instructions, modalities, temperature } = req.body || {};
+        const session = await openaiService.createRealtimeSession({
+            voice: voice || 'marin',
+            instructions,
+            modalities: Array.isArray(modalities) && modalities.length ? modalities : ['text', 'audio'],
+            temperature: typeof temperature === 'number' ? temperature : 0.7,
+        });
+
+        return res.json(session);
+    } catch (error) {
+        console.error('[AI Voice] error:', error);
+        const status = error.statusCode || error.status || 500;
+        res.status(status).json({ error: error.message || 'Failed to create realtime session' });
     }
 });
 

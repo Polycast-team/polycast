@@ -561,6 +561,17 @@ h1, h2, h3 {
   color: #8b5cf6;
 }
 
+/* Teal button (AI) */
+.bottom-toolbar-button.color-4:hover {
+  background: rgba(13, 148, 136, 0.1);
+  color: #0f9f96;
+}
+
+.bottom-toolbar-button.color-4.active {
+  background: rgba(13, 148, 136, 0.15);
+  color: #0f9f96;
+}
+
 .bottom-toolbar-button svg {
   width: 24px;
   height: 24px;

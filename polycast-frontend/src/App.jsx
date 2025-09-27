@@ -24,6 +24,7 @@ import authClient from './services/authClient.js';
 import { createFlashcardEntry } from './components/FixedCardDefinitions';
 import { extractSentenceWithWord, markClickedWordInSentence } from './utils/wordClickUtils';
 import ModeSelector from './components/ModeSelector';
+import AIMode from './components/ai/AIMode';
 
 
 
@@ -1148,6 +1149,18 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
               q.forEach((msg) => { try { handler(msg); } catch (e) { console.warn('Failed delivering pending signal:', e); } });
             }}
             unregisterWebrtcSignalHandler={() => { webrtcSignalHandlerRef.current = null; }}
+          />
+        ) : appMode === 'ai' ? (
+          <AIMode
+            selectedProfile={selectedProfile || internalSelectedProfile}
+            onAddWord={(word) => {
+              console.log('Add from AI mode:', word);
+              handleAddWord(word);
+            }}
+            selectedWords={selectedWords}
+            setSelectedWords={setSelectedWords}
+            wordDefinitions={wordDefinitions}
+            setWordDefinitions={setWordDefinitions}
           />
         ) : (
           <TranscriptionDisplay 
