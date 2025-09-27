@@ -399,7 +399,6 @@ router.post('/ai/voice/session', async (req, res) => {
             const sessionConfig = {
                 model: modelName,
                 voice: resolvedVoice,
-                modalities: ['audio'],
             };
 
             if (instructions && typeof instructions === 'string' && instructions.trim()) {
