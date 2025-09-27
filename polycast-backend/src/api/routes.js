@@ -396,26 +396,33 @@ router.post('/ai/voice/session', async (req, res) => {
             : DEFAULT_OPENAI_VOICE;
 
         const buildSessionPayload = (modelName) => {
-            const sessionConfig = {
+            const trimmedInstructions = (typeof instructions === 'string' && instructions.trim())
+                ? instructions.trim()
+                : undefined;
+
+            const payload = {
                 model: modelName,
                 voice: resolvedVoice,
+                modalities: ['audio', 'text'],
+                audio: {
+                    format: OPENAI_REALTIME_AUDIO_FORMAT,
+                },
             };
 
-            if (instructions && typeof instructions === 'string' && instructions.trim()) {
-                sessionConfig.instructions = instructions.trim();
+            if (trimmedInstructions) {
+                payload.instructions = trimmedInstructions;
             }
 
-            return { session: sessionConfig };
+            return payload;
         };
 
         const requestSession = async (modelName) => axios.post(
-            'https://api.openai.com/v1/realtime/client_secrets',
+            'https://api.openai.com/v1/realtime/sessions',
             buildSessionPayload(modelName),
             {
                 headers: {
                     Authorization: `Bearer ${config.openaiApiKey}`,
                     'Content-Type': 'application/json',
-                    'OpenAI-Beta': 'realtime=v1',
                 },
             }
         );
