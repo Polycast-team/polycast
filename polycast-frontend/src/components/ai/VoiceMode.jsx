@@ -247,6 +247,7 @@ function VoiceMode({
                   type: 'response.create',
                   response: {
                     modalities: ['text', 'audio'],
+                    instructions: instructions || 'You are Polycast AI, a helpful and concise language tutor. Speak briefly and return a text transcript while you speak.',
                   },
                 }));
                 hasSentIntroRef.current = true;

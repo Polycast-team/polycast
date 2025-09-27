@@ -404,6 +404,10 @@ router.post('/ai/voice/session', async (req, res) => {
                 model: modelName,
                 voice: resolvedVoice,
                 modalities: ['audio', 'text'],
+                // Enable server-side VAD so the model knows when you're done speaking
+                turn_detection: { type: 'server_vad' },
+                // Enable user speech transcription events over the data channel
+                input_audio_transcription: { model: 'whisper-1' },
             };
 
             if (trimmedInstructions) {
