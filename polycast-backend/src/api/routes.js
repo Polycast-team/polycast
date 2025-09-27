@@ -404,9 +404,6 @@ router.post('/ai/voice/session', async (req, res) => {
                 model: modelName,
                 voice: resolvedVoice,
                 modalities: ['audio', 'text'],
-                audio: {
-                    format: OPENAI_REALTIME_AUDIO_FORMAT,
-                },
             };
 
             if (trimmedInstructions) {
