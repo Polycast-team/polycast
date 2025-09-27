@@ -396,38 +396,16 @@ router.post('/ai/voice/session', async (req, res) => {
             : DEFAULT_OPENAI_VOICE;
 
         const buildSessionPayload = (modelName) => {
-            const turnDetectionConfig = {
-                type: 'server_vad',
-                threshold: 0.5,
-                prefix_padding_ms: 200,
-                silence_duration_ms: 600,
-            };
-
-            const sessionConfig = {
-                type: 'realtime',
+            const payload = {
                 model: modelName,
-                output_modalities: ['audio'],
-                audio: {
-                    input: {
-                        format: { type: 'audio/pcm', rate: 24000 },
-                        transcription: {
-                            model: 'whisper-1',
-                        },
-                        turn_detection: turnDetectionConfig,
-                    },
-                    output: {
-                        format: { type: 'audio/pcm', rate: 24000 },
-                        voice: resolvedVoice,
-                        speed: 1,
-                    },
-                },
+                voice: resolvedVoice,
             };
 
             if (instructions && typeof instructions === 'string' && instructions.trim()) {
-                sessionConfig.instructions = instructions.trim();
+                payload.instructions = instructions.trim();
             }
 
-            return { session: sessionConfig };
+            return payload;
         };
 
         const requestSession = async (modelName) => axios.post(
