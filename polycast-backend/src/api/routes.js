@@ -14,7 +14,7 @@ const OPENAI_TTS_MODEL = 'gpt-4o-mini-tts';
 const DEFAULT_OPENAI_VOICE = 'alloy';
 const OPENAI_REALTIME_MODEL = config.openaiRealtimeVoiceModel || 'gpt-realtime';
 const OPENAI_REALTIME_AUDIO_FORMAT = config.openaiRealtimeVoiceFormat || 'mp3';
-const GEMINI_CHAT_MODEL = config.geminiChatModel || 'gemini-2.0-flash';
+const GEMINI_CHAT_MODEL = config.geminiChatModel || 'gemini-2.5-flash-lite';
 
 const router = express.Router();
 // Auth
