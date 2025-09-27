@@ -760,6 +760,9 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
       // Update to video mode
       console.log('Setting mode to video (local only)');
       setAppMode('video');
+    } else if (newMode === 'ai') {
+      console.log('Setting mode to AI tutor');
+      setAppMode('ai');
     }
   }, [appMode, isRecording]);
 
