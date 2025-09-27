@@ -205,22 +205,26 @@ router.get('/dictionary/quick', async (req, res) => {
 
 router.post('/ai/chat', async (req, res) => {
     try {
-        const { messages, systemPrompt, temperature, verbosity, model, maxOutputTokens } = req.body || {};
+        const { messages, systemPrompt, temperature, model, maxOutputTokens } = req.body || {};
         if (!Array.isArray(messages) || messages.length === 0) {
             return res.status(400).json({ error: 'messages must be a non-empty array' });
         }
 
-        const chatMessages = Array.isArray(messages) ? [...messages] : [];
+        const chatMessages = [...messages];
         if (systemPrompt && typeof systemPrompt === 'string') {
             chatMessages.unshift({ role: 'system', content: systemPrompt });
         }
 
+        const normalizedMessages = chatMessages.map(msg => ({
+            role: msg?.role || 'user',
+            content: msg?.content ?? '',
+        }));
+
         const result = await openaiService.sendChatCompletion({
-            messages: chatMessages,
+            messages: normalizedMessages,
             model: model || 'gpt-5-mini',
             temperature: typeof temperature === 'number' ? temperature : 0.6,
             maxOutputTokens: maxOutputTokens || 1024,
-            verbosity: verbosity || 'low',
         });
 
         return res.json({
@@ -241,7 +245,7 @@ router.post('/ai/voice-session', async (req, res) => {
         const session = await openaiService.createRealtimeSession({
             voice: voice || 'marin',
             instructions,
-            modalities: Array.isArray(modalities) && modalities.length ? modalities : ['text', 'audio'],
+            outputModalities: Array.isArray(modalities) && modalities.length ? modalities : ['text', 'audio'],
             temperature: typeof temperature === 'number' ? temperature : 0.7,
         });
 

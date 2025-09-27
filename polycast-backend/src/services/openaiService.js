@@ -11,21 +11,47 @@ function ensureApiKey() {
   }
 }
 
-async function sendChatCompletion({ messages, model = 'gpt-5-mini', maxOutputTokens = 1024, temperature = 0.7, verbosity = 'low' }) {
+async function sendChatCompletion({ messages, model = 'gpt-5-mini', maxOutputTokens = 1024, temperature = 0.7 }) {
   ensureApiKey();
 
   if (!Array.isArray(messages) || messages.length === 0) {
     throw new Error('messages array is required');
   }
 
+  const normalizedMessages = messages.map((message = {}) => {
+    const role = message.role || 'user';
+    const rawContent = message.content ?? '';
+
+    const contentParts = Array.isArray(rawContent)
+      ? rawContent
+      : [{ type: 'text', text: String(rawContent) }];
+
+    const formatted = contentParts.map((part) => {
+      if (typeof part === 'string') {
+        return { type: 'text', text: part };
+      }
+      if (part?.type === 'text') {
+        return { type: 'text', text: String(part.text ?? '') };
+      }
+      return { type: 'text', text: String(part?.text ?? '') };
+    });
+
+    return { role, content: formatted };
+  });
+
+  const cleanedMessages = normalizedMessages.filter((msg) =>
+    Array.isArray(msg.content) && msg.content.some((part) => part.text.trim().length > 0)
+  );
+
+  if (cleanedMessages.length === 0) {
+    throw new Error('messages array is empty after normalization');
+  }
+
   const payload = {
     model,
-    messages,
+    messages: cleanedMessages,
     temperature,
     max_output_tokens: maxOutputTokens,
-    response_format: { type: 'text' },
-    reasoning: { effort: 'minimal' },
-    verbosity,
   };
 
   try {
@@ -38,8 +64,8 @@ async function sendChatCompletion({ messages, model = 'gpt-5-mini', maxOutputTok
     });
 
     const choice = response?.data?.choices?.[0];
-    const text = choice?.message?.content?.reduce
-      ? choice.message.content.reduce((acc, block) => acc + (block?.text || ''), '')
+    const text = Array.isArray(choice?.message?.content)
+      ? choice.message.content.map((block) => block?.text || '').join('')
       : choice?.message?.content;
 
     return {
@@ -49,6 +75,7 @@ async function sendChatCompletion({ messages, model = 'gpt-5-mini', maxOutputTok
       raw: response?.data,
     };
   } catch (error) {
+    console.error('[OpenAI] chat error payload:', error?.response?.data || error?.message);
     const message = error?.response?.data?.error?.message || error.message || 'Failed to reach OpenAI';
     const err = new Error(message);
     err.statusCode = error?.response?.status || 500;
@@ -60,7 +87,7 @@ async function createRealtimeSession({
   model = 'gpt-realtime',
   voice = 'marin',
   instructions,
-  modalities,
+  outputModalities,
   temperature = 0.7,
 } = {}) {
   ensureApiKey();
@@ -83,8 +110,8 @@ async function createRealtimeSession({
     sessionConfig.session.instructions = instructions;
   }
 
-  if (Array.isArray(modalities) && modalities.length) {
-    sessionConfig.session.modalities = modalities;
+  if (Array.isArray(outputModalities) && outputModalities.length) {
+    sessionConfig.session.output_modalities = outputModalities;
   }
 
   try {
@@ -98,6 +125,7 @@ async function createRealtimeSession({
 
     return response.data;
   } catch (error) {
+    console.error('[OpenAI] realtime error payload:', error?.response?.data || error?.message);
     const message = error?.response?.data?.error?.message || error.message || 'Failed to create realtime client secret';
     const err = new Error(message);
     err.statusCode = error?.response?.status || 500;
