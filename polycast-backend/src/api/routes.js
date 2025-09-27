@@ -396,16 +396,17 @@ router.post('/ai/voice/session', async (req, res) => {
             : DEFAULT_OPENAI_VOICE;
 
         const buildSessionPayload = (modelName) => {
-            const payload = {
+            const sessionConfig = {
                 model: modelName,
                 voice: resolvedVoice,
+                modalities: ['audio'],
             };
 
             if (instructions && typeof instructions === 'string' && instructions.trim()) {
-                payload.instructions = instructions.trim();
+                sessionConfig.instructions = instructions.trim();
             }
 
-            return payload;
+            return { session: sessionConfig };
         };
 
         const requestSession = async (modelName) => axios.post(
@@ -444,9 +445,24 @@ router.post('/ai/voice/session', async (req, res) => {
             },
         });
     } catch (error) {
-        console.error('[AI Voice] session error:', error?.response?.data || error?.message || error);
-        const message = error?.response?.data?.error?.message || error?.message || 'Failed to create realtime session';
-        res.status(error?.response?.status || 500).json({ error: message });
+        const status = error?.response?.status || 500;
+        const oaData = error?.response?.data;
+        console.error('[AI Voice] session error:', oaData || error?.message || error);
+
+        const safePayload = (() => {
+            try {
+                return JSON.stringify(buildSessionPayload(OPENAI_REALTIME_MODEL));
+            } catch (_) {
+                return undefined;
+            }
+        })();
+
+        const message = oaData?.error?.message || error?.message || 'Failed to create realtime session';
+        res.status(status).json({
+            error: message,
+            details: oaData?.error?.param ? { param: oaData.error.param, code: oaData.error.code } : undefined,
+            requestPayload: process.env.NODE_ENV === 'production' ? undefined : safePayload,
+        });
     }
 });
 
