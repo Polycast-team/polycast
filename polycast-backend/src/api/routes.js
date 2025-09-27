@@ -423,6 +423,7 @@ router.post('/ai/voice/session', async (req, res) => {
                 headers: {
                     Authorization: `Bearer ${config.openaiApiKey}`,
                     'Content-Type': 'application/json',
+                    'OpenAI-Beta': 'realtime=v1',
                 },
             }
         );
