@@ -231,6 +231,7 @@ router.post('/ai/chat', async (req, res) => {
             message: result.text,
             usage: result.usage,
             stopReason: result.stopReason,
+            model: result.modelUsed,
         });
     } catch (error) {
         console.error('[AI Chat] error:', error);
