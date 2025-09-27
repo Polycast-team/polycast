@@ -53,14 +53,30 @@ function VoiceMode({
         .map((item) => {
           if (typeof item === 'string') return item;
           if (item && typeof item === 'object') {
-            return item.text || item.transcript || item.content || '';
+            if (Array.isArray(item.content)) {
+              return item.content.map((entry) => normaliseTextFragment(entry)).join('');
+            }
+            return item.text
+              || item.transcript
+              || item.content
+              || item.delta
+              || item.value
+              || '';
           }
           return '';
         })
         .join('');
     }
     if (typeof fragment === 'object') {
-      return fragment.text || fragment.transcript || fragment.content || fragment.delta || fragment.value || '';
+      if (Array.isArray(fragment.content)) {
+        return fragment.content.map((entry) => normaliseTextFragment(entry)).join('');
+      }
+      return fragment.text
+        || fragment.transcript
+        || fragment.content
+        || fragment.delta
+        || fragment.value
+        || '';
     }
     return '';
   }, []);
@@ -81,6 +97,61 @@ function VoiceMode({
       return next;
     });
   }, []);
+
+  const extractTextFromEvent = useCallback((event) => {
+    if (!event || typeof event !== 'object') return '';
+
+    const fromDirect = normaliseTextFragment(event.delta)
+      || normaliseTextFragment(event.output_text)
+      || normaliseTextFragment(event.text)
+      || normaliseTextFragment(event.transcript)
+      || normaliseTextFragment(event.part)
+      || normaliseTextFragment(event.item)
+      || normaliseTextFragment(event.content)
+      || normaliseTextFragment(event.message);
+    if (fromDirect) return fromDirect;
+
+    const fromResponse = (response) => {
+      if (!response || typeof response !== 'object') return '';
+      const outputs = response.output || response.outputs;
+      if (!Array.isArray(outputs)) return '';
+      for (let i = 0; i < outputs.length; i += 1) {
+        const text = normaliseTextFragment(outputs[i]?.content);
+        if (text) return text;
+      }
+      return '';
+    };
+
+    return fromResponse(event.response) || '';
+  }, [normaliseTextFragment]);
+
+  const extractTextMapFromResponse = useCallback((response) => {
+    const map = {};
+    if (!response || typeof response !== 'object') return map;
+    const outputs = response.output || response.outputs;
+    if (!Array.isArray(outputs)) return map;
+    outputs.forEach((output, index) => {
+      const text = normaliseTextFragment(output?.content);
+      if (text) {
+        map[index] = text;
+      }
+    });
+    return map;
+  }, [normaliseTextFragment]);
+
+  const applyAssistantDelta = useCallback((id, fragment) => {
+    const delta = normaliseTextFragment(fragment);
+    if (!delta) return;
+    pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
+    addOrUpdateMessage(id, 'assistant', delta, { replace: false });
+  }, [addOrUpdateMessage, normaliseTextFragment]);
+
+  const finalizeAssistantMessage = useCallback((id, fragment) => {
+    const text = normaliseTextFragment(fragment) || pendingAssistantRef.current[id] || '';
+    pendingAssistantRef.current[id] = '';
+    if (!text) return;
+    addOrUpdateMessage(id, 'assistant', text, { replace: true });
+  }, [addOrUpdateMessage, normaliseTextFragment]);
 
   const closePopup = useCallback(() => setPopupInfo((prev) => ({ ...prev, visible: false })), []);
 
@@ -336,47 +407,68 @@ function VoiceMode({
       switch (event.type) {
         case 'response.output_text.delta': {
           const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          const delta = normaliseTextFragment(event.delta);
-          if (!delta) break;
-          pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
-          addOrUpdateMessage(id, 'assistant', delta, { replace: false });
-          setStatus((prev) => (prev === 'connecting' ? 'responding' : 'responding'));
+          applyAssistantDelta(id, event.delta || extractTextFromEvent(event));
+          setStatus('responding');
           break;
         }
         case 'response.output_text.done': {
           const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          const final = normaliseTextFragment(event.output_text)
-            || normaliseTextFragment(event.text)
-            || pendingAssistantRef.current[id]
-            || '';
-          pendingAssistantRef.current[id] = '';
-          addOrUpdateMessage(id, 'assistant', final, { replace: true });
+          const fromResponse = extractTextMapFromResponse(event.response);
+          const final = fromResponse[event.output_index ?? 0] || extractTextFromEvent(event);
+          finalizeAssistantMessage(id, final);
+          setStatus('ready');
+          break;
+        }
+        case 'response.output_item.added':
+        case 'response.output_item.created': {
+          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
+          applyAssistantDelta(id, extractTextFromEvent(event));
+          setStatus('responding');
+          break;
+        }
+        case 'response.content_part.delta':
+        case 'response.content_part.added': {
+          if (event.part?.type !== 'output_text') break;
+          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
+          const fragment = event.part?.delta || event.part?.text || event.part?.content || extractTextFromEvent(event);
+          applyAssistantDelta(id, fragment);
+          setStatus('responding');
+          break;
+        }
+        case 'response.content_part.done': {
+          if (event.part?.type !== 'output_text') break;
+          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
+          const fragment = event.part?.content || event.part?.text || extractTextFromEvent(event);
+          finalizeAssistantMessage(id, fragment);
           setStatus('ready');
           break;
         }
         case 'response.output_audio_transcript.delta': {
           const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          const delta = normaliseTextFragment(event.delta);
-          if (!delta) break;
-          pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
-          addOrUpdateMessage(id, 'assistant', delta, { replace: false });
+          applyAssistantDelta(id, event.delta || extractTextFromEvent(event));
           setStatus('responding');
           break;
         }
         case 'response.output_audio_transcript.done': {
           const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          const final = normaliseTextFragment(event.transcript)
-            || pendingAssistantRef.current[id]
-            || '';
-          pendingAssistantRef.current[id] = '';
-          addOrUpdateMessage(id, 'assistant', final, { replace: true });
+          const fromResponse = extractTextMapFromResponse(event.response);
+          const final = event.transcript || fromResponse[event.output_index ?? 0] || extractTextFromEvent(event);
+          finalizeAssistantMessage(id, final);
           setStatus('ready');
           break;
         }
         case 'response.completed':
-        case 'response.done':
+        case 'response.done': {
+          if (event.response) {
+            const fromResponse = extractTextMapFromResponse(event.response);
+            Object.entries(fromResponse).forEach(([index, text]) => {
+              const id = `${event.response?.id || 'assistant'}-${index}`;
+              finalizeAssistantMessage(id, text);
+            });
+          }
           setStatus('ready');
           break;
+        }
         case 'response.error':
           setError(event?.error?.message || 'Realtime response error');
           setStatus('error');
@@ -443,7 +535,16 @@ function VoiceMode({
       isMountedRef.current = false;
       cleanupConnection();
     };
-  }, [instructions, cleanupConnection, addOrUpdateMessage, normaliseTextFragment]);
+  }, [
+    instructions,
+    cleanupConnection,
+    addOrUpdateMessage,
+    normaliseTextFragment,
+    applyAssistantDelta,
+    extractTextFromEvent,
+    extractTextMapFromResponse,
+    finalizeAssistantMessage,
+  ]);
 
   const extractContentText = (content = []) => {
     if (!Array.isArray(content)) return '';
