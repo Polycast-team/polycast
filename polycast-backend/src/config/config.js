@@ -17,13 +17,13 @@ const config = {
 
     // Google AI (Gemini) Configuration
     geminiApiKey: process.env.GEMINI_API_KEY,
+    geminiChatModel: toStringOr(process.env.GEMINI_CHAT_MODEL, 'gemini-2.0-flash'),
 
     // Deepgram Configuration
     deepgramApiKey: process.env.DEEPGRAM_API_KEY,
 
-    // OpenAI Configuration (used for chat, realtime voice, and TTS)
+    // OpenAI Configuration (used for realtime voice and TTS)
     openaiApiKey: process.env.OPENAI_API_KEY,
-    openaiChatModel: process.env.OPENAI_CHAT_MODEL || 'gpt-5-nano',
     openaiRealtimeVoiceModel: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
     openaiRealtimeVoiceFormat: process.env.OPENAI_REALTIME_AUDIO_FORMAT || 'mp3',
     openaiRealtimeVadType: toStringOr(process.env.OPENAI_REALTIME_VAD_TYPE, 'server_vad'),

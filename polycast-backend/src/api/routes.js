@@ -4,16 +4,17 @@ const redisService = require('../services/redisService');
 const popupGeminiService = require('../services/popupGeminiService');
 const dictService = require('../profile-data/dictionaryService');
 const axios = require('axios');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const config = require('../config/config');
 const authService = require('../services/authService');
 const authMiddleware = require('./middleware/auth');
 
-// OpenAI model configuration
+// Model configuration
 const OPENAI_TTS_MODEL = 'gpt-4o-mini-tts';
 const DEFAULT_OPENAI_VOICE = 'alloy';
-const OPENAI_CHAT_MODEL = config.openaiChatModel || 'gpt-5';
 const OPENAI_REALTIME_MODEL = config.openaiRealtimeVoiceModel || 'gpt-realtime';
 const OPENAI_REALTIME_AUDIO_FORMAT = config.openaiRealtimeVoiceFormat || 'mp3';
+const GEMINI_CHAT_MODEL = config.geminiChatModel || 'gemini-2.0-flash';
 
 const router = express.Router();
 // Auth
@@ -265,10 +266,10 @@ router.put('/dictionary/:id/srs', authMiddleware, async (req, res) => {
 });
 
 
-// AI Chat endpoint (GPT-5 via Responses API)
+// AI Chat endpoint (Gemini Flash)
 router.post('/ai/chat', async (req, res) => {
-    if (!config.openaiApiKey) {
-        return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server' });
+    if (!config.geminiApiKey) {
+        return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server' });
     }
 
     try {
@@ -280,63 +281,64 @@ router.post('/ai/chat', async (req, res) => {
         } = req.body || {};
 
         const conversation = Array.isArray(messages) ? messages : [];
-        if (!conversation.length && !prompt) {
+        const promptText = typeof prompt === 'string' ? prompt.trim() : '';
+        if (!conversation.length && !promptText) {
             return res.status(400).json({ error: 'messages or prompt is required' });
         }
 
-        const inputMessages = mapConversationToInput(conversation);
-
-        if (prompt && typeof prompt === 'string') {
-            inputMessages.push({
-                role: 'user',
-                content: [
-                    {
-                        type: 'input_text',
-                        text: prompt,
-                    },
-                ],
-            });
-        }
-
-        const payload = {
-            model: OPENAI_CHAT_MODEL,
-            input: inputMessages,
-        };
-
+        const genAI = new GoogleGenerativeAI(config.geminiApiKey);
+        const generationConfig = {};
         if (typeof temperature === 'number' && Number.isFinite(temperature)) {
-            payload.temperature = temperature;
+            const clamped = Math.max(0, Math.min(1.5, temperature));
+            generationConfig.temperature = clamped;
         }
 
-        if (systemPrompt && typeof systemPrompt === 'string') {
-            payload.instructions = systemPrompt;
+        const modelOptions = { model: GEMINI_CHAT_MODEL };
+        if (Object.keys(generationConfig).length > 0) {
+            modelOptions.generationConfig = generationConfig;
+        }
+        if (typeof systemPrompt === 'string' && systemPrompt.trim()) {
+            modelOptions.systemInstruction = systemPrompt.trim();
         }
 
-        const oaResponse = await axios.post(
-            'https://api.openai.com/v1/responses',
-            payload,
-            {
-                headers: {
-                    Authorization: `Bearer ${config.openaiApiKey}`,
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
+        const model = genAI.getGenerativeModel(modelOptions);
 
-        const data = oaResponse.data || {};
-        const outputs = Array.isArray(data.output) ? data.output : (Array.isArray(data.outputs) ? data.outputs : []);
-        let assistantText = '';
+        const contents = [];
 
-        outputs.forEach((output) => {
-            const contentPieces = Array.isArray(output?.content) ? output.content : [];
-            contentPieces.forEach((piece) => {
-                if (piece?.type === 'output_text' && typeof piece?.text === 'string') {
-                    assistantText += piece.text;
-                }
-            });
+        conversation.forEach((msg) => {
+            const text = normaliseMessageText(msg?.content);
+            if (!text) return;
+            const role = typeof msg?.role === 'string' ? msg.role.toLowerCase() : 'user';
+            const geminiRole = role === 'assistant' ? 'model' : 'user';
+            contents.push({ role: geminiRole, parts: [{ text }] });
         });
 
-        if (!assistantText && typeof data?.output_text === 'string') {
-            assistantText = data.output_text;
+        if (promptText) {
+            contents.push({ role: 'user', parts: [{ text: promptText }] });
+        }
+
+        if (!contents.length) {
+            return res.status(400).json({ error: 'No valid messages to send' });
+        }
+
+        const result = await model.generateContent({ contents });
+        let assistantText = '';
+
+        if (result?.response?.text) {
+            const raw = await result.response.text();
+            if (typeof raw === 'string') {
+                assistantText = raw.trim();
+            }
+        }
+
+        if (!assistantText && Array.isArray(result?.response?.candidates)) {
+            const candidate = result.response.candidates.find((c) => Array.isArray(c?.content?.parts));
+            if (candidate) {
+                assistantText = candidate.content.parts
+                    .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+                    .join('')
+                    .trim();
+            }
         }
 
         if (!assistantText) {
@@ -346,40 +348,43 @@ router.post('/ai/chat', async (req, res) => {
         return res.json({
             message: {
                 role: 'assistant',
-                content: assistantText.trim(),
+                content: assistantText,
             },
-            usage: data?.usage || null,
+            usage: null,
         });
     } catch (error) {
-        console.error('[AI Chat] Error:', error?.response?.data || error?.message || error);
+        console.error('[AI Chat] Gemini error:', error?.response?.data || error?.message || error);
         const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate AI response';
         return res.status(error?.response?.status || 500).json({ error: message });
     }
 });
 
-// Helper to normalize messages for Responses API
-function mapConversationToInput(messages = []) {
-    return messages
-        .filter((msg) => {
-            if (!msg || typeof msg.role !== 'string' || msg.content === undefined || msg.content === null) {
-                return false;
-            }
-            const role = msg.role.toLowerCase();
-            return role === 'user' || role === 'assistant';
-        })
-        .map((msg) => {
-            const role = msg.role.toLowerCase();
-            const isAssistant = role === 'assistant';
-            return {
-                role: msg.role,
-                content: [
-                    {
-                        type: isAssistant ? 'output_text' : 'input_text',
-                        text: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-                    },
-                ],
-            };
-        });
+// Helper to normalize chat message content for Gemini inputs
+function normaliseMessageText(content) {
+    if (content === undefined || content === null) return '';
+    if (typeof content === 'string') return content.trim();
+    if (Array.isArray(content)) {
+        const combined = content
+            .map((part) => {
+                if (!part) return '';
+                if (typeof part === 'string') return part;
+                if (typeof part === 'object') {
+                    if (typeof part.text === 'string') return part.text;
+                    if (typeof part.value === 'string') return part.value;
+                    if (typeof part.content === 'string') return part.content;
+                }
+                return '';
+            })
+            .filter(Boolean)
+            .join(' ');
+        return combined.trim();
+    }
+    if (typeof content === 'object') {
+        if (typeof content.text === 'string') return content.text.trim();
+        if (typeof content.value === 'string') return content.value.trim();
+        if (Array.isArray(content.content)) return normaliseMessageText(content.content);
+    }
+    return '';
 }
 
 // Create ephemeral Realtime session token for voice mode
