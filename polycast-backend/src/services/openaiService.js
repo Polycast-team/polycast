@@ -11,7 +11,16 @@ function ensureApiKey() {
   }
 }
 
-async function sendChatCompletion({ messages, model = 'gpt-5-mini', maxOutputTokens = 1024, temperature = 0.7 }) {
+async function sendChatCompletion(params = {}) {
+  return sendChatWithFallback(params, { fallbackUsed: false });
+}
+
+async function sendChatWithFallback({
+  messages,
+  model = 'gpt-5-mini',
+  maxOutputTokens = 1024,
+  temperature = 0.7,
+}, { fallbackUsed }) {
   ensureApiKey();
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -75,10 +84,23 @@ async function sendChatCompletion({ messages, model = 'gpt-5-mini', maxOutputTok
       raw: response?.data,
     };
   } catch (error) {
-    console.error('[OpenAI] chat error payload:', error?.response?.data || error?.message);
-    const message = error?.response?.data?.error?.message || error.message || 'Failed to reach OpenAI';
+    const details = error?.response?.data;
+    const message = details?.error?.message || error.message || 'Failed to reach OpenAI';
+    const statusCode = error?.response?.status || 500;
+
+    console.error('[OpenAI] chat error payload:', details || message);
+
+    const missingModel = typeof message === 'string'
+      && /model .* (does not exist|unknown|not available)/i.test(message);
+
+    if (!fallbackUsed && model === 'gpt-5-mini' && missingModel) {
+      console.warn('[OpenAI] Falling back to gpt-5 for chat completion');
+      return sendChatWithFallback({ messages, model: 'gpt-5', maxOutputTokens, temperature }, { fallbackUsed: true });
+    }
+
     const err = new Error(message);
-    err.statusCode = error?.response?.status || 500;
+    err.statusCode = statusCode;
+    err.details = details;
     throw err;
   }
 }
@@ -125,10 +147,15 @@ async function createRealtimeSession({
 
     return response.data;
   } catch (error) {
-    console.error('[OpenAI] realtime error payload:', error?.response?.data || error?.message);
-    const message = error?.response?.data?.error?.message || error.message || 'Failed to create realtime client secret';
+    const details = error?.response?.data;
+    const message = details?.error?.message || error.message || 'Failed to create realtime client secret';
+    const statusCode = error?.response?.status || 500;
+
+    console.error('[OpenAI] realtime error payload:', details || message);
+
     const err = new Error(message);
-    err.statusCode = error?.response?.status || 500;
+    err.statusCode = statusCode;
+    err.details = details;
     throw err;
   }
 }

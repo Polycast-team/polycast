@@ -235,7 +235,7 @@ router.post('/ai/chat', async (req, res) => {
     } catch (error) {
         console.error('[AI Chat] error:', error);
         const status = error.statusCode || error.status || 500;
-        res.status(status).json({ error: error.message || 'Failed to generate response' });
+        res.status(status).json({ error: error.message || 'Failed to generate response', details: error.details || undefined });
     }
 });
 
@@ -253,7 +253,7 @@ router.post('/ai/voice-session', async (req, res) => {
     } catch (error) {
         console.error('[AI Voice] error:', error);
         const status = error.statusCode || error.status || 500;
-        res.status(status).json({ error: error.message || 'Failed to create realtime session' });
+        res.status(status).json({ error: error.message || 'Failed to create realtime session', details: error.details || undefined });
     }
 });
 
