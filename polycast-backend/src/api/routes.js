@@ -400,15 +400,39 @@ router.post('/ai/voice/session', async (req, res) => {
                 ? instructions.trim()
                 : undefined;
 
+            const turnDetection = {
+                type: config.openaiRealtimeVadType || 'server_vad',
+            };
+
+            if (turnDetection.type === 'server_vad') {
+                const { openaiRealtimeVadThreshold, openaiRealtimeVadSilenceMs, openaiRealtimeVadPrefixPaddingMs } = config;
+                if (Number.isFinite(openaiRealtimeVadThreshold)) {
+                    turnDetection.threshold = openaiRealtimeVadThreshold;
+                }
+                if (Number.isFinite(openaiRealtimeVadSilenceMs)) {
+                    turnDetection.silence_duration_ms = openaiRealtimeVadSilenceMs;
+                }
+                if (Number.isFinite(openaiRealtimeVadPrefixPaddingMs)) {
+                    turnDetection.prefix_padding_ms = openaiRealtimeVadPrefixPaddingMs;
+                }
+            }
+
             const payload = {
                 model: modelName,
                 voice: resolvedVoice,
                 modalities: ['audio', 'text'],
-                // Enable server-side VAD so the model knows when you're done speaking
-                turn_detection: { type: 'server_vad' },
+                // Enable tuned server-side VAD so the model knows when you're done speaking
+                turn_detection: turnDetection,
                 // Enable user speech transcription events over the data channel
                 input_audio_transcription: { model: 'whisper-1' },
             };
+
+            const noiseReductionType = typeof config.openaiRealtimeNoiseReduction === 'string'
+                ? config.openaiRealtimeNoiseReduction.trim()
+                : '';
+            if (noiseReductionType) {
+                payload.input_audio_noise_reduction = { type: noiseReductionType };
+            }
 
             if (trimmedInstructions) {
                 payload.instructions = trimmedInstructions;

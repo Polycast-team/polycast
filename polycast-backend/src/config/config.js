@@ -1,6 +1,17 @@
 require('dotenv').config();
 console.log('Loading configuration from config.js...');
 
+const toNumberOr = (value, fallback) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+};
+
+const toStringOr = (value, fallback) => {
+    if (typeof value !== 'string') return fallback;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : fallback;
+};
+
 const config = {
     port: parseInt(process.env.PORT, 10) || 8080,
 
@@ -15,6 +26,11 @@ const config = {
     openaiChatModel: process.env.OPENAI_CHAT_MODEL || 'gpt-5-nano',
     openaiRealtimeVoiceModel: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
     openaiRealtimeVoiceFormat: process.env.OPENAI_REALTIME_AUDIO_FORMAT || 'mp3',
+    openaiRealtimeVadType: toStringOr(process.env.OPENAI_REALTIME_VAD_TYPE, 'server_vad'),
+    openaiRealtimeVadThreshold: toNumberOr(process.env.OPENAI_REALTIME_VAD_THRESHOLD, 0.6),
+    openaiRealtimeVadSilenceMs: toNumberOr(process.env.OPENAI_REALTIME_VAD_SILENCE_MS, 800),
+    openaiRealtimeVadPrefixPaddingMs: toNumberOr(process.env.OPENAI_REALTIME_VAD_PREFIX_MS, 300),
+    openaiRealtimeNoiseReduction: toStringOr(process.env.OPENAI_REALTIME_NOISE_REDUCTION, 'near_field'),
 
     // Redis Configuration
     redisUrl: process.env.REDIS_URL,
