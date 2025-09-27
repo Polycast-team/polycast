@@ -45,6 +45,26 @@ function VoiceMode({
     typeof baseInstructions === 'string' && baseInstructions.trim() ? baseInstructions.trim() : undefined
   ), [baseInstructions]);
 
+  const normaliseTextFragment = useCallback((fragment) => {
+    if (!fragment) return '';
+    if (typeof fragment === 'string') return fragment;
+    if (Array.isArray(fragment)) {
+      return fragment
+        .map((item) => {
+          if (typeof item === 'string') return item;
+          if (item && typeof item === 'object') {
+            return item.text || item.transcript || item.content || '';
+          }
+          return '';
+        })
+        .join('');
+    }
+    if (typeof fragment === 'object') {
+      return fragment.text || fragment.transcript || fragment.content || fragment.delta || fragment.value || '';
+    }
+    return '';
+  }, []);
+
   const addOrUpdateMessage = useCallback((id, role, text = '', { replace = false } = {}) => {
     if (!id) return;
     setConversation((prev) => {
@@ -316,7 +336,8 @@ function VoiceMode({
       switch (event.type) {
         case 'response.output_text.delta': {
           const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          const delta = event.delta || '';
+          const delta = normaliseTextFragment(event.delta);
+          if (!delta) break;
           pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
           addOrUpdateMessage(id, 'assistant', delta, { replace: false });
           setStatus((prev) => (prev === 'connecting' ? 'responding' : 'responding'));
@@ -324,7 +345,29 @@ function VoiceMode({
         }
         case 'response.output_text.done': {
           const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          const final = pendingAssistantRef.current[id] || '';
+          const final = normaliseTextFragment(event.output_text)
+            || normaliseTextFragment(event.text)
+            || pendingAssistantRef.current[id]
+            || '';
+          pendingAssistantRef.current[id] = '';
+          addOrUpdateMessage(id, 'assistant', final, { replace: true });
+          setStatus('ready');
+          break;
+        }
+        case 'response.output_audio_transcript.delta': {
+          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
+          const delta = normaliseTextFragment(event.delta);
+          if (!delta) break;
+          pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
+          addOrUpdateMessage(id, 'assistant', delta, { replace: false });
+          setStatus('responding');
+          break;
+        }
+        case 'response.output_audio_transcript.done': {
+          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
+          const final = normaliseTextFragment(event.transcript)
+            || pendingAssistantRef.current[id]
+            || '';
           pendingAssistantRef.current[id] = '';
           addOrUpdateMessage(id, 'assistant', final, { replace: true });
           setStatus('ready');
@@ -400,7 +443,7 @@ function VoiceMode({
       isMountedRef.current = false;
       cleanupConnection();
     };
-  }, [instructions, cleanupConnection, addOrUpdateMessage]);
+  }, [instructions, cleanupConnection, addOrUpdateMessage, normaliseTextFragment]);
 
   const extractContentText = (content = []) => {
     if (!Array.isArray(content)) return '';
