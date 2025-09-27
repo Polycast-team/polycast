@@ -269,12 +269,22 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
     
     // Extract sentence and mark the word with tildes
-    const sentence = extractSentenceWithWord(fullTranscript || '', wordLower);
+    let sentence = extractSentenceWithWord(fullTranscript || '', wordLower);
+    if (!sentence || !sentence.trim()) {
+      console.debug('[handleAddWord] No transcript context found; falling back to word only.');
+      sentence = wordLower;
+    }
+
     // For Add Word flow, we mark the first occurrence since user is adding from menu
-    const sentenceWithMarkedWord = sentence.replace(
-      new RegExp(`\\b(${wordLower})\\b`, 'i'),
+    const wordRegex = new RegExp(`\\b(${wordLower})\\b`, 'i');
+    let sentenceWithMarkedWord = sentence.replace(
+      wordRegex,
       '~$1~'
     );
+
+    if (!sentenceWithMarkedWord.includes('~')) {
+      sentenceWithMarkedWord = `~${wordLower}~`;
+    }
 
     console.log(`🎯 [handleAddWord] Using UNIFIED API for word: "${wordLower}"`);
     console.log(`🎯 [handleAddWord] Sentence with marked word:`, sentenceWithMarkedWord);
