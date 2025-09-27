@@ -243,7 +243,12 @@ function VoiceMode({
             setStatus('ready');
             if (!hasSentIntroRef.current) {
               try {
-                channel.send(JSON.stringify({ type: 'response.create' }));
+                channel.send(JSON.stringify({
+                  type: 'response.create',
+                  response: {
+                    modalities: ['text', 'audio'],
+                  },
+                }));
                 hasSentIntroRef.current = true;
               } catch (sendErr) {
                 console.warn('[VoiceMode] failed to trigger welcome turn', sendErr);
