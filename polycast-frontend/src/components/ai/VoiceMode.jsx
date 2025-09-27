@@ -371,6 +371,20 @@ function VoiceMode({
           pendingUserRef.current[id] = '';
           addOrUpdateMessage(id, 'user', transcript, { replace: true });
           setStatus('ready');
+          try {
+            const channel = dataChannelRef.current;
+            if (channel && channel.readyState === 'open') {
+              channel.send(JSON.stringify({
+                type: 'response.create',
+                response: {
+                  modalities: ['text', 'audio'],
+                  instructions: instructions || 'You are Polycast AI. Reply concisely while speaking and also stream the same text.',
+                },
+              }));
+            }
+          } catch (e) {
+            console.warn('[VoiceMode] failed to request response after user speech', e);
+          }
           break;
         }
         case 'rate_limits.updated':
