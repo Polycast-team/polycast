@@ -21,6 +21,7 @@ function Main() {
   const [isMobile, setIsMobile] = useState(false);
   const [forceFlashcardMobile, setForceFlashcardMobile] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [authToken, setAuthToken] = useState(() => authClient.getToken ? authClient.getToken() : '');
 
   // Check if device should use mobile app (only once, no resize listener)
   useEffect(() => {
@@ -68,18 +69,53 @@ function Main() {
       }
     }
 
-    const token = authClient.getToken();
-    if (!token) {
+    if (!authToken) {
+      setCurrentProfile(null);
+      setSelectedProfile(null);
+      setSelectedLanguages(null);
       setProfileLoading(false);
+      clearProfileLanguageRegistry();
       return () => {
         aborted = true;
       };
     }
 
+    setProfileLoading(true);
     loadProfile();
 
     return () => {
       aborted = true;
+    };
+  }, [authToken]);
+
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      const token = authClient.getToken ? authClient.getToken() : '';
+      setAuthToken(token);
+      if (token) {
+        setProfileLoading(true);
+      } else {
+        clearProfileLanguageRegistry();
+        setCurrentProfile(null);
+        setSelectedProfile(null);
+        setSelectedLanguages(null);
+        setProfileLoading(false);
+      }
+    };
+    const handleStorage = (event) => {
+      if (event.key === 'pc_jwt') {
+        handleAuthChanged();
+      }
+    };
+
+    const authEventName = authClient.AUTH_EVENT || 'pc-auth-changed';
+
+    window.addEventListener(authEventName, handleAuthChanged);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener(authEventName, handleAuthChanged);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 

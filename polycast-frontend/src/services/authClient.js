@@ -3,8 +3,20 @@ import { registerProfileLanguages } from '../utils/profileLanguageMapping.js';
 
 const TOKEN_KEY = 'pc_jwt';
 
+const AUTH_EVENT = 'pc-auth-changed';
+
+function emitAuthChanged() {
+  try {
+    const token = getToken();
+    window.dispatchEvent(new CustomEvent(AUTH_EVENT, { detail: { token } }));
+  } catch (err) {
+    console.warn('[authClient] Failed to emit auth change event', err);
+  }
+}
+
 function saveToken(token) {
   try { localStorage.setItem(TOKEN_KEY, token); } catch {}
+  emitAuthChanged();
 }
 
 function getToken() {
@@ -13,6 +25,7 @@ function getToken() {
 
 function clearToken() {
   try { localStorage.removeItem(TOKEN_KEY); } catch {}
+  emitAuthChanged();
 }
 
 async function login(username, password) {
@@ -65,5 +78,5 @@ export default {
   getToken,
   saveToken,
   clearToken,
+  AUTH_EVENT,
 };
-
