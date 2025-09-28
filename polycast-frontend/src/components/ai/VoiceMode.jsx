@@ -18,9 +18,9 @@ const ICE_SERVERS = [
   { urls: 'stun:stun2.l.google.com:19302' },
 ];
 
-const DEFAULT_WORD_RATE = 3.2; // words per second fallback when duration unknown
-const MIN_WORD_RATE = 1.4;
-const MAX_WORD_RATE = 6.5;
+const DEFAULT_WORD_RATE = 5.4; // words per second fallback when duration unknown
+const MIN_WORD_RATE = 3.5;
+const MAX_WORD_RATE = 8.0;
 
 function VoiceMode({
   selectedProfile,
@@ -178,6 +178,12 @@ function VoiceMode({
     delete assistantAnimatedBuffersRef.current[id];
   }, []);
 
+  const buildPlaybackTokens = useCallback((text) => {
+    if (!text) return [];
+    const matches = text.match(/\S+\s*/g);
+    return matches ? matches : [text];
+  }, []);
+
   const schedulePlaybackFrame = useCallback((id) => {
     const playback = assistantPlaybackRef.current[id];
     if (!playback) return;
@@ -251,13 +257,13 @@ function VoiceMode({
     pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
     const playback = assistantPlaybackRef.current[id];
     if (playback) {
-      playback.tokens = tokenizeText(pendingAssistantRef.current[id]);
+      playback.tokens = buildPlaybackTokens(pendingAssistantRef.current[id]);
       schedulePlaybackFrame(id);
     } else {
       stopAssistantAnimation(id);
       addOrUpdateMessage(id, 'assistant', delta, { replace: false });
     }
-  }, [addOrUpdateMessage, normaliseTextFragment, schedulePlaybackFrame, stopAssistantAnimation]);
+  }, [addOrUpdateMessage, buildPlaybackTokens, normaliseTextFragment, schedulePlaybackFrame, stopAssistantAnimation]);
 
   const finalizeAssistantMessage = useCallback((id, fragment) => {
     const text = normaliseTextFragment(fragment) || pendingAssistantRef.current[id] || '';
@@ -266,7 +272,7 @@ function VoiceMode({
     delete assistantStreamFlagsRef.current[id];
     const playback = assistantPlaybackRef.current[id];
     if (playback) {
-      playback.tokens = tokenizeText(text);
+      playback.tokens = buildPlaybackTokens(text);
       playback.complete = true;
       schedulePlaybackFrame(id);
       return;
@@ -281,7 +287,7 @@ function VoiceMode({
       return;
     }
     animateAssistantMessage(id, text);
-  }, [addOrUpdateMessage, animateAssistantMessage, normaliseTextFragment, schedulePlaybackFrame, stopAssistantAnimation]);
+  }, [addOrUpdateMessage, animateAssistantMessage, buildPlaybackTokens, normaliseTextFragment, schedulePlaybackFrame, stopAssistantAnimation]);
 
   const closePopup = useCallback(() => setPopupInfo((prev) => ({ ...prev, visible: false })), []);
 
@@ -628,7 +634,7 @@ function VoiceMode({
         case 'output_audio_buffer.started': {
           const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
           const playback = assistantPlaybackRef.current[id] || {
-            tokens: tokenizeText(pendingAssistantRef.current[id] || ''),
+            tokens: buildPlaybackTokens(pendingAssistantRef.current[id] || ''),
             displayedCount: 0,
             wordRate: null,
             complete: false,
@@ -637,7 +643,7 @@ function VoiceMode({
           playback.startTime = performance.now();
           playback.complete = false;
           playback.displayedCount = 0;
-          playback.tokens = tokenizeText(pendingAssistantRef.current[id] || '');
+          playback.tokens = buildPlaybackTokens(pendingAssistantRef.current[id] || '');
           playback.wordRate = playback.wordRate || DEFAULT_WORD_RATE;
           cancelPlaybackTimer(id);
           assistantPlaybackRef.current[id] = playback;
@@ -652,7 +658,7 @@ function VoiceMode({
           const playback = assistantPlaybackRef.current[id];
           if (playback && playback.startTime) {
             const elapsed = Math.max((performance.now() - playback.startTime) / 1000, 0.4);
-            const totalWords = playback.tokens.length || tokenizeText(pendingAssistantRef.current[id] || '').length;
+            const totalWords = playback.tokens.length || buildPlaybackTokens(pendingAssistantRef.current[id] || '').length;
             if (totalWords > 0) {
               const computedRate = totalWords / elapsed;
               playback.wordRate = Math.min(MAX_WORD_RATE, Math.max(MIN_WORD_RATE, computedRate));
