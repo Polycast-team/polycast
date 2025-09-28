@@ -48,6 +48,8 @@ function VoiceMode({
   const assistantAnimationTimersRef = useRef({});
   const assistantAnimatedBuffersRef = useRef({});
   const pendingUserRef = useRef({});
+  const liveUserTurnRef = useRef(null);
+  const currentAssistantTurnRef = useRef(null);
   const isMountedRef = useRef(true);
   const hasSentIntroRef = useRef(false);
 
@@ -202,6 +204,7 @@ function VoiceMode({
     const delta = normaliseTextFragment(fragment);
     if (!delta) return;
     assistantStreamFlagsRef.current[id] = true;
+    currentAssistantTurnRef.current = id;
     pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
     stopAssistantAnimation(id);
     addOrUpdateMessage(id, 'assistant', delta, { replace: false });
@@ -210,6 +213,9 @@ function VoiceMode({
   const finalizeAssistantMessage = useCallback((id, fragment) => {
     const text = normaliseTextFragment(fragment) || pendingAssistantRef.current[id] || '';
     pendingAssistantRef.current[id] = '';
+    if (currentAssistantTurnRef.current === id) {
+      currentAssistantTurnRef.current = null;
+    }
     const wasStreaming = assistantStreamFlagsRef.current[id];
     delete assistantStreamFlagsRef.current[id];
     if (!text) {
@@ -576,6 +582,7 @@ function VoiceMode({
             if (contentText) {
               addOrUpdateMessage(id, 'user', contentText, { replace: true });
               pendingUserRef.current[id] = contentText;
+              liveUserTurnRef.current = null;
             }
           }
           break;
@@ -584,6 +591,20 @@ function VoiceMode({
           const id = `${event.item_id || 'user'}-live`;
           const delta = event.delta || '';
           pendingUserRef.current[id] = (pendingUserRef.current[id] || '') + delta;
+          if (!liveUserTurnRef.current) {
+            liveUserTurnRef.current = id;
+            addOrUpdateMessage(id, 'user', '', { replace: true });
+          }
+          if (currentAssistantTurnRef.current) {
+            const activeId = currentAssistantTurnRef.current;
+            const existing = pendingAssistantRef.current[activeId] || '';
+            const trimmed = existing.replace(/[\s.,;:!?]+$/u, '');
+            const truncated = trimmed ? `${trimmed} —` : '—';
+            pendingAssistantRef.current[activeId] = truncated;
+            addOrUpdateMessage(activeId, 'assistant', truncated, { replace: true });
+            assistantStreamFlagsRef.current[activeId] = false;
+            currentAssistantTurnRef.current = null;
+          }
           addOrUpdateMessage(id, 'user', delta, { replace: false });
           setStatus('listening');
           break;
@@ -593,6 +614,7 @@ function VoiceMode({
           const transcript = event.transcript || pendingUserRef.current[id] || '';
           pendingUserRef.current[id] = '';
           addOrUpdateMessage(id, 'user', transcript, { replace: true });
+          liveUserTurnRef.current = null;
           setStatus('ready');
           try {
             const channel = dataChannelRef.current;
