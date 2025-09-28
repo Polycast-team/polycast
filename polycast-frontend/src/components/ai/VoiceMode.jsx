@@ -45,8 +45,7 @@ function VoiceMode({
   const localStreamRef = useRef(null);
   const pendingAssistantRef = useRef({});
   const assistantStreamFlagsRef = useRef({});
-  const assistantAnimationTimersRef = useRef({});
-  const assistantAnimatedBuffersRef = useRef({});
+  // Removed word-by-word animation; we keep bubbles simple and immediate
   const pendingUserRef = useRef({});
   const liveUserTurnRef = useRef(null);
   const currentAssistantTurnRef = useRef(null);
@@ -158,77 +157,30 @@ function VoiceMode({
     return map;
   }, [normaliseTextFragment]);
 
-  const stopAssistantAnimation = useCallback((id) => {
-    const timer = assistantAnimationTimersRef.current[id];
-    if (timer) {
-      clearInterval(timer);
-      delete assistantAnimationTimersRef.current[id];
-    }
-    delete assistantAnimatedBuffersRef.current[id];
-  }, []);
-
-  const animateAssistantMessage = useCallback((id, finalText) => {
-    stopAssistantAnimation(id);
-    const parts = finalText.match(/\S+\s*/g) || [finalText];
-    let index = 0;
-    assistantAnimatedBuffersRef.current[id] = '';
-    addOrUpdateMessage(id, 'assistant', '', { replace: true });
-
-    const emitNext = () => {
-      const chunk = parts[index];
-      if (!chunk) {
-        stopAssistantAnimation(id);
-        addOrUpdateMessage(id, 'assistant', finalText, { replace: true });
-        return;
-      }
-      assistantAnimatedBuffersRef.current[id] = `${assistantAnimatedBuffersRef.current[id]}${chunk}`;
-      addOrUpdateMessage(id, 'assistant', assistantAnimatedBuffersRef.current[id], { replace: true });
-      index += 1;
-      if (index >= parts.length) {
-        stopAssistantAnimation(id);
-      }
-    };
-
-    emitNext();
-    if (parts.length > 1) {
-      assistantAnimationTimersRef.current[id] = setInterval(() => {
-        emitNext();
-        if (!assistantAnimationTimersRef.current[id]) {
-          clearInterval(assistantAnimationTimersRef.current[id]);
-        }
-      }, 80);
-    }
-  }, [addOrUpdateMessage, stopAssistantAnimation]);
+  // Animation removed
 
   const applyAssistantDelta = useCallback((id, fragment) => {
     const delta = normaliseTextFragment(fragment);
     if (!delta) return;
-    assistantStreamFlagsRef.current[id] = true;
-    currentAssistantTurnRef.current = id;
-    pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
-    stopAssistantAnimation(id);
-    addOrUpdateMessage(id, 'assistant', delta, { replace: false });
-  }, [addOrUpdateMessage, normaliseTextFragment, stopAssistantAnimation]);
+    const targetId = currentAssistantTurnRef.current || id;
+    assistantStreamFlagsRef.current[targetId] = true;
+    currentAssistantTurnRef.current = targetId;
+    pendingAssistantRef.current[targetId] = (pendingAssistantRef.current[targetId] || '') + delta;
+    addOrUpdateMessage(targetId, 'assistant', delta, { replace: false });
+  }, [addOrUpdateMessage, normaliseTextFragment]);
 
   const finalizeAssistantMessage = useCallback((id, fragment) => {
-    const text = normaliseTextFragment(fragment) || pendingAssistantRef.current[id] || '';
-    pendingAssistantRef.current[id] = '';
-    if (currentAssistantTurnRef.current === id) {
-      currentAssistantTurnRef.current = null;
-    }
-    const wasStreaming = assistantStreamFlagsRef.current[id];
-    delete assistantStreamFlagsRef.current[id];
+    const targetId = currentAssistantTurnRef.current || id;
+    const text = normaliseTextFragment(fragment) || pendingAssistantRef.current[targetId] || '';
+    pendingAssistantRef.current[targetId] = '';
+    const wasStreaming = assistantStreamFlagsRef.current[targetId];
+    delete assistantStreamFlagsRef.current[targetId];
     if (!text) {
-      stopAssistantAnimation(id);
       return;
     }
-    if (wasStreaming) {
-      stopAssistantAnimation(id);
-      addOrUpdateMessage(id, 'assistant', text, { replace: true });
-      return;
-    }
-    animateAssistantMessage(id, text);
-  }, [addOrUpdateMessage, animateAssistantMessage, normaliseTextFragment, stopAssistantAnimation]);
+    addOrUpdateMessage(targetId, 'assistant', text, { replace: true });
+    currentAssistantTurnRef.current = null;
+  }, [addOrUpdateMessage, normaliseTextFragment]);
 
   const closePopup = useCallback(() => setPopupInfo((prev) => ({ ...prev, visible: false })), []);
 
@@ -436,6 +388,10 @@ function VoiceMode({
                   },
                 }));
                 hasSentIntroRef.current = true;
+                // Pre-create assistant bubble immediately when we request a response
+                const provisionalId = `assistant-${Date.now()}`;
+                currentAssistantTurnRef.current = provisionalId;
+                addOrUpdateMessage(provisionalId, 'assistant', '', { replace: true });
               } catch (sendErr) {
                 console.warn('[VoiceMode] failed to trigger welcome turn', sendErr);
               }
@@ -538,11 +494,13 @@ function VoiceMode({
           break;
         }
         case 'response.output_audio_transcript.delta': {
-          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          if (!pendingAssistantRef.current[id]) {
-            addOrUpdateMessage(id, 'assistant', '', { replace: true });
+          const computedId = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
+          const targetId = currentAssistantTurnRef.current || computedId;
+          if (!pendingAssistantRef.current[targetId]) {
+            addOrUpdateMessage(targetId, 'assistant', '', { replace: true });
+            currentAssistantTurnRef.current = targetId;
           }
-          applyAssistantDelta(id, event.delta || extractTextFromEvent(event));
+          applyAssistantDelta(targetId, event.delta || extractTextFromEvent(event));
           setStatus('responding');
           break;
         }
@@ -571,10 +529,11 @@ function VoiceMode({
           setStatus('error');
           break;
         case 'output_audio_buffer.started': {
-          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          pendingAssistantRef.current[id] = pendingAssistantRef.current[id] || '';
-          addOrUpdateMessage(id, 'assistant', pendingAssistantRef.current[id], { replace: true });
-          currentAssistantTurnRef.current = id;
+          const computedId = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
+          const targetId = currentAssistantTurnRef.current || computedId;
+          pendingAssistantRef.current[targetId] = pendingAssistantRef.current[targetId] || '';
+          addOrUpdateMessage(targetId, 'assistant', pendingAssistantRef.current[targetId], { replace: true });
+          currentAssistantTurnRef.current = targetId;
           setStatus('responding');
           break;
         }
@@ -637,6 +596,10 @@ function VoiceMode({
                   instructions: instructions || defaultVoiceInstructions,
                 },
               }));
+              // Pre-create assistant bubble immediately for the next response
+              const provisionalId = `assistant-${Date.now()}`;
+              currentAssistantTurnRef.current = provisionalId;
+              addOrUpdateMessage(provisionalId, 'assistant', '', { replace: true });
             }
           } catch (e) {
             console.warn('[VoiceMode] failed to request response after user speech', e);
@@ -663,9 +626,7 @@ function VoiceMode({
     return () => {
       isMountedRef.current = false;
       cleanupConnection();
-      Object.keys(assistantAnimationTimersRef.current).forEach((key) => clearInterval(assistantAnimationTimersRef.current[key]));
-      assistantAnimationTimersRef.current = {};
-      assistantAnimatedBuffersRef.current = {};
+      // No animation timers to clean up
     };
   }, [
     instructions,
