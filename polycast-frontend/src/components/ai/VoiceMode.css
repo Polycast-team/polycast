@@ -245,6 +245,8 @@
   background: rgba(12, 20, 37, 0.78);
   border: 1px solid rgba(148, 163, 184, 0.15);
   box-shadow: inset 0 0 0 1px rgba(30, 41, 59, 0.38);
+  max-width: 68ch;
+  align-self: flex-start;
 }
 
 .voice-transcript-assistant {
@@ -252,7 +254,11 @@
 }
 
 .voice-transcript-user {
-  border-left: 3px solid rgba(56, 189, 248, 0.7);
+  border-left: none;
+  border-right: 3px solid rgba(56, 189, 248, 0.75);
+  align-self: flex-end;
+  background: rgba(20, 31, 56, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(30, 41, 59, 0.4), 0 18px 28px rgba(8, 12, 24, 0.35);
 }
 
 .voice-transcript-label {
@@ -261,6 +267,15 @@
   font-size: 12px;
   color: rgba(226, 232, 240, 0.7);
   margin-bottom: 8px;
+}
+
+.voice-transcript-user .voice-transcript-label {
+  text-align: right;
+  color: rgba(148, 197, 240, 0.8);
+}
+
+.voice-transcript-user .voice-transcript-text {
+  text-align: right;
 }
 
 .voice-transcript-text {

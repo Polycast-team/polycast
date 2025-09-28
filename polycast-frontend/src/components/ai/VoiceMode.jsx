@@ -238,12 +238,29 @@ function VoiceMode({
     });
   }, [handleWordClick, selectedWords]);
 
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+
   useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const threshold = 80;
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShouldAutoScroll(distanceFromBottom < threshold);
+    };
+
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!shouldAutoScroll) return;
     const el = scrollContainerRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [conversation]);
+  }, [conversation, shouldAutoScroll]);
 
   const cleanupConnection = useCallback(() => {
     if (isClosing) return;
