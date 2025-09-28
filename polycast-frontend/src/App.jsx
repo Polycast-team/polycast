@@ -16,7 +16,7 @@ import { useFlashcardCalendar } from './hooks/useFlashcardCalendar';
 import VideoMode from './components/VideoMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
-import { getLanguageForProfile, getTranslationsForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from './utils/profileLanguageMapping.js';
+import { getLanguageForProfile, getTranslationsForProfile, getNativeLanguageForProfile, getUITranslationsForProfile, getRegisteredProfiles } from './utils/profileLanguageMapping.js';
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
@@ -29,16 +29,50 @@ import AIMode from './components/ai/AIMode';
 
 
 // App now receives an array of target languages and room setup as props
-function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, studentHomeLanguage, onJoinRoom, onHostRoom, onFlashcardModeChange, onProfileChange }) {
+function App({
+  targetLanguages,
+  selectedProfile,
+  currentProfile,
+  profileLoading,
+  onReset,
+  roomSetup,
+  userRole,
+  studentHomeLanguage,
+  onJoinRoom,
+  onHostRoom,
+  onFlashcardModeChange,
+  onProfileChange,
+}) {
   // Debug logging
-  console.log('App component received props:', { targetLanguages, selectedProfile, roomSetup, userRole, studentHomeLanguage });
-  
+  console.log('App component received props:', { targetLanguages, selectedProfile, currentProfile, roomSetup, userRole, studentHomeLanguage });
+
+  if (profileLoading) {
+    return (
+      <div className="app-loading-state">
+        Loading profile…
+      </div>
+    );
+  }
+
+  if (!selectedProfile) {
+    throw new Error('App requires a selected profile before rendering');
+  }
+
+  if (!Array.isArray(targetLanguages) || targetLanguages.length === 0) {
+    throw new Error('App requires at least one target language');
+  }
+
   // Get translations for this profile's language
   const t = getTranslationsForProfile(selectedProfile);
   const ui = getUITranslationsForProfile(selectedProfile);
-  
-  // Step 1: Use selectedProfile from props, with fallback to non-saving
-  const [internalSelectedProfile, setSelectedProfile] = React.useState(selectedProfile || 'non-saving');
+
+  const [internalSelectedProfile, setSelectedProfile] = React.useState(selectedProfile);
+
+  useEffect(() => {
+    if (selectedProfile && selectedProfile !== internalSelectedProfile) {
+      setSelectedProfile(selectedProfile);
+    }
+  }, [selectedProfile, internalSelectedProfile]);
   
   // Join Room state for students
   const [showJoinRoomModal, setShowJoinRoomModal] = useState(false);
@@ -48,12 +82,10 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   
   // Function to fetch profile data from backend
   const fetchProfileData = useCallback(async (profile) => {
-    if (profile === 'non-saving') {
-      // In non-saving mode, keep current (localStorage-backed) state as-is
-      console.log('Non-saving mode: using local state/localStorage for dictionary data.');
-      return;
+    if (!profile) {
+      throw new Error('Cannot fetch profile data without a profile identifier');
     }
-    
+
     // TODO: Add room creation logic via POST /api/create-room when switching to host mode
     // TODO: Generate unique 5-digit room code and store in backend
     // TODO: Create room state management for tracking participants
@@ -102,12 +134,17 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   
   // Fetch profile data when selectedProfile changes
   useEffect(() => {
-    const currentProfile = selectedProfile || internalSelectedProfile;
+    const currentProfile = internalSelectedProfile;
     fetchProfileData(currentProfile);
-  }, [selectedProfile, internalSelectedProfile, fetchProfileData]);
-  // Use host-selected languages for WebSocket communication, fallback to profile language for students
-  const profileLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
-  const effectiveLanguages = userRole === 'host' ? (targetLanguages || []) : [profileLanguage];
+  }, [internalSelectedProfile, fetchProfileData]);
+  // Use host-selected languages for WebSocket communication; students use their profile language
+  const profileLanguage = getLanguageForProfile(internalSelectedProfile);
+  const registeredProfiles = getRegisteredProfiles();
+  if (userRole === 'host' && (!targetLanguages || targetLanguages.length === 0)) {
+    throw new Error('Host sessions require at least one target language');
+  }
+
+  const effectiveLanguages = userRole === 'host' ? targetLanguages : [profileLanguage];
   const languagesQueryParam = effectiveLanguages.map(encodeURIComponent).join(',');
   
   console.log('Effective languages for WebSocket:', effectiveLanguages);
@@ -265,8 +302,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // Local handler to add a word to dictionary (flashcard entry in local state)
   const handleAddWord = useCallback(async (word) => {
     const wordLower = (word || '').toLowerCase();
-    const nativeLanguage = getNativeLanguageForProfile(selectedProfile || internalSelectedProfile);
-    const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
+    const nativeLanguage = getNativeLanguageForProfile(internalSelectedProfile);
+    const targetLanguage = getLanguageForProfile(internalSelectedProfile);
     
     // Extract sentence and mark the word with tildes
     let sentence = extractSentenceWithWord(fullTranscript || '', wordLower);
@@ -374,8 +411,8 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
   // New: add multiple senses at once (from AddWordPopup)
   const handleAddWordSenses = useCallback((word, senses) => {
     const wordLower = (word || '').toLowerCase();
-    const nativeLanguage = getNativeLanguageForProfile(selectedProfile || internalSelectedProfile);
-    const targetLanguage = getLanguageForProfile(selectedProfile || internalSelectedProfile);
+    const nativeLanguage = getNativeLanguageForProfile(internalSelectedProfile);
+    const targetLanguage = getLanguageForProfile(internalSelectedProfile);
     const contextSentence = fullTranscript || '';
 
     const baseCount = Object.values(wordDefinitions).filter(
@@ -804,7 +841,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
     [],
     wordDefinitions,
     [],
-    selectedProfile || internalSelectedProfile,
+    internalSelectedProfile,
     [],
     0
   );
@@ -935,31 +972,32 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
                 onAudioSent={onAudioSent}
               />
             </div>
-            <HostToolbar
-              showTBA={showTBA}
-              readyState={readyState}
-              isRecording={isRecording}
-              onStartRecording={handleStartRecording}
-              onStopRecording={handleStopRecording}
-              appMode={appMode}
-              setAppMode={handleAppModeChange}
-              toolbarStats={toolbarStats}
-              showLiveTranscript={true}
-              setShowLiveTranscript={() => {}}
-              showTranslation={false}
-              setShowTranslation={() => {}}
-              roomSetup={roomSetup}
-              selectedProfile={selectedProfile || internalSelectedProfile}
-              setSelectedProfile={profile => {
-                console.log('Profile switched to:', profile);
-                if (onProfileChange) {
-                  onProfileChange(profile);
-                } else {
-                  setSelectedProfile(profile);
-                }
-              }}
-              userRole={userRole}
-            />
+              <HostToolbar
+                showTBA={showTBA}
+                readyState={readyState}
+                isRecording={isRecording}
+                onStartRecording={handleStartRecording}
+                onStopRecording={handleStopRecording}
+                appMode={appMode}
+                setAppMode={handleAppModeChange}
+                toolbarStats={toolbarStats}
+                showLiveTranscript={true}
+                setShowLiveTranscript={() => {}}
+                showTranslation={false}
+                setShowTranslation={() => {}}
+                roomSetup={roomSetup}
+                selectedProfile={internalSelectedProfile}
+                setSelectedProfile={profile => {
+                  console.log('Profile switched to:', profile);
+                  if (onProfileChange) {
+                    onProfileChange(profile);
+                  } else {
+                    setSelectedProfile(profile);
+                  }
+                }}
+                availableProfiles={registeredProfiles}
+                userRole={userRole}
+              />
           </div>
         </div>
       )}
@@ -1053,7 +1091,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         {appMode === 'dictionary' ? (
           <DictionaryTable 
             wordDefinitions={wordDefinitions}
-            selectedProfile={selectedProfile || internalSelectedProfile}
+            selectedProfile={internalSelectedProfile}
             isAddingWordBusy={isAddingWordBusy}
             toolbarStats={toolbarStats}
             onAddWordSenses={handleAddWordSenses}
@@ -1135,7 +1173,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             setWordDefinitions={setWordDefinitions}
             fullTranscript={fullTranscript}
             targetLanguages={effectiveLanguages}
-            selectedProfile={selectedProfile || internalSelectedProfile}
+            selectedProfile={internalSelectedProfile}
           />
         ) : appMode === 'video' ? (
           <VideoMode
@@ -1149,7 +1187,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
             transcriptBlocks={transcriptBlocks}
             translations={translations}
             targetLanguages={effectiveLanguages}
-            selectedProfile={selectedProfile || internalSelectedProfile}
+            selectedProfile={internalSelectedProfile}
             studentHomeLanguage={studentHomeLanguage}
             selectedWords={selectedWords}
             setSelectedWords={setSelectedWords}
@@ -1170,7 +1208,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
           />
         ) : appMode === 'ai' ? (
           <AIMode
-            selectedProfile={selectedProfile || internalSelectedProfile}
+            selectedProfile={internalSelectedProfile}
             selectedWords={selectedWords}
             wordDefinitions={wordDefinitions}
             setWordDefinitions={setWordDefinitions}
@@ -1313,7 +1351,7 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
         onModeChange={handleAppModeChange}
         userRole={userRole}
         roomSetup={roomSetup}
-        selectedProfile={selectedProfile || internalSelectedProfile}
+        selectedProfile={internalSelectedProfile}
       />
 
     </div>
@@ -1323,6 +1361,14 @@ function App({ targetLanguages, selectedProfile, onReset, roomSetup, userRole, s
 // Update PropTypes
 App.propTypes = {
     targetLanguages: PropTypes.arrayOf(PropTypes.string).isRequired,
+    selectedProfile: PropTypes.string,
+    currentProfile: PropTypes.shape({
+        id: PropTypes.number,
+        username: PropTypes.string,
+        native_language: PropTypes.string,
+        target_language: PropTypes.string,
+    }),
+    profileLoading: PropTypes.bool.isRequired,
     onReset: PropTypes.func,
     roomSetup: PropTypes.shape({
         isHost: PropTypes.bool.isRequired,

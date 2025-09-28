@@ -27,6 +27,7 @@ function HostToolbar({
     showLiveTranscript,
     selectedProfile,
     setSelectedProfile,
+    availableProfiles,
     userRole,
     roomSetup,
     toolbarStats,
@@ -36,13 +37,18 @@ function HostToolbar({
     const isConnected = readyState === ReadyState.OPEN;
     const t = getTranslationsForProfile(selectedProfile);
     const ui = getUITranslationsForProfile(selectedProfile);
+    const profileOptions = availableProfiles && availableProfiles.length ? availableProfiles : null;
+
+    if (roomSetup?.isHost && !profileOptions) {
+        throw new Error('HostToolbar requires availableProfiles when hosting a room');
+    }
 
     return (
         <div className="controls">
             {/* Mode Dropdown */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {/* Profile Dropdown - only show for hosts */}
-                {roomSetup?.isHost && (
+                {roomSetup?.isHost && profileOptions && (
                   <>
                     <label style={{ color: '#ccc', fontSize: 15, fontWeight: 500 }}>{ui.profile}:</label>
                     <select
@@ -54,14 +60,9 @@ function HostToolbar({
                       style={{ minWidth: 110, fontSize: 15, padding: '2px 6px', borderRadius: 6, marginRight: 12 }}
                       aria-label="Profile Selection Dropdown"
                     >
-                      <option value="cat">cat</option>
-                      <option value="dog">dog</option>
-                      <option value="mouse">mouse</option>
-                      <option value="horse">horse</option>
-                      <option value="lizard">lizard</option>
-                      <option value="shirley">shirley</option>
-                      <option value="joshua">joshua</option>
-                      <option value="tyson">tyson</option>
+                      {profileOptions.map((profile) => (
+                        <option key={profile} value={profile}>{profile}</option>
+                      ))}
                     </select>
                   </>
                 )}
@@ -144,6 +145,7 @@ HostToolbar.propTypes = {
     showLiveTranscript: PropTypes.bool.isRequired,
     selectedProfile: PropTypes.string.isRequired,
     setSelectedProfile: PropTypes.func.isRequired,
+    availableProfiles: PropTypes.arrayOf(PropTypes.string),
     userRole: PropTypes.string,
     roomSetup: PropTypes.object,
     toolbarStats: PropTypes.shape({

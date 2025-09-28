@@ -22,11 +22,14 @@ function AIMode({
   const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
   const targetLanguage = getLanguageForProfile(selectedProfile);
 
-  const systemPrompt = useMemo(() => (
-    DEFAULT_SYSTEM_PROMPT_TEMPLATE
-      .replace(/\{nativeLanguage\}/g, nativeLanguage || 'English')
-      .replace(/\{targetLanguage\}/g, targetLanguage || 'English')
-  ), [nativeLanguage, targetLanguage]);
+  const systemPrompt = useMemo(() => {
+    if (!nativeLanguage || !targetLanguage) {
+      throw new Error('AIMode requires both nativeLanguage and targetLanguage to build system prompt');
+    }
+    return DEFAULT_SYSTEM_PROMPT_TEMPLATE
+      .replace(/\{nativeLanguage\}/g, nativeLanguage)
+      .replace(/\{targetLanguage\}/g, targetLanguage);
+  }, [nativeLanguage, targetLanguage]);
 
   const [messages, setMessages] = useState([
     {

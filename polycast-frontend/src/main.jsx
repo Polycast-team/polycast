@@ -5,23 +5,82 @@ import MobileShell from './components/MobileShell.jsx'
 // import ProfileSelectorScreen from './components/ProfileSelectorScreen.jsx';
 import LanguageSelectorScreen from './components/LanguageSelectorScreen.jsx';
 import { shouldUseMobileApp } from './utils/deviceDetection.js';
-import { getLanguageForProfile } from './utils/profileLanguageMapping.js';
+import { getLanguageForProfile, registerProfileLanguages, clearProfileLanguageRegistry } from './utils/profileLanguageMapping.js';
 import './components/RoomSelectionScreen.css'; // Import styles
 import './index.css'
 import apiService from './services/apiService.js'
+import authClient from './services/authClient.js'
 
 function Main() {
   const [roomSetup, setRoomSetup] = useState(null);
   const [selectedLanguages, setSelectedLanguages] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [currentProfile, setCurrentProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isMobile, setIsMobile] = useState(false);
   const [forceFlashcardMobile, setForceFlashcardMobile] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   // Check if device should use mobile app (only once, no resize listener)
   useEffect(() => {
     setIsMobile(shouldUseMobileApp());
+  }, []);
+
+  useEffect(() => {
+    let aborted = false;
+
+    async function loadProfile() {
+      try {
+        const profile = await authClient.me();
+        if (!profile) {
+          if (!aborted) {
+            setProfileLoading(false);
+          }
+          return;
+        }
+        if (!profile.username || !profile.native_language || !profile.target_language) {
+          throw new Error('Profile response missing language fields');
+        }
+        if (aborted) return;
+        registerProfileLanguages(profile.username, {
+          nativeLanguage: profile.native_language,
+          targetLanguage: profile.target_language,
+        });
+        setCurrentProfile(profile);
+        setSelectedProfile(profile.username);
+        setSelectedLanguages([profile.target_language]);
+      } catch (err) {
+        console.error('Failed to load profile data', err);
+        if (!aborted) {
+          if (authClient.clearToken) {
+            authClient.clearToken();
+          }
+          clearProfileLanguageRegistry();
+          setCurrentProfile(null);
+          setSelectedProfile(null);
+          setSelectedLanguages(null);
+        }
+      } finally {
+        if (!aborted) {
+          setProfileLoading(false);
+        }
+      }
+    }
+
+    const token = authClient.getToken();
+    if (!token) {
+      setProfileLoading(false);
+      return () => {
+        aborted = true;
+      };
+    }
+
+    loadProfile();
+
+    return () => {
+      aborted = true;
+    };
   }, []);
 
   // Always render the unified responsive App; keep detection for future defaults only
@@ -32,10 +91,13 @@ function Main() {
     setError('');
     try {
       const data = await apiService.postJson(apiService.createRoomUrl(), {});
-      // Directly enter App with host room setup and default language/profile
+      if (!currentProfile) {
+        throw new Error('Cannot create a room before profile data is loaded');
+      }
+      // Directly enter App with host room setup and current profile
       setRoomSetup({ isHost: true, roomCode: data.roomCode });
-      setSelectedLanguages(['English']);
-      setSelectedProfile('joshua');
+      setSelectedLanguages([currentProfile.target_language]);
+      setSelectedProfile(currentProfile.username);
     } catch (err) {
       console.error('Error creating room:', err);
       setError(`Failed to create room: ${err.message}`);
@@ -48,14 +110,16 @@ function Main() {
   useEffect(() => {
     try {
       const pending = sessionStorage.getItem('pc_pendingHostRoom');
-      if (pending && !roomSetup) {
+      if (pending && !roomSetup && currentProfile) {
         setRoomSetup({ isHost: true, roomCode: pending });
-        setSelectedLanguages(['English']);
-        setSelectedProfile('joshua');
+        setSelectedLanguages([currentProfile.target_language]);
+        setSelectedProfile(currentProfile.username);
         sessionStorage.removeItem('pc_pendingHostRoom');
       }
-    } catch {}
-  }, [roomSetup]);
+    } catch (err) {
+      console.error('Failed to resume pending host room', err);
+    }
+  }, [roomSetup, currentProfile]);
 
   // Route-based auth flow now handles login/register; always render AppRouter
 
@@ -63,12 +127,19 @@ function Main() {
 
   // Step 3: Main app
   const propsToPass = {
-    targetLanguages: selectedLanguages || ['English'], // Default fallback
-    selectedProfile: selectedProfile,
+    targetLanguages: selectedLanguages,
+    selectedProfile,
+    currentProfile,
+    profileLoading,
     onReset: () => {
       setRoomSetup(null);
-      setSelectedLanguages(null);
-      setSelectedProfile(null);
+      if (currentProfile) {
+        setSelectedLanguages([currentProfile.target_language]);
+        setSelectedProfile(currentProfile.username);
+      } else {
+        setSelectedLanguages(null);
+        setSelectedProfile(null);
+      }
       setForceFlashcardMobile(false); // Reset mobile mode when resetting
     },
     roomSetup: roomSetup?.roomCode ? roomSetup : null, // Only pass room setup when valid

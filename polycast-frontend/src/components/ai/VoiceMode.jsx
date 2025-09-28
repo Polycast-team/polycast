@@ -45,9 +45,12 @@ function VoiceMode({
     typeof baseInstructions === 'string' && baseInstructions.trim() ? baseInstructions.trim() : undefined
   ), [baseInstructions]);
 
-  const defaultVoiceInstructions = useMemo(() => (
-    `You are Polycast AI, a helpful and concise language tutor. You are speaking with a learner whose native language is ${nativeLanguage || 'English'} and whose target language is ${targetLanguage || 'English'}. Keep replies brief, speak clearly, and always provide a matching text transcript while you talk.`
-  ), [nativeLanguage, targetLanguage]);
+  const defaultVoiceInstructions = useMemo(() => {
+    if (!nativeLanguage || !targetLanguage) {
+      throw new Error('VoiceMode requires native and target languages to craft instructions');
+    }
+    return `You are Polycast AI, a helpful and concise language tutor. You are speaking with a learner whose native language is ${nativeLanguage} and whose target language is ${targetLanguage}. Keep replies brief, speak clearly, and always provide a matching text transcript while you talk.`;
+  }, [nativeLanguage, targetLanguage]);
 
   const normaliseTextFragment = useCallback((fragment) => {
     if (!fragment) return '';

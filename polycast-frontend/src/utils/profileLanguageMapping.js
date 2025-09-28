@@ -1,60 +1,39 @@
-// Profile to language mapping
-export const PROFILE_LANGUAGE_MAP = {
-  'cat': 'Spanish',
-  'dog': 'French', 
-  'mouse': 'German',
-  'horse': 'Italian',
-  'lizard': 'Portuguese',
-  'shirley': 'Chinese',
-  // Target language per profile (what they are learning)
-  'joshua': 'English',
-  'tyson': 'English'
+const profileLanguageRegistry = new Map();
+
+export const clearProfileLanguageRegistry = () => {
+  profileLanguageRegistry.clear();
 };
 
-// Profile credentials (password for each profile)
-export const PROFILE_CREDENTIALS = {
-  'cat': 'password',
-  'dog': 'password',
-  'mouse': 'password',
-  'horse': 'password',
-  'lizard': 'password',
-  'shirley': 'password',
-  'joshua': 'password',
-  'tyson': 'password'
+export const registerProfileLanguages = (profileKey, { nativeLanguage, targetLanguage }) => {
+  if (!profileKey) throw new Error('profileKey is required when registering profile languages');
+  if (!nativeLanguage) throw new Error(`nativeLanguage is required for profile "${profileKey}"`);
+  if (!targetLanguage) throw new Error(`targetLanguage is required for profile "${profileKey}"`);
+  profileLanguageRegistry.set(profileKey, { nativeLanguage, targetLanguage });
 };
 
-// Native language per profile (their L1)
-export const PROFILE_NATIVE_LANGUAGE_MAP = {
-  // Native languages per profile (controls overall UI language)
-  'cat': 'Spanish',
-  'dog': 'French',
-  'mouse': 'German',
-  'horse': 'Italian',
-  'lizard': 'Portuguese',
-  'shirley': 'Chinese',
-  'joshua': 'Spanish', // Joshua is a native Spanish speaker
-  'tyson': 'English'
-};
-
-// Get language for a profile
 export const getLanguageForProfile = (profile) => {
-  return PROFILE_LANGUAGE_MAP[profile] || 'English';
+  if (!profile) {
+    throw new Error('Profile identifier is required to resolve target language');
+  }
+  const entry = profileLanguageRegistry.get(profile);
+  if (!entry || !entry.targetLanguage) {
+    throw new Error(`Target language has not been registered for profile "${profile}"`);
+  }
+  return entry.targetLanguage;
 };
 
-// Get native language for a profile
 export const getNativeLanguageForProfile = (profile) => {
-  return PROFILE_NATIVE_LANGUAGE_MAP[profile] || 'English';
+  if (!profile) {
+    throw new Error('Profile identifier is required to resolve native language');
+  }
+  const entry = profileLanguageRegistry.get(profile);
+  if (!entry || !entry.nativeLanguage) {
+    throw new Error(`Native language has not been registered for profile "${profile}"`);
+  }
+  return entry.nativeLanguage;
 };
 
-// Get all available profiles
-export const getAvailableProfiles = () => {
-  return Object.keys(PROFILE_LANGUAGE_MAP);
-};
-
-// Check if profile exists
-export const isValidProfile = (profile) => {
-  return profile in PROFILE_LANGUAGE_MAP;
-};
+export const getRegisteredProfiles = () => Array.from(profileLanguageRegistry.keys());
 
 // Translations for flashcard interface
 // UI strings for general interface (native language)
@@ -476,26 +455,19 @@ export const FLASHCARD_TRANSLATIONS = {
 // Get translations for a profile's language
 export const getTranslationsForProfile = (profile) => {
   const language = getLanguageForProfile(profile);
-  return FLASHCARD_TRANSLATIONS[language] || FLASHCARD_TRANSLATIONS['English'];
+  const translations = FLASHCARD_TRANSLATIONS[language];
+  if (!translations) {
+    throw new Error(`No flashcard translations configured for language "${language}"`);
+  }
+  return translations;
 };
 
 // General UI strings in native language
 export const getUITranslationsForProfile = (profile) => {
   const native = getNativeLanguageForProfile(profile);
-  return UI_STRINGS[native] || UI_STRINGS['English'];
-};
-
-// Validate user credentials
-export const validateCredentials = (username, password) => {
-  const profileKey = username.toLowerCase();
-  
-  if (!PROFILE_LANGUAGE_MAP[profileKey]) {
-    return { ok: false, error: 'Invalid username' };
+  const strings = UI_STRINGS[native];
+  if (!strings) {
+    throw new Error(`No UI translation strings configured for native language "${native}"`);
   }
-  
-  if (PROFILE_CREDENTIALS[profileKey] !== password) {
-    return { ok: false, error: 'Invalid password' };
-  }
-  
-  return { ok: true, profileKey };
+  return strings;
 };

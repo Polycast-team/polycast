@@ -1,4 +1,5 @@
 import apiService from './apiService.js';
+import { registerProfileLanguages } from '../utils/profileLanguageMapping.js';
 
 const TOKEN_KEY = 'pc_jwt';
 
@@ -19,6 +20,12 @@ async function login(username, password) {
   console.log('[authClient] POST', url, { username });
   const res = await apiService.postJson(url, { username, password });
   if (res?.token) saveToken(res.token);
+  if (res?.profile) {
+    registerProfileLanguages(res.profile.username, {
+      nativeLanguage: res.profile.native_language,
+      targetLanguage: res.profile.target_language,
+    });
+  }
   return res;
 }
 
@@ -27,15 +34,28 @@ async function register(username, password, nativeLanguage, targetLanguage) {
   console.log('[authClient] POST', url, { username, nativeLanguage, targetLanguage });
   const res = await apiService.postJson(url, { username, password, nativeLanguage, targetLanguage });
   if (res?.token) saveToken(res.token);
+  if (res?.profile) {
+    registerProfileLanguages(res.profile.username, {
+      nativeLanguage: res.profile.native_language,
+      targetLanguage: res.profile.target_language,
+    });
+  }
   return res;
 }
 
 async function me() {
   const url = `${apiService.baseUrl}/api/auth/me`;
   const token = getToken();
-  return apiService.fetchJson(url, {
+  const profile = await apiService.fetchJson(url, {
     headers: { Authorization: token ? `Bearer ${token}` : '' }
   });
+  if (profile?.username) {
+    registerProfileLanguages(profile.username, {
+      nativeLanguage: profile.native_language,
+      targetLanguage: profile.target_language,
+    });
+  }
+  return profile;
 }
 
 export default {
@@ -46,5 +66,4 @@ export default {
   saveToken,
   clearToken,
 };
-
 

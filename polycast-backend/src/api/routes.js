@@ -22,8 +22,9 @@ router.post('/auth/register', async (req, res) => {
     console.log('[Auth] register hit. content-type:', req.headers['content-type']);
     console.log('[Auth] register body:', req.body);
     try {
-        const { username, password, nativeLanguage = 'English', targetLanguage = 'English' } = req.body || {};
+        const { username, password, nativeLanguage, targetLanguage } = req.body || {};
         if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
+        if (!nativeLanguage || !targetLanguage) return res.status(400).json({ error: 'nativeLanguage and targetLanguage are required' });
         const existing = await authService.findUserByUsername(username);
         if (existing) return res.status(409).json({ error: 'Username already exists' });
         const profile = await authService.createUser({ username, password, nativeLanguage, targetLanguage });

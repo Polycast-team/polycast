@@ -147,9 +147,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
 
   // Map profile target language to Google TTS voice
   const getTtsVoiceForLanguage = useCallback((profile) => {
-    const targetLang = (getLanguageForProfile(profile) || '').toLowerCase();
-    // Default English fallback
-    const fallback = { languageCode: 'en-US', name: 'en-US-Neural2-J' };
+    const targetLang = getLanguageForProfile(profile).toLowerCase();
 
     // Prefer Latin American Spanish for better pronunciation for learners
     if (targetLang.startsWith('spanish') || targetLang === 'es' || targetLang === 'español') {
@@ -174,7 +172,7 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       return { languageCode: 'it-IT', name: 'it-IT-Neural2-C' };
     }
     // TODO: add more mappings as needed (cn/kr/ru/etc.)
-    return fallback;
+    throw new Error(`No Google TTS voice configured for target language "${targetLang}"`);
   }, []);
 
   // Generate audio for specific sentence (no database caching)
