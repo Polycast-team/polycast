@@ -26,6 +26,7 @@ import {
   getVoiceTranslationsForProfile,
   getErrorTranslationsForProfile,
 } from './utils/profileLanguageMapping.js';
+import { getAppStrings } from './i18n/index.js';
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
@@ -55,10 +56,21 @@ function App({
   // Debug logging
   console.log('App component received props:', { targetLanguages, selectedProfile, currentProfile, roomSetup, userRole, studentHomeLanguage });
 
+  const fallbackAppStrings = getAppStrings('en');
+
   if (profileLoading) {
+    const interimAppStrings = selectedProfile
+      ? getAppTranslationsForProfile(selectedProfile)
+      : {
+          ...fallbackAppStrings,
+          loadingProfile: `[fallback:en] ${fallbackAppStrings.loadingProfile}`,
+        };
+    if (!selectedProfile) {
+      console.warn('[i18n-fallback] Displaying loading screen using English while profile selects.');
+    }
     return (
       <div className="app-loading-state">
-        {appStrings.loadingProfile}
+        {interimAppStrings.loadingProfile}
       </div>
     );
   }
