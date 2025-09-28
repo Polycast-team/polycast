@@ -9,7 +9,7 @@ import apiService from '../../services/apiService';
 import './AIMode.css';
 import VoiceMode from './VoiceMode';
 
-const DEFAULT_SYSTEM_PROMPT = 'You are Polycast AI, an AI language tutor. You are speaking in a chat interface with a user whose native language is {nativeLanguage} and target language is {targetLanguage}. Your goal is to make conversation with the user. The user should not be required to steer the course of the conversation. Take initiative to guide the conversation. Make sure your responses are conversational and concise.';
+const DEFAULT_SYSTEM_PROMPT_TEMPLATE = 'You are Polycast AI, an AI language tutor. You are speaking in a chat interface with a user whose native language is {nativeLanguage} and target language is {targetLanguage}. Your goal is to make conversation with the user. The user should not be required to steer the course of the conversation. Take initiative to guide the conversation. Make sure your responses are conversational and concise.';
 
 function AIMode({
   selectedProfile,
@@ -21,6 +21,12 @@ function AIMode({
   const ui = getUITranslationsForProfile(selectedProfile);
   const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
   const targetLanguage = getLanguageForProfile(selectedProfile);
+
+  const systemPrompt = useMemo(() => (
+    DEFAULT_SYSTEM_PROMPT_TEMPLATE
+      .replace(/\{nativeLanguage\}/g, nativeLanguage || 'English')
+      .replace(/\{targetLanguage\}/g, targetLanguage || 'English')
+  ), [nativeLanguage, targetLanguage]);
 
   const [messages, setMessages] = useState([
     {
@@ -147,7 +153,7 @@ function AIMode({
     try {
       const response = await aiService.sendChat({
         messages: [...conversationForApi, userMessage],
-        systemPrompt: DEFAULT_SYSTEM_PROMPT,
+        systemPrompt,
       });
       if (response?.message?.content) {
         appendMessage({ role: 'assistant', content: response.message.content });
@@ -162,7 +168,7 @@ function AIMode({
       setIsAwaitingResponse(false);
       focusInput();
     }
-  }, [appendMessage, conversationForApi, focusInput, inputValue]);
+  }, [appendMessage, conversationForApi, focusInput, inputValue, systemPrompt]);
 
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -251,7 +257,7 @@ function AIMode({
         <VoiceMode
           selectedProfile={selectedProfile}
           onClose={() => setIsVoiceModeOpen(false)}
-          baseInstructions={DEFAULT_SYSTEM_PROMPT}
+          baseInstructions={systemPrompt}
           onAddWord={onAddWord}
           selectedWords={selectedWords}
           wordDefinitions={wordDefinitions}

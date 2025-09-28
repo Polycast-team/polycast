@@ -45,6 +45,10 @@ function VoiceMode({
     typeof baseInstructions === 'string' && baseInstructions.trim() ? baseInstructions.trim() : undefined
   ), [baseInstructions]);
 
+  const defaultVoiceInstructions = useMemo(() => (
+    `You are Polycast AI, a helpful and concise language tutor. You are speaking with a learner whose native language is ${nativeLanguage || 'English'} and whose target language is ${targetLanguage || 'English'}. Keep replies brief, speak clearly, and always provide a matching text transcript while you talk.`
+  ), [nativeLanguage, targetLanguage]);
+
   const normaliseTextFragment = useCallback((fragment) => {
     if (!fragment) return '';
     if (typeof fragment === 'string') return fragment;
@@ -338,7 +342,7 @@ function VoiceMode({
                   type: 'response.create',
                   response: {
                     modalities: ['text', 'audio'],
-                    instructions: instructions || 'You are Polycast AI, an AI language tutor. You are speaking in a voice interface with a user whose native language is {nativeLanguage} and target language is {targetLanguage}. Your goal is to make conversation with the user. The user should not be required to steer the course of the conversation. Take initiative to guide the conversation. Make sure your responses are conversational and concise.',
+                    instructions: instructions || defaultVoiceInstructions,
                   },
                 }));
                 hasSentIntroRef.current = true;
@@ -513,7 +517,7 @@ function VoiceMode({
                 type: 'response.create',
                 response: {
                   modalities: ['text', 'audio'],
-                  instructions: instructions || 'You are Polycast AI. Reply concisely while speaking and also stream the same text.',
+                  instructions: instructions || defaultVoiceInstructions,
                 },
               }));
             }
