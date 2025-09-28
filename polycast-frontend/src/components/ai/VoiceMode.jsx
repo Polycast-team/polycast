@@ -18,10 +18,6 @@ const ICE_SERVERS = [
   { urls: 'stun:stun2.l.google.com:19302' },
 ];
 
-const DEFAULT_WORD_RATE = 5.4; // words per second fallback when duration unknown
-const MIN_WORD_RATE = 3.5;
-const MAX_WORD_RATE = 8.0;
-
 function VoiceMode({
   selectedProfile,
   baseInstructions,
@@ -51,7 +47,6 @@ function VoiceMode({
   const assistantStreamFlagsRef = useRef({});
   const assistantAnimationTimersRef = useRef({});
   const assistantAnimatedBuffersRef = useRef({});
-  const assistantPlaybackRef = useRef({});
   const pendingUserRef = useRef({});
   const isMountedRef = useRef(true);
   const hasSentIntroRef = useRef(false);
@@ -161,14 +156,6 @@ function VoiceMode({
     return map;
   }, [normaliseTextFragment]);
 
-  const cancelPlaybackTimer = useCallback((id) => {
-    const playback = assistantPlaybackRef.current[id];
-    if (playback?.frame) {
-      cancelAnimationFrame(playback.frame);
-      playback.frame = null;
-    }
-  }, []);
-
   const stopAssistantAnimation = useCallback((id) => {
     const timer = assistantAnimationTimersRef.current[id];
     if (timer) {
@@ -177,45 +164,6 @@ function VoiceMode({
     }
     delete assistantAnimatedBuffersRef.current[id];
   }, []);
-
-  const buildPlaybackTokens = useCallback((text) => {
-    if (!text) return [];
-    const matches = text.match(/\S+\s*/g);
-    return matches ? matches : [text];
-  }, []);
-
-  const schedulePlaybackFrame = useCallback((id) => {
-    const playback = assistantPlaybackRef.current[id];
-    if (!playback) return;
-
-    const tick = () => {
-      const current = assistantPlaybackRef.current[id];
-      if (!current) return;
-
-      const now = performance.now();
-      const elapsedSeconds = current.startTime ? Math.max((now - current.startTime) / 1000, 0) : 0;
-      const rate = current.wordRate || DEFAULT_WORD_RATE;
-      const targetCount = current.tokens.length ? Math.floor(elapsedSeconds * rate) : 0;
-      const clamped = Math.min(current.tokens.length, targetCount);
-
-      if (clamped > current.displayedCount) {
-        current.displayedCount = clamped;
-        const displayText = current.tokens.slice(0, clamped).join('');
-        addOrUpdateMessage(id, 'assistant', displayText, { replace: true });
-      }
-
-      if (current.complete && current.displayedCount >= current.tokens.length) {
-        current.frame = null;
-        delete assistantPlaybackRef.current[id];
-        return;
-      }
-
-      current.frame = requestAnimationFrame(tick);
-    };
-
-    if (playback.frame) return;
-    playback.frame = requestAnimationFrame(tick);
-  }, [addOrUpdateMessage]);
 
   const animateAssistantMessage = useCallback((id, finalText) => {
     stopAssistantAnimation(id);
@@ -255,28 +203,15 @@ function VoiceMode({
     if (!delta) return;
     assistantStreamFlagsRef.current[id] = true;
     pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
-    const playback = assistantPlaybackRef.current[id];
-    if (playback) {
-      playback.tokens = buildPlaybackTokens(pendingAssistantRef.current[id]);
-      schedulePlaybackFrame(id);
-    } else {
-      stopAssistantAnimation(id);
-      addOrUpdateMessage(id, 'assistant', delta, { replace: false });
-    }
-  }, [addOrUpdateMessage, buildPlaybackTokens, normaliseTextFragment, schedulePlaybackFrame, stopAssistantAnimation]);
+    stopAssistantAnimation(id);
+    addOrUpdateMessage(id, 'assistant', delta, { replace: false });
+  }, [addOrUpdateMessage, normaliseTextFragment, stopAssistantAnimation]);
 
   const finalizeAssistantMessage = useCallback((id, fragment) => {
     const text = normaliseTextFragment(fragment) || pendingAssistantRef.current[id] || '';
     pendingAssistantRef.current[id] = '';
     const wasStreaming = assistantStreamFlagsRef.current[id];
     delete assistantStreamFlagsRef.current[id];
-    const playback = assistantPlaybackRef.current[id];
-    if (playback) {
-      playback.tokens = buildPlaybackTokens(text);
-      playback.complete = true;
-      schedulePlaybackFrame(id);
-      return;
-    }
     if (!text) {
       stopAssistantAnimation(id);
       return;
@@ -287,7 +222,7 @@ function VoiceMode({
       return;
     }
     animateAssistantMessage(id, text);
-  }, [addOrUpdateMessage, animateAssistantMessage, buildPlaybackTokens, normaliseTextFragment, schedulePlaybackFrame, stopAssistantAnimation]);
+  }, [addOrUpdateMessage, animateAssistantMessage, normaliseTextFragment, stopAssistantAnimation]);
 
   const closePopup = useCallback(() => setPopupInfo((prev) => ({ ...prev, visible: false })), []);
 
@@ -599,11 +534,6 @@ function VoiceMode({
         case 'response.output_audio_transcript.delta': {
           const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
           applyAssistantDelta(id, event.delta || extractTextFromEvent(event));
-          const playback = assistantPlaybackRef.current[id];
-          if (playback) {
-            playback.tokens = tokenizeText(pendingAssistantRef.current[id] || '');
-            schedulePlaybackFrame(id);
-          }
           setStatus('responding');
           break;
         }
@@ -631,44 +561,12 @@ function VoiceMode({
           setError(event?.error?.message || 'Realtime response error');
           setStatus('error');
           break;
-        case 'output_audio_buffer.started': {
-          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          const playback = assistantPlaybackRef.current[id] || {
-            tokens: buildPlaybackTokens(pendingAssistantRef.current[id] || ''),
-            displayedCount: 0,
-            wordRate: null,
-            complete: false,
-            frame: null,
-          };
-          playback.startTime = performance.now();
-          playback.complete = false;
-          playback.displayedCount = 0;
-          playback.tokens = buildPlaybackTokens(pendingAssistantRef.current[id] || '');
-          playback.wordRate = playback.wordRate || DEFAULT_WORD_RATE;
-          cancelPlaybackTimer(id);
-          assistantPlaybackRef.current[id] = playback;
-          stopAssistantAnimation(id);
-          addOrUpdateMessage(id, 'assistant', '', { replace: true });
-          schedulePlaybackFrame(id);
+        case 'output_audio_buffer.started':
           setStatus('responding');
           break;
-        }
-        case 'output_audio_buffer.stopped': {
-          const id = `${event.response_id || 'assistant'}-${event.output_index ?? 0}`;
-          const playback = assistantPlaybackRef.current[id];
-          if (playback && playback.startTime) {
-            const elapsed = Math.max((performance.now() - playback.startTime) / 1000, 0.4);
-            const totalWords = playback.tokens.length || buildPlaybackTokens(pendingAssistantRef.current[id] || '').length;
-            if (totalWords > 0) {
-              const computedRate = totalWords / elapsed;
-              playback.wordRate = Math.min(MAX_WORD_RATE, Math.max(MIN_WORD_RATE, computedRate));
-            }
-            playback.complete = true;
-            schedulePlaybackFrame(id);
-          }
+        case 'output_audio_buffer.stopped':
           setStatus('ready');
           break;
-        }
         case 'conversation.item.created': {
           const item = event.item;
           if (!item) break;
@@ -727,8 +625,6 @@ function VoiceMode({
       Object.keys(assistantAnimationTimersRef.current).forEach((key) => clearInterval(assistantAnimationTimersRef.current[key]));
       assistantAnimationTimersRef.current = {};
       assistantAnimatedBuffersRef.current = {};
-      Object.keys(assistantPlaybackRef.current).forEach((key) => cancelPlaybackTimer(key));
-      assistantPlaybackRef.current = {};
     };
   }, [
     instructions,
@@ -739,7 +635,6 @@ function VoiceMode({
     extractTextFromEvent,
     extractTextMapFromResponse,
     finalizeAssistantMessage,
-    cancelPlaybackTimer,
   ]);
 
   const extractContentText = (content = []) => {
