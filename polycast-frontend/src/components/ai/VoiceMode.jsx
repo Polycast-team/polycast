@@ -44,6 +44,9 @@ function VoiceMode({
   const dataChannelRef = useRef(null);
   const localStreamRef = useRef(null);
   const pendingAssistantRef = useRef({});
+  const assistantStreamFlagsRef = useRef({});
+  const assistantAnimationTimersRef = useRef({});
+  const assistantAnimatedBuffersRef = useRef({});
   const pendingUserRef = useRef({});
   const isMountedRef = useRef(true);
   const hasSentIntroRef = useRef(false);
@@ -153,19 +156,73 @@ function VoiceMode({
     return map;
   }, [normaliseTextFragment]);
 
+  const stopAssistantAnimation = useCallback((id) => {
+    const timer = assistantAnimationTimersRef.current[id];
+    if (timer) {
+      clearInterval(timer);
+      delete assistantAnimationTimersRef.current[id];
+    }
+    delete assistantAnimatedBuffersRef.current[id];
+  }, []);
+
+  const animateAssistantMessage = useCallback((id, finalText) => {
+    stopAssistantAnimation(id);
+    const parts = finalText.match(/\S+\s*/g) || [finalText];
+    let index = 0;
+    assistantAnimatedBuffersRef.current[id] = '';
+    addOrUpdateMessage(id, 'assistant', '', { replace: true });
+
+    const emitNext = () => {
+      const chunk = parts[index];
+      if (!chunk) {
+        stopAssistantAnimation(id);
+        addOrUpdateMessage(id, 'assistant', finalText, { replace: true });
+        return;
+      }
+      assistantAnimatedBuffersRef.current[id] = `${assistantAnimatedBuffersRef.current[id]}${chunk}`;
+      addOrUpdateMessage(id, 'assistant', assistantAnimatedBuffersRef.current[id], { replace: true });
+      index += 1;
+      if (index >= parts.length) {
+        stopAssistantAnimation(id);
+      }
+    };
+
+    emitNext();
+    if (parts.length > 1) {
+      assistantAnimationTimersRef.current[id] = setInterval(() => {
+        emitNext();
+        if (!assistantAnimationTimersRef.current[id]) {
+          clearInterval(assistantAnimationTimersRef.current[id]);
+        }
+      }, 80);
+    }
+  }, [addOrUpdateMessage, stopAssistantAnimation]);
+
   const applyAssistantDelta = useCallback((id, fragment) => {
     const delta = normaliseTextFragment(fragment);
     if (!delta) return;
+    assistantStreamFlagsRef.current[id] = true;
+    stopAssistantAnimation(id);
     pendingAssistantRef.current[id] = (pendingAssistantRef.current[id] || '') + delta;
     addOrUpdateMessage(id, 'assistant', delta, { replace: false });
-  }, [addOrUpdateMessage, normaliseTextFragment]);
+  }, [addOrUpdateMessage, normaliseTextFragment, stopAssistantAnimation]);
 
   const finalizeAssistantMessage = useCallback((id, fragment) => {
     const text = normaliseTextFragment(fragment) || pendingAssistantRef.current[id] || '';
     pendingAssistantRef.current[id] = '';
-    if (!text) return;
-    addOrUpdateMessage(id, 'assistant', text, { replace: true });
-  }, [addOrUpdateMessage, normaliseTextFragment]);
+    const wasStreaming = assistantStreamFlagsRef.current[id];
+    delete assistantStreamFlagsRef.current[id];
+    if (!text) {
+      stopAssistantAnimation(id);
+      return;
+    }
+    if (wasStreaming) {
+      stopAssistantAnimation(id);
+      addOrUpdateMessage(id, 'assistant', text, { replace: true });
+      return;
+    }
+    animateAssistantMessage(id, text);
+  }, [addOrUpdateMessage, animateAssistantMessage, normaliseTextFragment, stopAssistantAnimation]);
 
   const closePopup = useCallback(() => setPopupInfo((prev) => ({ ...prev, visible: false })), []);
 
@@ -565,6 +622,9 @@ function VoiceMode({
     return () => {
       isMountedRef.current = false;
       cleanupConnection();
+      Object.keys(assistantAnimationTimersRef.current).forEach((key) => clearInterval(assistantAnimationTimersRef.current[key]));
+      assistantAnimationTimersRef.current = {};
+      assistantAnimatedBuffersRef.current = {};
     };
   }, [
     instructions,
