@@ -492,7 +492,6 @@ const TRANSLATIONS = {
   // providing localized text for each key.
 };
 
-export default TRANSLATIONS;
 TRANSLATIONS.hi = build('hi', {
   ui: {
     profile: 'प्रोफ़ाइल',
