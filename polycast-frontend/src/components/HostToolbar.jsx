@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { ReadyState } from 'react-use-websocket';
-import { getTranslationsForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
+import { getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 
 // Minimalist line icons (SVG) with transparent background
 const iconColor = '#a0a0b8';
@@ -35,7 +35,6 @@ function HostToolbar({
     // Check if we're in host mode (all control functions available) or student mode (view-only)
     const isHostMode = setIsTextMode !== null && onStartRecording !== null;
     const isConnected = readyState === ReadyState.OPEN;
-    const t = getTranslationsForProfile(selectedProfile);
     const ui = getUITranslationsForProfile(selectedProfile);
     const profileOptions = availableProfiles && availableProfiles.length ? availableProfiles : null;
 

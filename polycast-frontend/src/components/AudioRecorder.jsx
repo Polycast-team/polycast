@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
+import { getErrorTranslationsForProfile } from '../utils/profileLanguageMapping.js';
 
-function AudioRecorder({ sendMessage, isRecording }) {
+function AudioRecorder({ sendMessage, isRecording, selectedProfile }) {
   const streamRef = useRef(null); 
   const audioContextRef = useRef(null);
   const processorRef = useRef(null);
   const sourceRef = useRef(null);
   const [micError, setMicError] = useState(null);
   const [hasStream, setHasStream] = useState(false);
+  const errorStrings = selectedProfile ? getErrorTranslationsForProfile(selectedProfile) : { micAccessDenied: 'Microphone access denied or unavailable' };
   
   // Get microphone access on mount
   useEffect(() => {
@@ -25,7 +27,7 @@ function AudioRecorder({ sendMessage, isRecording }) {
         setMicError(null);
         setHasStream(true);
       } catch (err) {
-        setMicError('Microphone access denied or unavailable');
+        setMicError(errorStrings.micAccessDenied);
         console.error('Mic error:', err);
       }
     }
@@ -115,6 +117,7 @@ function AudioRecorder({ sendMessage, isRecording }) {
 AudioRecorder.propTypes = {
   sendMessage: PropTypes.func.isRequired,
   isRecording: PropTypes.bool.isRequired,
+  selectedProfile: PropTypes.string.isRequired,
 };
 
 export default AudioRecorder;

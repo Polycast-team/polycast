@@ -16,7 +16,16 @@ import { useFlashcardCalendar } from './hooks/useFlashcardCalendar';
 import VideoMode from './components/VideoMode';
 import ErrorPopup from './components/ErrorPopup';
 import { useErrorHandler } from './hooks/useErrorHandler';
-import { getLanguageForProfile, getTranslationsForProfile, getNativeLanguageForProfile, getUITranslationsForProfile, getRegisteredProfiles } from './utils/profileLanguageMapping.js';
+import {
+  getLanguageForProfile,
+  getFlashcardTranslationsForProfile,
+  getNativeLanguageForProfile,
+  getUITranslationsForProfile,
+  getRegisteredProfiles,
+  getAppTranslationsForProfile,
+  getVoiceTranslationsForProfile,
+  getErrorTranslationsForProfile,
+} from './utils/profileLanguageMapping.js';
 import TBAPopup from './components/popups/TBAPopup';
 import { useTBAHandler } from './hooks/useTBAHandler';
 import apiService from './services/apiService.js';
@@ -49,7 +58,7 @@ function App({
   if (profileLoading) {
     return (
       <div className="app-loading-state">
-        Loading profile…
+        {appStrings.loadingProfile}
       </div>
     );
   }
@@ -63,8 +72,11 @@ function App({
   }
 
   // Get translations for this profile's language
-  const t = getTranslationsForProfile(selectedProfile);
+  const flashcardStrings = getFlashcardTranslationsForProfile(selectedProfile);
   const ui = getUITranslationsForProfile(selectedProfile);
+  const appStrings = getAppTranslationsForProfile(selectedProfile);
+  const voiceStrings = getVoiceTranslationsForProfile(selectedProfile);
+  const errorStrings = getErrorTranslationsForProfile(selectedProfile);
 
   const [internalSelectedProfile, setSelectedProfile] = React.useState(selectedProfile);
 
@@ -527,7 +539,7 @@ function App({
     const cleanedRoomCode = joinRoomCode.replace(/[^0-9]/g, '').trim();
 
     if (cleanedRoomCode.length !== 5) {
-      setJoinRoomError(t.enterRoomCode + ' (5 digits)');
+      setJoinRoomError(errorStrings.joinRoomCodeLength);
       return;
     }
 
@@ -937,7 +949,7 @@ function App({
           onMouseOver={e => (e.currentTarget.style.opacity = 0.85)}
           onMouseOut={e => (e.currentTarget.style.opacity = 1)}
         >
-          Polycast
+          {appStrings.appName}
         </h1>
         
         {/* Right side spacer only; colored room pill moved to top-right header */}
@@ -969,6 +981,7 @@ function App({
               <AudioRecorder
                 sendMessage={sendMessage}
                 isRecording={isRecording}
+                selectedProfile={internalSelectedProfile}
                 onAudioSent={onAudioSent}
               />
             </div>
@@ -1017,7 +1030,9 @@ function App({
           opacity: 0.96,
           userSelect: 'none',
         }}>
-          Viewing host's transcription in real-time • <span style={{ color: '#ffb84d' }}>Click words to add to dictionary</span>
+          {voiceStrings.studentLiveBannerPrefix}
+          {' • '}
+          <span style={{ color: '#ffb84d' }}>{voiceStrings.studentLiveBannerHighlight}</span>
         </div>
       )}
       
@@ -1026,9 +1041,9 @@ function App({
         <button
           onClick={() => { try { authClient.clearToken(); } catch {}; window.location.assign('/'); }}
           style={{ padding: '8px 12px', fontSize: 14, borderRadius: 4, background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}
-          title="Logout"
+          title={appStrings.logout}
         >
-          Logout
+          {appStrings.logout}
         </button>
         {(appMode === 'video' || appMode === 'audio') && !roomSetup && (
           <>
@@ -1036,17 +1051,17 @@ function App({
               onClick={async () => {
                 // Preserve current mode; ask parent to host and update props in place
                 try { await onHostRoom?.(); }
-                catch (e) { alert('Failed to create room: ' + (e?.message || e)); }
+                catch (e) { alert(errorStrings.createRoomFailed(e?.message || e)); }
               }}
               style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#3b82f6', color: '#fff', border: 'none', cursor: 'pointer' }}
             >
-              Host call
+              {appStrings.hostCall}
             </button>
             <button
               onClick={() => setShowJoinRoomModal(true)}
               style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer' }}
             >
-              Join call
+              {appStrings.joinCall}
             </button>
           </>
         )}
@@ -1067,7 +1082,7 @@ function App({
             >
               {roomSetup.isHost ? `${ui.room}: ${roomSetup.roomCode}` : `${ui.student} • ${ui.room}: ${roomSetup.roomCode}`}
             </div>
-            <button onClick={onReset} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>End call</button>
+            <button onClick={onReset} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>{appStrings.endCall}</button>
           </>
         )}
       </div>
@@ -1084,7 +1099,7 @@ function App({
           className="notification-popup" 
           style={{ opacity: notificationOpacity }}
         >
-          Audio sent for transcription
+          {appStrings.audioSentNotification}
         </div>
       )}
       <div className="display-container">

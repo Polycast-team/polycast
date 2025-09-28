@@ -7,7 +7,7 @@ import { calculateNextReview, formatNextReviewTime } from '../utils/srsAlgorithm
 import { useFlashcardSession } from '../hooks/useFlashcardSession';
 import { useFlashcardSRS } from '../hooks/useFlashcardSRS';
 import { useFlashcardCalendar } from '../hooks/useFlashcardCalendar';
-import { getTranslationsForProfile, getLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
+import { getFlashcardTranslationsForProfile, getLanguageForProfile, getUITranslationsForProfile } from '../utils/profileLanguageMapping';
 import '../services/apiService.js';
 import apiService from '../services/apiService.js';
 //
@@ -16,7 +16,7 @@ import apiService from '../services/apiService.js';
 
 const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, englishSegments, targetLanguages, selectedProfile }) => {
   // Get translations for this profile's language
-  const t = getTranslationsForProfile(selectedProfile);
+  const t = getFlashcardTranslationsForProfile(selectedProfile);
   const ui = getUITranslationsForProfile(selectedProfile);
   
   // Single responsive mode

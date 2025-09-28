@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import './DictionaryTable.css';
 import TBAPopup from './popups/TBAPopup';
 import { useTBAHandler } from '../hooks/useTBAHandler';
-import { getUITranslationsForProfile } from '../utils/profileLanguageMapping';
+import { getUITranslationsForProfile, getDictionaryTranslationsForProfile } from '../utils/profileLanguageMapping.js';
 
 // Calendar icon component
 function CalendarIcon() {
@@ -73,7 +73,7 @@ FrequencyDots.propTypes = {
 };
 
 // Legend component for frequency explanation
-const FrequencyLegend = () => {
+const FrequencyLegend = ({ strings }) => {
   return (
     <div className="frequency-legend" style={{
       marginTop: '10px',
@@ -83,27 +83,27 @@ const FrequencyLegend = () => {
       fontSize: '12px',
       color: '#a0a0b8'
     }}>
-      <div style={{ marginBottom: '5px', fontWeight: 'bold' }}>Frequency Guide:</div>
+      <div style={{ marginBottom: '5px', fontWeight: 'bold' }}>{strings.frequencyGuideTitle}</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ff4d4d' }} />
-          <span>1: Rare</span>
+          <span>{strings.frequencyRare}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ff944d' }} />
-          <span>2: Uncommon</span>
+          <span>{strings.frequencyUncommon}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ffdd4d' }} />
-          <span>3: Moderate</span>
+          <span>{strings.frequencyModerate}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#75d147' }} />
-          <span>4: Common</span>
+          <span>{strings.frequencyCommon}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#4ade80' }} />
-          <span>5: Very Common</span>
+          <span>{strings.frequencyVeryCommon}</span>
         </div>
       </div>
     </div>
@@ -127,6 +127,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
   const addWordInputRef = React.useRef(null);
   const {tba: popupTBA, showTBA, clearTBA} = useTBAHandler();
   const ui = getUITranslationsForProfile(selectedProfile);
+  const dictionaryStrings = getDictionaryTranslationsForProfile(selectedProfile);
 
 
   // Group entries by word
@@ -334,13 +335,13 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
             onClick={() => setIsSearchOpen(true)}
             style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
           >
-            🔎 Search
+            {dictionaryStrings.searchButton}
           </button>
           <button
             onClick={() => setIsAddOpen(true)}
             style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
           >
-            ＋ Add Word
+            {dictionaryStrings.addWordButton}
           </button>
           {/* Calendar button */}
           <button 
@@ -356,7 +357,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
               alignItems: 'center',
               gap: '4px'
             }}
-            aria-label={ui.calendar}
+            aria-label={dictionaryStrings.calendarButton}
           >
             <CalendarIcon />
           </button>
@@ -388,8 +389,8 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
         />
         <div className="empty-dictionary-message">
           {searchTerm ? 
-            `No words matching "${searchTerm}" found in your dictionary.` : 
-            'Your dictionary is empty. Add words from the transcript by clicking on them!'}
+            dictionaryStrings.noMatches(searchTerm) : 
+            `${dictionaryStrings.empty} ${dictionaryStrings.emptyHelp}`}
         </div>
       </div>
     );
@@ -403,13 +404,13 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
           onClick={() => setIsSearchOpen(true)}
           style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
         >
-          🔎 Search
+          {dictionaryStrings.searchButton}
         </button>
         <button
           onClick={() => setIsAddOpen(true)}
           style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
         >
-          ＋ Add Word
+          {dictionaryStrings.addWordButton}
         </button>
         
         {/* Calendar button */}
@@ -426,7 +427,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
             alignItems: 'center',
             gap: '4px'
           }}
-          aria-label={ui.calendar}
+          aria-label={dictionaryStrings.calendarButton}
         >
           <CalendarIcon />
         </button>
@@ -451,7 +452,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
       {/* Controls */}
       <div className="dictionary-controls" style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="sort-controls">
-          <label style={{ color: '#a0a0b8', fontSize: '14px', marginRight: '8px' }}>Sort by:</label>
+          <label style={{ color: '#a0a0b8', fontSize: '14px', marginRight: '8px' }}>{dictionaryStrings.sortLabel}</label>
           <select 
             value={sortMethod} 
             onChange={(e) => setSortMethod(e.target.value)}
@@ -465,12 +466,12 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
               cursor: 'pointer'
             }}
           >
-            <option value="alphabetical">Alphabetical (A-Z)</option>
-            <option value="frequency-desc">Most Common First</option>
-            <option value="frequency-asc">Least Common First</option>
+            <option value="alphabetical">{dictionaryStrings.sortAlphabetical}</option>
+            <option value="frequency-desc">{dictionaryStrings.sortMostCommon}</option>
+            <option value="frequency-asc">{dictionaryStrings.sortLeastCommon}</option>
           </select>
         </div>
-        
+
         <div className="frequency-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button 
             onClick={() => setShowFrequencyLegend(prev => !prev)}
@@ -484,9 +485,9 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
               cursor: 'pointer'
             }}
           >
-            Frequency Guide
+            {dictionaryStrings.frequencyGuideButton}
           </button>
-          
+
           <div className="keyboard-shortcuts" style={{ position: 'relative' }}>
             <button
               onClick={() => setShowKeyboardShortcuts(prev => !prev)}
@@ -503,7 +504,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
                 gap: '5px'
               }}
             >
-              <span style={{ fontSize: '16px' }}>⌨️</span> Keyboard Shortcuts
+              <span style={{ fontSize: '16px' }}>⌨️</span> {dictionaryStrings.keyboardShortcutsButton}
             </button>
             
             {showKeyboardShortcuts && (
@@ -563,7 +564,7 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
       {/* Frequency legend (optional) */}
       {showFrequencyLegend && (
         <div style={{ padding: '0 16px' }}>
-          <FrequencyLegend />
+          <FrequencyLegend strings={dictionaryStrings} />
         </div>
       )}
       

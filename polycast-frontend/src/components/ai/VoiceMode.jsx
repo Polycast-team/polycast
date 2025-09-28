@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types';
 import tokenizeText from '../../utils/tokenizeText';
 import { extractSentenceWithWord } from '../../utils/wordClickUtils';
-import { getLanguageForProfile, getNativeLanguageForProfile } from '../../utils/profileLanguageMapping';
+import {
+  getLanguageForProfile,
+  getNativeLanguageForProfile,
+  getVoiceTranslationsForProfile,
+  getUITranslationsForProfile,
+} from '../../utils/profileLanguageMapping.js';
 import aiService from '../../services/aiService';
 import apiService from '../../services/apiService';
 import WordDefinitionPopup from '../WordDefinitionPopup';
@@ -24,6 +29,8 @@ function VoiceMode({
 }) {
   const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
   const targetLanguage = getLanguageForProfile(selectedProfile);
+  const voiceStrings = getVoiceTranslationsForProfile(selectedProfile);
+  const ui = getUITranslationsForProfile(selectedProfile);
 
   const [status, setStatus] = useState('connecting');
   const [error, setError] = useState('');
@@ -574,21 +581,21 @@ function VoiceMode({
   const statusLabel = useMemo(() => {
     switch (status) {
       case 'connecting':
-        return 'Connecting to realtime voice…';
+        return voiceStrings.statusConnecting;
       case 'ready':
-        return 'Listening — start speaking!';
+        return voiceStrings.statusReady;
       case 'listening':
-        return 'Listening…';
+        return voiceStrings.statusListening;
       case 'responding':
-        return 'AI is responding…';
+        return voiceStrings.statusResponding;
       case 'ended':
-        return 'Session ended';
+        return voiceStrings.statusEnded;
       case 'error':
-        return 'Error';
+        return voiceStrings.statusError;
       default:
         return '';
     }
-  }, [status]);
+  }, [status, voiceStrings]);
 
   return (
     <div className="voice-mode-overlay">
@@ -597,7 +604,7 @@ function VoiceMode({
           type="button"
           className="voice-close-btn"
           onClick={handleEndSession}
-          aria-label="Close voice mode"
+          aria-label={voiceStrings.closeButtonAria}
         >
           ×
         </button>
@@ -611,27 +618,27 @@ function VoiceMode({
           </div>
 
           <div className="voice-status-block">
-            <h2>Polycast Voice</h2>
+            <h2>{ui.voiceHeading}</h2>
             <p className="voice-status-text">{statusLabel}</p>
             {error ? (
               <p className="voice-status-error">{error}</p>
             ) : (
-              <p className="voice-status-hint">Speak naturally — Polycast is listening and will respond in real time.</p>
+              <p className="voice-status-hint">{ui.voiceHint}</p>
             )}
           </div>
 
           <button type="button" className="voice-end-btn" onClick={handleEndSession}>
-            End Session
+            {ui.endSession}
           </button>
         </div>
 
         <div className="voice-transcript-panel" ref={scrollContainerRef}>
           {conversation.length === 0 ? (
-            <div className="voice-placeholder">Waiting for the conversation to begin…</div>
+            <div className="voice-placeholder">{ui.voiceWaiting}</div>
           ) : (
             conversation.map((turn) => (
               <div key={turn.id} className={`voice-transcript-turn voice-transcript-${turn.role}`}>
-                <div className="voice-transcript-label">{turn.role === 'assistant' ? 'Polycast AI' : 'You'}</div>
+                <div className="voice-transcript-label">{turn.role === 'assistant' ? voiceStrings.assistantLabel : voiceStrings.userLabel}</div>
                 <div className="voice-transcript-text">{renderTokens(turn.content, turn.id)}</div>
               </div>
             ))
