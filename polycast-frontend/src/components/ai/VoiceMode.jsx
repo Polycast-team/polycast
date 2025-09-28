@@ -609,40 +609,42 @@ function VoiceMode({
           ×
         </button>
 
-        <div className="voice-center">
-          <div className={`voice-orb voice-orb-${status}`}>
-            <span className="voice-orb-ring ring-1" />
-            <span className="voice-orb-ring ring-2" />
-            <span className="voice-orb-ring ring-3" />
-            <div className="voice-orb-core" />
+        <div className="voice-layout">
+          <div className="voice-center">
+            <div className={`voice-orb voice-orb-${status}`}>
+              <span className="voice-orb-ring ring-1" />
+              <span className="voice-orb-ring ring-2" />
+              <span className="voice-orb-ring ring-3" />
+              <div className="voice-orb-core" />
+            </div>
+
+            <div className="voice-status-block">
+              <h2>{ui.voiceHeading}</h2>
+              <p className="voice-status-text">{statusLabel}</p>
+              {error ? (
+                <p className="voice-status-error">{error}</p>
+              ) : (
+                <p className="voice-status-hint">{ui.voiceHint}</p>
+              )}
+            </div>
+
+            <button type="button" className="voice-end-btn" onClick={handleEndSession}>
+              {ui.endSession}
+            </button>
           </div>
 
-          <div className="voice-status-block">
-            <h2>{ui.voiceHeading}</h2>
-            <p className="voice-status-text">{statusLabel}</p>
-            {error ? (
-              <p className="voice-status-error">{error}</p>
+          <div className="voice-transcript-panel" ref={scrollContainerRef}>
+            {conversation.length === 0 ? (
+              <div className="voice-placeholder">{ui.voiceWaiting}</div>
             ) : (
-              <p className="voice-status-hint">{ui.voiceHint}</p>
+              conversation.map((turn) => (
+                <div key={turn.id} className={`voice-transcript-turn voice-transcript-${turn.role}`}>
+                  <div className="voice-transcript-label">{turn.role === 'assistant' ? voiceStrings.assistantLabel : voiceStrings.userLabel}</div>
+                  <div className="voice-transcript-text">{renderTokens(turn.content, turn.id)}</div>
+                </div>
+              ))
             )}
           </div>
-
-          <button type="button" className="voice-end-btn" onClick={handleEndSession}>
-            {ui.endSession}
-          </button>
-        </div>
-
-        <div className="voice-transcript-panel" ref={scrollContainerRef}>
-          {conversation.length === 0 ? (
-            <div className="voice-placeholder">{ui.voiceWaiting}</div>
-          ) : (
-            conversation.map((turn) => (
-              <div key={turn.id} className={`voice-transcript-turn voice-transcript-${turn.role}`}>
-                <div className="voice-transcript-label">{turn.role === 'assistant' ? voiceStrings.assistantLabel : voiceStrings.userLabel}</div>
-                <div className="voice-transcript-text">{renderTokens(turn.content, turn.id)}</div>
-              </div>
-            ))
-          )}
         </div>
 
         <audio ref={remoteAudioRef} autoPlay playsInline />
