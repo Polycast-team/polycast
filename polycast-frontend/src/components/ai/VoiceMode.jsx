@@ -591,10 +591,15 @@ function VoiceMode({
           const id = `${event.item_id || 'user'}-live`;
           const delta = event.delta || '';
           pendingUserRef.current[id] = (pendingUserRef.current[id] || '') + delta;
-          if (!liveUserTurnRef.current) {
-            liveUserTurnRef.current = id;
-            addOrUpdateMessage(id, 'user', '', { replace: true });
+          const existingTurn = liveUserTurnRef.current;
+          if (!existingTurn) {
+            const newId = `${Date.now()}-live`;
+            liveUserTurnRef.current = newId;
+            pendingUserRef.current[newId] = pendingUserRef.current[id];
+            delete pendingUserRef.current[id];
+            addOrUpdateMessage(newId, 'user', '', { replace: true });
           }
+          const targetId = liveUserTurnRef.current || id;
           if (currentAssistantTurnRef.current) {
             const activeId = currentAssistantTurnRef.current;
             const existing = pendingAssistantRef.current[activeId] || '';
@@ -605,15 +610,21 @@ function VoiceMode({
             assistantStreamFlagsRef.current[activeId] = false;
             currentAssistantTurnRef.current = null;
           }
-          addOrUpdateMessage(id, 'user', delta, { replace: false });
+          const bubbleId = liveUserTurnRef.current || id;
+          const updatedText = pendingUserRef.current[bubbleId] || pendingUserRef.current[id] || '';
+          addOrUpdateMessage(bubbleId, 'user', updatedText, { replace: true });
           setStatus('listening');
           break;
         }
         case 'conversation.item.input_audio_transcription.completed': {
-          const id = `${event.item_id || 'user'}-live`;
-          const transcript = event.transcript || pendingUserRef.current[id] || '';
-          pendingUserRef.current[id] = '';
-          addOrUpdateMessage(id, 'user', transcript, { replace: true });
+          const originalId = `${event.item_id || 'user'}-live`;
+          const transcript = event.transcript || pendingUserRef.current[originalId] || pendingUserRef.current[liveUserTurnRef.current] || '';
+          const bubbleId = liveUserTurnRef.current || originalId;
+          if (bubbleId !== originalId) {
+            delete pendingUserRef.current[originalId];
+          }
+          pendingUserRef.current[bubbleId] = '';
+          addOrUpdateMessage(bubbleId, 'user', transcript, { replace: true });
           liveUserTurnRef.current = null;
           setStatus('ready');
           try {
