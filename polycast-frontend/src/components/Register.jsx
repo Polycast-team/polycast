@@ -3,18 +3,18 @@ import authClient from '../services/authClient.js';
 import { Link, useNavigate } from 'react-router-dom';
 import { getRegisterStrings, getErrorStrings, getLanguageOptions } from '../i18n/index.js';
 import { findLanguageByCode } from '../i18n/languages.js';
+import './auth/AuthLayout.css';
 
 function Register() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [interfaceLanguage, setInterfaceLanguage] = useState('en');
   const [nativeLanguageCode, setNativeLanguageCode] = useState('en');
   const [targetLanguageCode, setTargetLanguageCode] = useState('es');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const registerStrings = useMemo(() => getRegisterStrings(interfaceLanguage), [interfaceLanguage]);
-  const errorStrings = useMemo(() => getErrorStrings(interfaceLanguage), [interfaceLanguage]);
+  const registerStrings = useMemo(() => getRegisterStrings(nativeLanguageCode), [nativeLanguageCode]);
+  const errorStrings = useMemo(() => getErrorStrings(nativeLanguageCode), [nativeLanguageCode]);
   const languageOptions = useMemo(() => getLanguageOptions(), []);
 
   const onSubmit = async (e) => {
@@ -33,7 +33,7 @@ function Register() {
         nativeLanguage,
         targetLanguage
       );
-      navigate('/');
+      navigate('/app');
     } catch (e2) {
       setError(e2?.message || errorStrings.registrationFailed);
     } finally {
@@ -42,68 +42,61 @@ function Register() {
   };
 
   return (
-    <div style={{ maxWidth: 360, margin: '60px auto', color: '#fff' }}>
-      <h2 style={{ marginBottom: 16 }}>{registerStrings.title}</h2>
-      <form onSubmit={onSubmit}>
-        <div style={{ marginBottom: 12 }}>
-          <label>{registerStrings.languageLabel}</label>
-          <select
-            value={interfaceLanguage}
-            onChange={(e) => setInterfaceLanguage(e.target.value)}
-            style={{ width: '100%' }}
-          >
-            {languageOptions.map(({ code, englishName, nativeName }) => (
-              <option key={code} value={code}>
-                {englishName} ({nativeName})
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>{registerStrings.username}</label>
-          <input value={username} onChange={e => setUsername(e.target.value)} style={{ width: '100%' }} autoComplete="username" />
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>{registerStrings.password}</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%' }} autoComplete="new-password" />
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>{registerStrings.nativeLanguage}</label>
-          <select
-            value={nativeLanguageCode}
-            onChange={(e) => setNativeLanguageCode(e.target.value)}
-            style={{ width: '100%' }}
-          >
-            {languageOptions.map(({ code, englishName, nativeName }) => (
-              <option key={code} value={code}>
-                {englishName} ({nativeName})
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>{registerStrings.targetLanguage}</label>
-          <select
-            value={targetLanguageCode}
-            onChange={(e) => setTargetLanguageCode(e.target.value)}
-            style={{ width: '100%' }}
-          >
-            {languageOptions.map(({ code, englishName, nativeName }) => (
-              <option key={code} value={code}>
-                {englishName} ({nativeName})
-              </option>
-            ))}
-          </select>
-        </div>
-        {error && <div style={{ color: '#f87171', marginBottom: 8 }}>{error}</div>}
-        <button type="submit" disabled={loading}>{registerStrings.submit}</button>
-      </form>
-      <div style={{ marginTop: 12 }}>
+    <div className="auth-shell">
+      <div className="auth-nav">
+        <Link className="auth-brand" to="/">Polycast</Link>
         <Link to="/login">{registerStrings.backToLogin}</Link>
+      </div>
+
+      <div className="auth-content">
+        <div className="auth-card">
+          <h2>{registerStrings.title}</h2>
+          <p className="auth-subtitle">Create your profile, choose your languages, and start teaching or learning.</p>
+          <form onSubmit={onSubmit} className="auth-form">
+            <div className="auth-field">
+              <label>{registerStrings.username}</label>
+              <input value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" />
+            </div>
+            <div className="auth-field">
+              <label>{registerStrings.password}</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" />
+            </div>
+            <div className="auth-field">
+              <label>{registerStrings.nativeLanguage}</label>
+              <select
+                value={nativeLanguageCode}
+                onChange={(e) => setNativeLanguageCode(e.target.value)}
+              >
+                {languageOptions.map(({ code, englishName, nativeName }) => (
+                  <option key={code} value={code}>
+                    {englishName} ({nativeName})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="auth-field">
+              <label>{registerStrings.targetLanguage}</label>
+              <select
+                value={targetLanguageCode}
+                onChange={(e) => setTargetLanguageCode(e.target.value)}
+              >
+                {languageOptions.map(({ code, englishName, nativeName }) => (
+                  <option key={code} value={code}>
+                    {englishName} ({nativeName})
+                  </option>
+                ))}
+              </select>
+            </div>
+            {error && <div className="auth-error">{error}</div>}
+            <button className="auth-submit" type="submit" disabled={loading}>{registerStrings.submit}</button>
+          </form>
+          <div className="auth-switch">
+            <Link to="/login">{registerStrings.backToLogin}</Link>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 export default Register;
-

@@ -2,6 +2,32 @@ import React, { useMemo, useState } from 'react';
 import authClient from '../services/authClient.js';
 import { Link, useNavigate } from 'react-router-dom';
 import { getLoginStrings, getErrorStrings, getLanguageOptions } from '../i18n/index.js';
+import './auth/AuthLayout.css';
+
+function determineInterfaceLanguage() {
+  const options = getLanguageOptions();
+  if (typeof navigator === 'undefined') return 'en';
+  const raw = (navigator.language || navigator.userLanguage || '').toLowerCase();
+  if (!raw) return 'en';
+
+  const candidates = [raw];
+  const segment = raw.split('-')[0];
+  if (segment && segment !== raw) candidates.push(segment);
+
+  for (const candidate of candidates) {
+    const byCode = options.find(({ code }) => code === candidate);
+    if (byCode) return byCode.code;
+  }
+
+  for (const candidate of candidates) {
+    const byName = options.find(({ englishName, nativeName }) =>
+      englishName.toLowerCase() === candidate || nativeName.toLowerCase() === candidate
+    );
+    if (byName) return byName.code;
+  }
+
+  return 'en';
+}
 
 function Login() {
   const navigate = useNavigate();
@@ -9,10 +35,9 @@ function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [interfaceLanguage, setInterfaceLanguage] = useState('en');
+  const interfaceLanguage = useMemo(determineInterfaceLanguage, []);
   const loginStrings = useMemo(() => getLoginStrings(interfaceLanguage), [interfaceLanguage]);
   const errorStrings = useMemo(() => getErrorStrings(interfaceLanguage), [interfaceLanguage]);
-  const languageOptions = useMemo(() => getLanguageOptions(), []);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -20,7 +45,7 @@ function Login() {
     setLoading(true);
     try {
       await authClient.login(username.trim(), password);
-      navigate('/');
+      navigate('/app');
     } catch (e2) {
       setError(e2?.message || errorStrings.loginFailed);
     } finally {
@@ -29,36 +54,32 @@ function Login() {
   };
 
   return (
-    <div style={{ maxWidth: 360, margin: '60px auto', color: '#fff' }}>
-      <h2 style={{ marginBottom: 16 }}>{loginStrings.title}</h2>
-      <form onSubmit={onSubmit}>
-        <div style={{ marginBottom: 12 }}>
-          <label>{loginStrings.languageLabel}</label>
-          <select
-            value={interfaceLanguage}
-            onChange={(e) => setInterfaceLanguage(e.target.value)}
-            style={{ width: '100%' }}
-          >
-            {languageOptions.map(({ code, englishName, nativeName }) => (
-              <option key={code} value={code}>
-                {englishName} ({nativeName})
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>{loginStrings.username}</label>
-          <input value={username} onChange={e => setUsername(e.target.value)} style={{ width: '100%' }} />
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>{loginStrings.password}</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%' }} />
-        </div>
-        {error && <div style={{ color: '#f87171', marginBottom: 8 }}>{error}</div>}
-        <button type="submit" disabled={loading}>{loginStrings.submit}</button>
-      </form>
-      <div style={{ marginTop: 12 }}>
+    <div className="auth-shell">
+      <div className="auth-nav">
+        <Link className="auth-brand" to="/">Polycast</Link>
         <Link to="/register">{loginStrings.createAccountLink}</Link>
+      </div>
+
+      <div className="auth-content">
+        <div className="auth-card">
+          <h2>{loginStrings.title}</h2>
+          <p className="auth-subtitle">Sign in to continue your lessons and live sessions.</p>
+          <form onSubmit={onSubmit} className="auth-form">
+            <div className="auth-field">
+              <label>{loginStrings.username}</label>
+              <input value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" />
+            </div>
+            <div className="auth-field">
+              <label>{loginStrings.password}</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" />
+            </div>
+            {error && <div className="auth-error">{error}</div>}
+            <button className="auth-submit" type="submit" disabled={loading}>{loginStrings.submit}</button>
+          </form>
+          <div className="auth-switch">
+            <Link to="/register">{loginStrings.createAccountLink}</Link>
+          </div>
+        </div>
       </div>
     </div>
   );
