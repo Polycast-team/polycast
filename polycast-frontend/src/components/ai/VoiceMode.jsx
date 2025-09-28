@@ -50,7 +50,6 @@ function VoiceMode({
   const pendingUserRef = useRef({});
   const liveUserTurnRef = useRef(null);
   const currentAssistantTurnRef = useRef(null);
-  const userAnimationsRef = useRef({});
   const isMountedRef = useRef(true);
   const hasSentIntroRef = useRef(false);
 
@@ -232,50 +231,6 @@ function VoiceMode({
   }, [addOrUpdateMessage, animateAssistantMessage, normaliseTextFragment, stopAssistantAnimation]);
 
   const closePopup = useCallback(() => setPopupInfo((prev) => ({ ...prev, visible: false })), []);
-
-  const stopUserAnimation = useCallback((id, { flush } = {}) => {
-    const anim = userAnimationsRef.current[id];
-    if (!anim) return;
-    if (anim.timer) {
-      clearInterval(anim.timer);
-      anim.timer = null;
-    }
-    if (flush && anim.tokens.length) {
-      addOrUpdateMessage(id, 'user', anim.tokens.join(''), { replace: true });
-    }
-    delete userAnimationsRef.current[id];
-  }, [addOrUpdateMessage]);
-
-  const advanceUserAnimation = useCallback((id) => {
-    const anim = userAnimationsRef.current[id];
-    if (!anim) return false;
-    if (anim.displayed < anim.tokens.length) {
-      anim.displayed += 1;
-      const text = anim.tokens.slice(0, anim.displayed).join('');
-      addOrUpdateMessage(id, 'user', text, { replace: true });
-      return true;
-    }
-    return false;
-  }, [addOrUpdateMessage]);
-
-  const ensureUserAnimation = useCallback((id) => {
-    const anim = userAnimationsRef.current[id];
-    if (!anim) return;
-    if (anim.timer) return;
-    anim.timer = setInterval(() => {
-      const progressed = advanceUserAnimation(id);
-      const current = userAnimationsRef.current[id];
-      if (!current) return;
-      if (!progressed && current.complete) {
-        if (current.timer) {
-          clearInterval(current.timer);
-          current.timer = null;
-        }
-        delete userAnimationsRef.current[id];
-      }
-    }, 55);
-    advanceUserAnimation(id);
-  }, [advanceUserAnimation]);
 
   const handleWordClick = useCallback(async (word, event, surroundingText = '') => {
     if (!event) return;
@@ -628,7 +583,6 @@ function VoiceMode({
               addOrUpdateMessage(id, 'user', contentText, { replace: true });
               pendingUserRef.current[id] = contentText;
               liveUserTurnRef.current = null;
-              stopUserAnimation(`${id}-live`, { flush: true });
             }
           }
           break;
@@ -640,7 +594,6 @@ function VoiceMode({
           if (!liveUserTurnRef.current) {
             liveUserTurnRef.current = id;
             addOrUpdateMessage(id, 'user', '', { replace: true });
-            userAnimationsRef.current[id] = userAnimationsRef.current[id] || { tokens: [], displayed: 0, timer: null, complete: false };
           }
           if (currentAssistantTurnRef.current) {
             const activeId = currentAssistantTurnRef.current;
@@ -652,11 +605,7 @@ function VoiceMode({
             assistantStreamFlagsRef.current[activeId] = false;
             currentAssistantTurnRef.current = null;
           }
-          const anim = userAnimationsRef.current[id] || { tokens: [], displayed: 0, timer: null, complete: false };
-          anim.tokens = tokenizeText(pendingUserRef.current[id]);
-          anim.complete = false;
-          userAnimationsRef.current[id] = anim;
-          ensureUserAnimation(id);
+          addOrUpdateMessage(id, 'user', delta, { replace: false });
           setStatus('listening');
           break;
         }
@@ -664,14 +613,7 @@ function VoiceMode({
           const id = `${event.item_id || 'user'}-live`;
           const transcript = event.transcript || pendingUserRef.current[id] || '';
           pendingUserRef.current[id] = '';
-          const anim = userAnimationsRef.current[id];
-          if (anim) {
-            anim.tokens = tokenizeText(transcript);
-            anim.complete = true;
-            ensureUserAnimation(id);
-          } else {
-            addOrUpdateMessage(id, 'user', transcript, { replace: true });
-          }
+          addOrUpdateMessage(id, 'user', transcript, { replace: true });
           liveUserTurnRef.current = null;
           setStatus('ready');
           try {
@@ -705,11 +647,6 @@ function VoiceMode({
       Object.keys(assistantAnimationTimersRef.current).forEach((key) => clearInterval(assistantAnimationTimersRef.current[key]));
       assistantAnimationTimersRef.current = {};
       assistantAnimatedBuffersRef.current = {};
-      Object.keys(userAnimationsRef.current).forEach((key) => {
-        const anim = userAnimationsRef.current[key];
-        if (anim?.timer) clearInterval(anim.timer);
-      });
-      userAnimationsRef.current = {};
     };
   }, [
     instructions,
@@ -720,8 +657,6 @@ function VoiceMode({
     extractTextFromEvent,
     extractTextMapFromResponse,
     finalizeAssistantMessage,
-    ensureUserAnimation,
-    stopUserAnimation,
   ]);
 
   const extractContentText = (content = []) => {
