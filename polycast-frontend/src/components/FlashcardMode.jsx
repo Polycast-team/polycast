@@ -605,14 +605,14 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
         <div className="desktop-card-container">
           <div className="no-flashcards-message">
             <div className="no-flashcards-icon">📚</div>
-            <h2>{ui.noFlashcardsTitle}</h2>
-            <p>{ui.noFlashcardsMessage}</p>
+            <h2>{t.noFlashcardsTitle}</h2>
+            <p>{t.noFlashcardsMessage}</p>
             <div className="no-flashcards-instructions">
-              <p><strong>{ui.instructionsTitle}</strong></p>
+              <p><strong>{t.instructionsTitle}</strong></p>
               <ol>
-                <li>{ui.methodDictionary}</li>
-                <li>{ui.methodTranscript}</li>
-                <li>{ui.methodReturn}</li>
+                <li>{t.methodDictionary}</li>
+                <li>{t.methodTranscript}</li>
+                <li>{t.methodReturn}</li>
               </ol>
             </div>
           </div>
