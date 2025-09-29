@@ -721,6 +721,15 @@ function App({
         } else if (parsedData.type === 'info') {
           console.log('Backend Info:', parsedData.message);
           setSignalLog(prev => [`info: ${parsedData.message}`, ...prev].slice(0, 10));
+        } else if (parsedData.type === 'transcript_history') {
+          // Handle transcript history for newly joined students
+          console.log('[Frontend] Received transcript_history:', parsedData.data);
+          const lines = (parsedData.data || []).map((item) => item && item.text).filter(Boolean);
+          if (lines.length > 0) {
+            setTranscriptBlocks([{ speaker: 'host', lines, partial: '' }]);
+            setFullTranscript(lines.join(' '));
+            setCurrentPartial('');
+          }
         } else if (parsedData.type === 'translation') {
           // Handle single translation (non-batch)
           setTranslations(prevTranslations => {

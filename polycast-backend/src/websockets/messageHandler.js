@@ -46,6 +46,19 @@ async function handleWebSocketMessage(ws, message, clientData) {
         }
         await handleAudioMessage(ws, message, clientData);
     } else if (typeof message === 'string') {
+        // Handle STOP_STREAM sent as a plain text frame
+        if (message === 'STOP_STREAM') {
+            if (ws.deepgramSession) {
+                console.log('[Audio] Closing Deepgram streaming session (string STOP_STREAM)');
+                try {
+                    ws.deepgramSession.close();
+                } catch (e) {
+                    console.warn('[Audio] Error closing Deepgram session:', e);
+                }
+                ws.deepgramSession = null;
+            }
+            return;
+        }
         try {
             const data = JSON.parse(message);
             if (data.type === 'text_submit') {
