@@ -337,6 +337,15 @@ function VideoMode({
       pcRef.current = null;
     };
   }, [inRoom, isHost, sendMessage]);
+
+  // Auto-unmute by default in Video mode
+  useEffect(() => {
+    if (allowMic && !isRecording && typeof onStartRecording === 'function') {
+      try { onStartRecording(); } catch (_) {}
+    }
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Word definition popup is handled within ChatTranscript
 
@@ -465,6 +474,7 @@ function VideoMode({
                       (onStartRecording || (() => {}))();
                     }
                   }}
+                  aria-label={isRecording ? 'Mute microphone' : 'Unmute microphone'}
                   title={isRecording ? 'Mute' : 'Unmute'}
                   style={{
                     background: isRecording ? '#ef4444' : '#10b981',
@@ -478,7 +488,22 @@ function VideoMode({
                     cursor: 'pointer'
                   }}
                 >
-                  <span style={{ fontWeight: 600 }}>{isRecording ? 'Mute' : 'Unmute'}</span>
+                  {isRecording ? (
+                    // Mic (unmuted)
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z" />
+                      <path d="M19 11a7 7 0 0 1-14 0" />
+                      <path d="M12 19v2" />
+                    </svg>
+                  ) : (
+                    // Mic off (muted)
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z" />
+                      <path d="M19 11a7 7 0 0 1-14 0" />
+                      <path d="M12 19v2" />
+                      <line x1="4" y1="4" x2="20" y2="20" />
+                    </svg>
+                  )}
                 </button>
               </div>
             )}

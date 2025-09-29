@@ -459,6 +459,15 @@ h1, h2, h3 {
   box-sizing: border-box;
 }
 
+/* Prevent overlap with bottom ModeSelector by constraining content areas that set explicit viewport heights */
+.display-container .video-mode-root,
+.display-container .pc-video-layout,
+.display-container .pc-transcript-container {
+  /* Reserve space equal to the bottom toolbar area */
+  max-height: calc(100vh - (var(--bottom-toolbar-h, 72px) + 30px));
+  overflow: hidden;
+}
+
 .notification-popup {
   position: fixed; /* Or absolute relative to a container */
   top: 80px; /* Adjust as needed */
