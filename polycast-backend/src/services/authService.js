@@ -40,6 +40,11 @@ async function updateProfileLanguages(id, { nativeLanguage, targetLanguage }) {
   return rows[0];
 }
 
+async function deleteProfile(id) {
+  const { rowCount } = await pool.query('DELETE FROM profiles WHERE id=$1', [id]);
+  return rowCount > 0;
+}
+
 module.exports = {
   createUser,
   findUserByUsername,
@@ -47,6 +52,7 @@ module.exports = {
   issueToken,
   getProfileById,
   updateProfileLanguages,
+  deleteProfile,
 };
 
 

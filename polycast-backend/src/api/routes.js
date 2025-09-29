@@ -71,6 +71,17 @@ router.get('/auth/me', authMiddleware, async (req, res) => {
     }
 });
 
+router.delete('/auth/account', authMiddleware, async (req, res) => {
+    try {
+        const ok = await authService.deleteProfile(req.user.id);
+        if (!ok) return res.status(404).json({ error: 'Not found' });
+        return res.json({ ok: true });
+    } catch (e) {
+        console.error('[Auth] delete account error:', e);
+        res.status(500).json({ error: 'Failed to delete account' });
+    }
+});
+
 // Profile
 router.get('/profiles/me', authMiddleware, async (req, res) => {
     try {

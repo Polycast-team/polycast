@@ -35,6 +35,7 @@ import { createFlashcardEntry } from './components/FixedCardDefinitions';
 import { extractSentenceWithWord, markClickedWordInSentence } from './utils/wordClickUtils';
 import ModeSelector from './components/ModeSelector';
 import AIMode from './components/ai/AIMode';
+import SettingsButton from './components/SettingsButton';
 
 
 
@@ -201,6 +202,7 @@ function App({
   const [showCalendar, setShowCalendar] = useState(false);
   const [toolbarStats, setToolbarStats] = useState({ newCards: 0, learningCards: 0, reviewCards: 0 });
   const [signalLog, setSignalLog] = useState([]); // recent signaling/debug events
+  const [srsSettingsVersion, setSrsSettingsVersion] = useState(0);
   // Auto-send functionality removed - using manual Record/Stop button instead
   const notificationTimeoutRef = useRef(null);
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
@@ -896,6 +898,8 @@ function App({
   return (
     <div className="App">
       {/* Debug overlay removed */}
+      {/* Global Settings - upper left */}
+      <SettingsButton onSrsChange={() => setSrsSettingsVersion(v => v + 1)} />
       {/* Fullscreen button - upper left corner for all modes */}
       <button
         onClick={() => {
@@ -908,7 +912,7 @@ function App({
         style={{
           position: 'fixed',
           top: '20px',
-          left: '20px',
+          left: '72px',
           zIndex: 1001,
           background: 'rgba(35, 35, 58, 0.9)',
           color: '#fff',
@@ -1195,6 +1199,7 @@ function App({
           />
         ) : appMode === 'flashcard' ? (
           <FlashcardMode 
+            key={`flashcard-${srsSettingsVersion}`}
             selectedWords={selectedWords}
             wordDefinitions={wordDefinitions}
             setWordDefinitions={setWordDefinitions}
