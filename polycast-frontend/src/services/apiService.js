@@ -58,18 +58,21 @@ class ApiService {
     });
     
     if (!response.ok) {
+      let message = `HTTP ${response.status}`;
       try {
-        const data = await response.json();
-        const message = data?.error || data?.message || `HTTP ${response.status}`;
-        throw new Error(message);
-      } catch (_) {
-        try {
-          const text = await response.text();
-          throw new Error(text || `HTTP ${response.status}`);
-        } catch (e2) {
-          throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        if (text) {
+          try {
+            const data = JSON.parse(text);
+            message = data?.error || data?.message || message;
+          } catch (_) {
+            message = text || message;
+          }
         }
+      } catch (_) {
+        // ignore and keep default message
       }
+      throw new Error(message);
     }
     
     return response.json();
