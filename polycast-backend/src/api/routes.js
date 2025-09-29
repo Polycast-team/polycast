@@ -43,9 +43,9 @@ router.post('/auth/login', async (req, res) => {
         const { username, password } = req.body || {};
         if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
         const user = await authService.findUserByUsername(username);
-        if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+        if (!user) return res.status(401).json({ error: 'Account not found' });
         const ok = await authService.verifyPassword(password, user.password_hash);
-        if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+        if (!ok) return res.status(401).json({ error: 'Incorrect password' });
         const token = authService.issueToken(user);
         const profile = {
             id: user.id,

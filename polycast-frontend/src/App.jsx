@@ -252,6 +252,7 @@ function App({
         (rows || []).forEach(r => {
           // Reconstruct display fields from gemini_unified_json if available
           const u = r.gemini_unified_json || {};
+          const isNewFromDb = !r.due_at; // Persisted notion: no due_at means never reviewed
           map[r.sense_key] = {
             dbId: r.id,
             word: r.word,
@@ -264,13 +265,13 @@ function App({
             contextualExplanation: u.definition || '',
             inFlashcards: true,
             srsData: {
-              // Map DB SRS to client shape; nextReviewDate aligns with due_at
-              status: 'new',
-              isNew: true,
+              // Map DB SRS to client shape based on persisted fields
+              status: isNewFromDb ? 'new' : 'review',
+              isNew: isNewFromDb,
               gotWrongThisSession: false,
               SRS_interval: r.study_interval_level || 1,
-              dueDate: r.due_at || new Date().toISOString(),
-              nextReviewDate: r.due_at || new Date().toISOString(),
+              dueDate: r.due_at || null,
+              nextReviewDate: r.due_at || null,
             }
           };
         });
