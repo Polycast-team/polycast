@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 150px);
-  background-color: #1e1e28;
+  background-color: var(--pc-surface);
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
   overflow: hidden;
@@ -15,8 +15,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  background-color: #2c2c3a;
-  border-bottom: 1px solid #39394d;
+  background-color: var(--pc-surface);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -27,8 +27,8 @@
   padding: 12px 16px;
   border-radius: 8px;
   border: 1px solid #39394d;
-  background-color: #252533;
-  color: #f5f5f5;
+  background-color: var(--pc-bg);
+  color: var(--pc-text);
   font-size: 16px;
   transition: all 0.2s ease;
   outline: none;
@@ -45,7 +45,7 @@
 
 .dictionary-count {
   margin-left: 16px;
-  color: #a0a0b8;
+  color: var(--pc-text-muted);
   font-size: 14px;
   white-space: nowrap;
 }
@@ -61,7 +61,7 @@
   margin-bottom: 8px;
   border-radius: 8px;
   overflow: hidden;
-  background-color: #252533;
+  background-color: var(--pc-bg);
   border: 1px solid #39394d;
   transition: all 0.2s ease;
 }
@@ -83,22 +83,22 @@
 }
 
 .dictionary-word-header:hover {
-  background-color: #2c2c3a;
+  background-color: var(--pc-surface);
 }
 
 .dictionary-word-header.expanded {
-  background-color: #2c2c3a;
+  background-color: var(--pc-surface);
   border-bottom: 1px solid #39394d;
 }
 
 .dictionary-word-title {
   font-weight: 600;
   font-size: 18px;
-  color: #4ade80;
+  color: var(--pc-accent);
 }
 
 .definition-count {
-  color: #a0a0b8;
+  color: var(--pc-text-muted);
   font-size: 16px;
   font-weight: normal;
 }
@@ -111,7 +111,7 @@
 }
 
 .expand-icon {
-  color: #a0a0b8;
+  color: var(--pc-text-muted);
   transition: all 0.2s ease;
 }
 
@@ -174,7 +174,7 @@
 
 .part-of-speech {
   background-color: #39394d;
-  color: #d6d6e7;
+  color: var(--pc-text);
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 14px;
@@ -208,13 +208,13 @@
 }
 
 .definition-translation {
-  color: #f5f5f5;
+  color: var(--pc-text);
   font-size: 16px;
   line-height: 1.5;
 }
 
 .definition-example {
-  color: #a0a0b8;
+  color: var(--pc-text-muted);
   font-style: italic;
   font-size: 14px;
   line-height: 1.5;
@@ -222,7 +222,7 @@
 
 /* Highlight for tilde-marked word in examples */
 .dict-highlight {
-  color: #ffde59; /* yellow */
+  color: #ffde59; /* keep yellow */
   font-weight: 700;
 }
 
@@ -230,7 +230,7 @@
 .empty-dictionary-message {
   padding: 40px 20px;
   text-align: center;
-  color: #a0a0b8;
+  color: var(--pc-text-muted);
   font-size: 16px;
   line-height: 1.6;
   display: flex;
