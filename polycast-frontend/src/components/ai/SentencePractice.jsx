@@ -248,11 +248,9 @@ Return only the evaluation result.`;
       if (match) {
         const [, oldWord, newWord] = match;
         return (
-          <span key={index} className="corr-pair" onClick={(e) => openExplainPopup(e, oldWord, newWord)}>
-            <div className="correction-stack">
-              <span className="correction-new">{newWord}</span>
-              <span className="correction-old">{oldWord}</span>
-            </div>
+          <span key={index} className="correction-pair">
+            <span className="correction-new">{newWord}</span>
+            <span className="correction-old">{oldWord}</span>
           </span>
         );
       }
@@ -340,25 +338,15 @@ Return only the evaluation result.`;
                     <div className="result-icon">✗</div>
                     <div className="result-text">
                       <h4>{ui?.needsCorrection || "Needs Correction"}</h4>
-                      <p>{ui?.correctedVersion || "Here's the corrected version:"}</p>
-                      <button 
-                        className="show-corrections-btn"
-                        onClick={() => setExplainPopup(prev => ({ 
-                          ...prev, 
-                          visible: true, 
-                          position: { x: 0, y: 0 }, 
-                          oldWord: '', 
-                          newWord: '', 
-                          loading: false, 
-                          response: renderCorrectedText(evaluationResult.correctedText), 
-                          input: '' 
-                        }))}
-                      >
-                        Show Corrections
-                      </button>
-                      <div className="your-translation">
-                        <div className="yt-label">Your attempt (click words):</div>
-                        <div className="yt-content">{renderClickableTokens(userTranslation, 'yt')}</div>
+                      <div className="correction-display">
+                        <div className="corrected-version">
+                          <div className="correction-label">Corrected version:</div>
+                          <div className="correction-text">{renderCorrectedText(evaluationResult.correctedText)}</div>
+                        </div>
+                        <div className="your-translation">
+                          <div className="yt-label">Your attempt (click words):</div>
+                          <div className="yt-content">{renderClickableTokens(userTranslation, 'yt')}</div>
+                        </div>
                       </div>
                     </div>
                   </div>
