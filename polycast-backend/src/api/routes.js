@@ -635,16 +635,13 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         
         console.log('[Tatoeba] Request params:', { fromLang, toLang, fromCode, toCode, targetWord });
         
-        // Fetch sentences from Tatoeba - try different approaches to get longer sentences
+        // Fetch sentences from Tatoeba - get truly random sentences
         let searchUrl;
         if (targetWord) {
             searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
         } else {
-            // Try searching for words that are more likely to appear in longer, more complex sentences
-            const complexWords = ['because', 'although', 'however', 'therefore', 'meanwhile', 'furthermore', 'nevertheless', 'consequently', 'additionally', 'specifically'];
-            const randomWord = complexWords[Math.floor(Math.random() * complexWords.length)];
-            console.log('[Tatoeba] Searching for complex word:', randomWord);
-            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${randomWord}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
+            // Get random sentences without any word filtering
+            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
         }
         
         console.log('[Tatoeba] API URL:', searchUrl);
@@ -655,13 +652,20 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         console.log('[Tatoeba] Response data:', response.data);
         
         if (response.data && response.data.results && response.data.results.length > 0) {
-            // Filter sentences to only include those with at least 5 words
-            // (min_words parameter doesn't work in Tatoeba API)
+            // Filter sentences for length and explicit content
             const minWordCount = 5;
+            const explicitWords = ['fuck', 'shit', 'damn', 'hell', 'bitch', 'ass', 'sex', 'porn', 'nude', 'naked', 'dick', 'pussy', 'cock', 'vagina', 'penis', 'breast', 'boob', 'tit', 'fuck', 'fucking', 'fucked', 'fucks'];
+            
             const filteredResults = response.data.results.filter(result => {
+                const text = result.text.toLowerCase();
                 const wordCount = result.text.trim().split(/\s+/).length;
-                console.log(`[Tatoeba] Sentence: "${result.text}" - Word count: ${wordCount}`);
-                return wordCount >= minWordCount;
+                
+                // Check for explicit content
+                const hasExplicitContent = explicitWords.some(word => text.includes(word));
+                
+                console.log(`[Tatoeba] Sentence: "${result.text}" - Word count: ${wordCount}, Explicit: ${hasExplicitContent}`);
+                
+                return wordCount >= minWordCount && !hasExplicitContent;
             });
             
             console.log(`[Tatoeba] Filtered ${filteredResults.length} sentences with >= ${minWordCount} words from ${response.data.results.length} total results`);
