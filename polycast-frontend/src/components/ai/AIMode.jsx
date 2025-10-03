@@ -8,6 +8,8 @@ import aiService from '../../services/aiService';
 import apiService from '../../services/apiService';
 import './AIMode.css';
 import VoiceMode from './VoiceMode';
+import AIModeSelector from './AIModeSelector';
+import SentencePractice from './SentencePractice';
 
 const DEFAULT_SYSTEM_PROMPT_TEMPLATE = 'You are Polycast AI, an AI language tutor. You are speaking in a chat interface with a user whose native language is {nativeLanguage} and target language is {targetLanguage}. You should primarily speak in {targetLanguage}, but be willing to offer explanations and small guidance in {nativeLanguage} if need be while making {targetLanguage} the priority. Your goal is to make conversation with the user. The user should not be required to steer the course of the conversation. Take initiative to guide the conversation. Make sure your responses are conversational and concise.';
 
@@ -45,6 +47,8 @@ function AIMode({
   const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
   const [loadingDefinition, setLoadingDefinition] = useState(false);
   const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
+  const [showModeSelector, setShowModeSelector] = useState(true);
+  const [selectedAIMode, setSelectedAIMode] = useState(null);
 
   const scrollContainerRef = useRef(null);
   const conversationForApi = useMemo(() => (
@@ -186,86 +190,112 @@ function AIMode({
     )
   ), [wordDefinitions]);
 
+  const handleModeSelect = useCallback((mode) => {
+    setSelectedAIMode(mode);
+    setShowModeSelector(false);
+  }, []);
+
+  const handleBackToSelector = useCallback(() => {
+    setShowModeSelector(true);
+    setSelectedAIMode(null);
+  }, []);
+
   return (
     <div className="ai-mode-container" ref={scrollContainerRef}>
-      {popupInfo.visible && (
-        <WordDefinitionPopup
-          word={popupInfo.word}
-          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
-          position={popupInfo.position}
-          isInDictionary={isWordInDictionary(popupInfo.word)}
-          onAddToDictionary={() => onAddWord && onAddWord(popupInfo.word)}
-          onRemoveFromDictionary={() => {}}
-          loading={loadingDefinition}
-          nativeLanguage={nativeLanguage}
-          onClose={() => setPopupInfo((prev) => ({ ...prev, visible: false }))}
+      {showModeSelector ? (
+        <AIModeSelector
+          isOpen={showModeSelector}
+          onClose={() => setShowModeSelector(false)}
+          onSelectMode={handleModeSelect}
+          selectedProfile={selectedProfile}
         />
-      )}
+      ) : selectedAIMode === 'sentence-practice' ? (
+        <SentencePractice
+          selectedProfile={selectedProfile}
+          onBack={handleBackToSelector}
+        />
+      ) : (
+        <>
+          {popupInfo.visible && (
+            <WordDefinitionPopup
+              word={popupInfo.word}
+              definition={wordDefinitions[popupInfo.word.toLowerCase()]}
+              position={popupInfo.position}
+              isInDictionary={isWordInDictionary(popupInfo.word)}
+              onAddToDictionary={() => onAddWord && onAddWord(popupInfo.word)}
+              onRemoveFromDictionary={() => {}}
+              loading={loadingDefinition}
+              nativeLanguage={nativeLanguage}
+              onClose={() => setPopupInfo((prev) => ({ ...prev, visible: false }))}
+            />
+          )}
 
-      <div className="ai-messages-pane">
-      {messages.map((message) => (
-        <div
-          key={message.id}
-          className={`ai-message ai-message-${message.role}`}
-        >
-            <div className="ai-message-author">
-              {message.role === 'assistant' ? 'Polycast AI' : ui.youLabel || 'You'}
+          <div className="ai-messages-pane">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`ai-message ai-message-${message.role}`}
+            >
+                <div className="ai-message-author">
+                  {message.role === 'assistant' ? 'Polycast AI' : ui.youLabel || 'You'}
+                </div>
+                <div className="ai-message-text">
+                  {renderClickableTokens(message.content, message.id)}
+                </div>
+              </div>
+          ))}
+
+          {isAwaitingResponse && (
+            <div className="ai-typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
             </div>
-            <div className="ai-message-text">
-              {renderClickableTokens(message.content, message.id)}
+          )}
+          </div>
+
+          {error && (
+            <div className="ai-error-banner">{error}</div>
+          )}
+
+          <div className="ai-input-bar">
+            <textarea
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={ui?.aiInputPlaceholder || 'Ask Polycast AI…'}
+              rows={3}
+            />
+            <div className="ai-input-actions">
+              <button
+                className="ai-voice-button"
+                onClick={() => setIsVoiceModeOpen(true)}
+                title="Open voice assistant"
+              >
+                🎙️
+              </button>
+              <button
+                className="ai-send-button"
+                onClick={handleSend}
+                disabled={isSending}
+              >
+                {isSending ? ui?.sending || 'Sending…' : ui?.send || 'Send'}
+              </button>
             </div>
           </div>
-      ))}
 
-      {isAwaitingResponse && (
-        <div className="ai-typing-indicator">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      )}
-      </div>
-
-      {error && (
-        <div className="ai-error-banner">{error}</div>
-      )}
-
-      <div className="ai-input-bar">
-        <textarea
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={ui?.aiInputPlaceholder || 'Ask Polycast AI…'}
-          rows={3}
-        />
-        <div className="ai-input-actions">
-          <button
-            className="ai-voice-button"
-            onClick={() => setIsVoiceModeOpen(true)}
-            title="Open voice assistant"
-          >
-            🎙️
-          </button>
-          <button
-            className="ai-send-button"
-            onClick={handleSend}
-            disabled={isSending}
-          >
-            {isSending ? ui?.sending || 'Sending…' : ui?.send || 'Send'}
-          </button>
-        </div>
-      </div>
-
-      {isVoiceModeOpen && (
-        <VoiceMode
-          selectedProfile={selectedProfile}
-          onClose={() => setIsVoiceModeOpen(false)}
-          baseInstructions={systemPrompt}
-          onAddWord={onAddWord}
-          selectedWords={selectedWords}
-          wordDefinitions={wordDefinitions}
-          setWordDefinitions={setWordDefinitions}
-        />
+          {isVoiceModeOpen && (
+            <VoiceMode
+              selectedProfile={selectedProfile}
+              onClose={() => setIsVoiceModeOpen(false)}
+              baseInstructions={systemPrompt}
+              onAddWord={onAddWord}
+              selectedWords={selectedWords}
+              wordDefinitions={wordDefinitions}
+              setWordDefinitions={setWordDefinitions}
+            />
+          )}
+        </>
       )}
     </div>
   );
