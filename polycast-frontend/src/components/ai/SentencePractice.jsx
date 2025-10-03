@@ -2,6 +2,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../../utils/profileLanguageMapping';
 import aiService from '../../services/aiService';
+import apiService from '../../services/apiService';
+import tokenizeText from '../../utils/tokenizeText';
+import WordDefinitionPopup from '../WordDefinitionPopup';
 import './SentencePractice.css';
 
 function SentencePractice({
@@ -19,6 +22,11 @@ function SentencePractice({
   const [evaluationResult, setEvaluationResult] = useState(null);
   const [error, setError] = useState('');
   const [score, setScore] = useState({ correct: 0, total: 0 });
+  const [ignoreAccents, setIgnoreAccents] = useState(false);
+  const [popupInfo, setPopupInfo] = useState({ visible: false, word: '', position: { x: 0, y: 0 } });
+  const [loadingDefinition, setLoadingDefinition] = useState(false);
+  const [wordDefinitions, setWordDefinitions] = useState({});
+  const [explainPopup, setExplainPopup] = useState({ visible: false, position: { x: 0, y: 0 }, oldWord: '', newWord: '', loading: false, response: '', input: '' });
 
   const generateSentence = useCallback(async () => {
     setIsLoading(true);
@@ -64,6 +72,7 @@ If the translation is correct, respond with: "CORRECT"
 If the translation has errors, provide the corrected version using this format:
 - For each word that should be replaced, use: --oldWord[newWord]
 - Example: "How --is[are] you" means replace "is" with "are"
+${ignoreAccents ? '- IMPORTANT: Ignore accent-only differences. If the only difference is diacritics/accents, consider it CORRECT and do not mark with --old[new].' : ''}
 
 Return only the evaluation result.`;
 
@@ -110,6 +119,108 @@ Return only the evaluation result.`;
     generateSentence();
   }, [generateSentence]);
 
+  const handleWordClick = useCallback(async (word, event, surroundingText = '') => {
+    if (!event) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const popupWidth = 380;
+    const spaceOnRight = viewportWidth - rect.right;
+    const fitsOnRight = spaceOnRight >= popupWidth + 10;
+    const xPos = fitsOnRight ? rect.right + 5 : rect.left - popupWidth - 5;
+    setPopupInfo({
+      visible: true,
+      word,
+      position: { x: Math.max(5, Math.min(viewportWidth - popupWidth - 5, xPos)), y: rect.top - 5 },
+    });
+
+    setLoadingDefinition(true);
+    try {
+      const sentenceWithMarkedWord = (surroundingText || '').replace(new RegExp(`\\b(${word})\\b`, 'i'), '~$1~');
+      const url = apiService.getUnifiedWordDataUrl(word, sentenceWithMarkedWord, nativeLanguage, targetLanguage);
+      const unifiedData = await apiService.fetchJson(url);
+      setWordDefinitions((prev) => ({
+        ...prev,
+        [word.toLowerCase()]: {
+          ...unifiedData,
+          word,
+          translation: unifiedData.translation || word,
+          contextualExplanation: unifiedData.definition || 'Definition unavailable',
+          definition: unifiedData.definition || 'Definition unavailable',
+          example: unifiedData.exampleForDictionary || unifiedData.example || '',
+          frequency: unifiedData.frequency || 5,
+        },
+      }));
+    } catch (err) {
+      setWordDefinitions((prev) => ({
+        ...prev,
+        [word.toLowerCase()]: {
+          word,
+          translation: word,
+          contextualExplanation: 'Definition unavailable',
+          definition: 'Definition unavailable',
+          example: `~${word}~`,
+        },
+      }));
+    } finally {
+      setLoadingDefinition(false);
+    }
+  }, [nativeLanguage, targetLanguage]);
+
+  const renderClickableTokens = useCallback((text, keyPrefix) => {
+    const tokens = tokenizeText(text || '');
+    return tokens.map((token, index) => {
+      const isWord = /^[\p{L}\p{M}\d']+$/u.test(token);
+      const tokenKey = `${keyPrefix}-${index}`;
+      return (
+        <span
+          key={tokenKey}
+          onClick={isWord ? (e) => handleWordClick(token, e, text) : undefined}
+          className={isWord ? 'sp-clickable-word' : ''}
+        >
+          {token}
+        </span>
+      );
+    });
+  }, [handleWordClick]);
+
+  const openExplainPopup = async (event, oldWord, newWord) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const pos = { x: rect.left, y: rect.bottom };
+    setExplainPopup((prev) => ({ ...prev, visible: true, position: pos, oldWord, newWord, loading: true, response: '' }));
+    try {
+      const prompt = `Explain briefly why "${oldWord}" is incorrect and "${newWord}" is correct in ${targetLanguage}.`;
+      const response = await aiService.sendChat({
+        messages: [{ role: 'user', content: prompt }],
+        systemPrompt: 'You are a helpful language tutor. Explain grammar or word choice differences clearly and briefly.',
+      });
+      const content = response?.message?.content || '';
+      setExplainPopup((prev) => ({ ...prev, loading: false, response: content }));
+    } catch (err) {
+      setExplainPopup((prev) => ({ ...prev, loading: false, response: 'Failed to load explanation.' }));
+    }
+  };
+
+  const handleExplainFollowUp = async (e) => {
+    e.preventDefault();
+    const q = explainPopup.input.trim();
+    if (!q) return;
+    setExplainPopup((prev) => ({ ...prev, loading: true }));
+    try {
+      const baseContext = `Original (${nativeLanguage}): ${currentSentence}\nYour translation (${targetLanguage}): ${userTranslation}\nCorrection: ${explainPopup.oldWord} -> ${explainPopup.newWord}`;
+      const response = await aiService.sendChat({
+        messages: [
+          { role: 'system', content: baseContext },
+          { role: 'user', content: q },
+        ],
+        systemPrompt: 'Continue explaining concisely with examples when helpful.',
+      });
+      const content = response?.message?.content || '';
+      setExplainPopup((prev) => ({ ...prev, loading: false, response: content, input: '' }));
+    } catch (err) {
+      setExplainPopup((prev) => ({ ...prev, loading: false, response: 'Failed to get response.' }));
+    }
+  };
+
   const renderCorrectedText = (text) => {
     if (!text) return null;
 
@@ -121,9 +232,9 @@ Return only the evaluation result.`;
       if (match) {
         const [, oldWord, newWord] = match;
         return (
-          <span key={index}>
-            <span className="correction-old">{oldWord}</span>
+          <span key={index} className="corr-pair" onClick={(e) => openExplainPopup(e, oldWord, newWord)}>
             <span className="correction-new">{newWord}</span>
+            <span className="correction-old">{oldWord}</span>
           </span>
         );
       }
@@ -150,6 +261,12 @@ Return only the evaluation result.`;
       </div>
 
       <div className="sentence-practice-content">
+        <div className="sentence-practice-controls">
+          <label className="toggle-accents">
+            <input type="checkbox" checked={ignoreAccents} onChange={(e)=> setIgnoreAccents(e.target.checked)} />
+            <span>Ignore accents when checking</span>
+          </label>
+        </div>
         {isLoading ? (
           <div className="sentence-practice-loading">
             <div className="loading-spinner"></div>
@@ -160,7 +277,7 @@ Return only the evaluation result.`;
             <div className="sentence-practice-prompt">
               <h3>{ui?.translateThis || "Translate this sentence"}:</h3>
               <div className="sentence-practice-original">
-                {currentSentence}
+                {renderClickableTokens(currentSentence, 'orig')}
               </div>
               <p className="sentence-practice-instructions">
                 {ui?.translateTo || "Translate to"}: <strong>{targetLanguage}</strong>
@@ -204,6 +321,10 @@ Return only the evaluation result.`;
                       <div className="corrected-translation">
                         {renderCorrectedText(evaluationResult.correctedText)}
                       </div>
+                      <div className="your-translation">
+                        <div className="yt-label">Your attempt (click words):</div>
+                        <div className="yt-content">{renderClickableTokens(userTranslation, 'yt')}</div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -224,6 +345,42 @@ Return only the evaluation result.`;
           </div>
         )}
       </div>
+      {popupInfo.visible && (
+        <WordDefinitionPopup
+          word={popupInfo.word}
+          definition={wordDefinitions[popupInfo.word.toLowerCase()]}
+          position={popupInfo.position}
+          isInDictionary={false}
+          onAddToDictionary={() => {}}
+          onRemoveFromDictionary={() => {}}
+          loading={loadingDefinition}
+          nativeLanguage={nativeLanguage}
+          onClose={() => setPopupInfo((prev) => ({ ...prev, visible: false }))}
+        />
+      )}
+
+      {explainPopup.visible && (
+        <div className="explain-popup" style={{ top: explainPopup.position.y + 6, left: explainPopup.position.x }}>
+          <button className="popup-close-btn" onClick={() => setExplainPopup((p)=> ({ ...p, visible: false }))}>×</button>
+          <div className="explain-header">
+            <span className="explain-title">Why {explainPopup.oldWord} → {explainPopup.newWord}?</span>
+          </div>
+          <div className="explain-body">
+            {explainPopup.loading ? (
+              <div className="dict-loading">
+                <div className="dict-loading-spinner"></div>
+                <div className="dict-loading-text">Loading…</div>
+              </div>
+            ) : (
+              <div className="explain-text">{explainPopup.response}</div>
+            )}
+          </div>
+          <form onSubmit={handleExplainFollowUp} className="explain-form">
+            <input type="text" value={explainPopup.input} onChange={(e)=> setExplainPopup((p)=> ({ ...p, input: e.target.value }))} placeholder="Ask a follow-up…" disabled={explainPopup.loading} />
+            <button type="submit" disabled={explainPopup.loading || !explainPopup.input.trim()}>Ask</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
