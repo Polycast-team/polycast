@@ -636,11 +636,17 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         console.log('[Tatoeba] Request params:', { fromLang, toLang, fromCode, toCode, targetWord });
         
         // Fetch sentences from Tatoeba - using correct API format
-        // Increase limit to get more sentences for filtering
-        // Try to get more substantial sentences by searching for common words
-        const searchUrl = targetWord 
-            ? `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=100`
-            : `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=the&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=100`;
+        // Try different approaches to get better sentences
+        let searchUrl;
+        if (targetWord) {
+            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=100`;
+        } else {
+            // Try searching for common words that are likely to appear in longer sentences
+            const commonWords = ['I', 'you', 'we', 'they', 'this', 'that', 'have', 'will', 'can', 'should'];
+            const randomWord = commonWords[Math.floor(Math.random() * commonWords.length)];
+            console.log('[Tatoeba] Searching for random word:', randomWord);
+            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${randomWord}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=100`;
+        }
         
         console.log('[Tatoeba] API URL:', searchUrl);
         
@@ -650,8 +656,8 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         console.log('[Tatoeba] Response data:', response.data);
         
         if (response.data && response.data.results && response.data.results.length > 0) {
-            // Filter sentences to only include those with at least 3 words
-            const minWordCount = 3;
+            // Filter sentences to only include those with at least 5 words
+            const minWordCount = 5;
             const filteredResults = response.data.results.filter(result => {
                 const wordCount = result.text.trim().split(/\s+/).length;
                 return wordCount >= minWordCount;
