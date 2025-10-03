@@ -70,10 +70,16 @@ function SentencePractice({
     setError('');
 
     try {
-      const prompt = `Evaluate this translation:
+      const prompt = `Evaluate this translation for accuracy and naturalness:
 
 Original sentence (${nativeLanguage}): "${currentSentence}"
 User's translation (${targetLanguage}): "${userTranslation}"
+
+Consider the translation CORRECT if:
+- The meaning is accurately conveyed
+- The grammar is correct
+- The translation sounds natural in ${targetLanguage}
+- It's a valid way to express the same idea (even if different from other possible translations)
 
 If the translation is correct, respond with: "CORRECT"
 
@@ -82,11 +88,13 @@ If the translation has errors, provide the corrected version using this format:
 - Example: "How --is[are] you" means replace "is" with "are"
 ${ignoreAccents ? '- IMPORTANT: Ignore accent-only differences. If the only difference is diacritics/accents, consider it CORRECT and do not mark with --old[new].' : ''}
 
+Be flexible and recognize that there are often multiple correct ways to translate the same sentence.
+
 Return only the evaluation result.`;
 
       const response = await aiService.sendChat({
         messages: [{ role: 'user', content: prompt }],
-        systemPrompt: "You are a language learning assistant. Evaluate translations and provide corrections using the specified format.",
+        systemPrompt: "You are a helpful language learning assistant. Be encouraging and recognize that there are often multiple correct ways to translate the same sentence. Focus on meaning and naturalness rather than exact word-for-word matches. Use the specified format for corrections.",
       });
 
       if (response?.message?.content) {
