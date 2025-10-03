@@ -648,7 +648,9 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         console.log('[Tatoeba] Response data:', response.data);
         
         if (response.data && response.data.results && response.data.results.length > 0) {
-            const result = response.data.results[0];
+            // Randomly select a sentence from the results
+            const randomIndex = Math.floor(Math.random() * response.data.results.length);
+            const result = response.data.results[randomIndex];
             const nativeSentence = result.text;
             
             // Parse translations - Tatoeba API structure
@@ -661,7 +663,13 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
                 }
             }
             
-            console.log('[Tatoeba] Parsed result:', { nativeSentence, targetSentence, targetWord });
+            console.log('[Tatoeba] Parsed result:', { 
+                selectedIndex: randomIndex, 
+                totalResults: response.data.results.length,
+                nativeSentence, 
+                targetSentence, 
+                targetWord 
+            });
             
             return res.json({
                 nativeSentence,
