@@ -10,6 +10,7 @@ import './components/RoomSelectionScreen.css'; // Import styles
 import './index.css'
 import apiService from './services/apiService.js'
 import authClient from './services/authClient.js'
+import { initThemeFromStorage } from './theme/palettes.js'
 
 function Main() {
   const [roomSetup, setRoomSetup] = useState(null);
@@ -26,6 +27,13 @@ function Main() {
   // Check if device should use mobile app (only once, no resize listener)
   useEffect(() => {
     setIsMobile(shouldUseMobileApp());
+  }, []);
+
+  // Initialize theme from localStorage (or defaults)
+  useEffect(() => {
+    try {
+      initThemeFromStorage();
+    } catch {}
   }, []);
 
   useEffect(() => {

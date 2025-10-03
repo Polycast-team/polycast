@@ -180,7 +180,7 @@
   margin: 8px 0 0;
   font-size: 28px;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--pc-text);
 }
 
 .voice-status-hint,
