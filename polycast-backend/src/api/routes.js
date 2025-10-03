@@ -636,9 +636,10 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         console.log('[Tatoeba] Request params:', { fromLang, toLang, fromCode, toCode, targetWord });
         
         // Fetch sentences from Tatoeba - using correct API format
+        // Increase limit to get more sentences for filtering
         const searchUrl = targetWord 
-            ? `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}`
-            : `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}`;
+            ? `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=50`
+            : `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=50`;
         
         console.log('[Tatoeba] API URL:', searchUrl);
         
@@ -648,10 +649,29 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         console.log('[Tatoeba] Response data:', response.data);
         
         if (response.data && response.data.results && response.data.results.length > 0) {
-            // Randomly select a sentence from the results
-            const randomIndex = Math.floor(Math.random() * response.data.results.length);
-            const result = response.data.results[randomIndex];
-            const nativeSentence = result.text;
+            // Filter sentences to only include those with at least 5 words
+            const minWordCount = 5;
+            const filteredResults = response.data.results.filter(result => {
+                const wordCount = result.text.trim().split(/\s+/).length;
+                return wordCount >= minWordCount;
+            });
+            
+            console.log(`[Tatoeba] Filtered ${filteredResults.length} sentences with >= ${minWordCount} words from ${response.data.results.length} total results`);
+            
+            let result, nativeSentence;
+            
+            if (filteredResults.length === 0) {
+                console.log('[Tatoeba] No sentences found with minimum word count, falling back to all results');
+                // Fallback to all results if no sentences meet the minimum length
+                const randomIndex = Math.floor(Math.random() * response.data.results.length);
+                result = response.data.results[randomIndex];
+                nativeSentence = result.text;
+            } else {
+                // Randomly select a sentence from the filtered results
+                const randomIndex = Math.floor(Math.random() * filteredResults.length);
+                result = filteredResults[randomIndex];
+                nativeSentence = result.text;
+            }
             
             // Parse translations - Tatoeba API structure
             let targetSentence = null;
@@ -663,9 +683,12 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
                 }
             }
             
+            const wordCount = nativeSentence.trim().split(/\s+/).length;
             console.log('[Tatoeba] Parsed result:', { 
                 selectedIndex: randomIndex, 
                 totalResults: response.data.results.length,
+                filteredResults: filteredResults.length,
+                wordCount,
                 nativeSentence, 
                 targetSentence, 
                 targetWord 
