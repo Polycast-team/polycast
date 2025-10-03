@@ -633,19 +633,35 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         const fromCode = langMap[fromLang] || 'eng';
         const toCode = langMap[toLang] || 'spa';
         
-        // Fetch sentences from Tatoeba
+        console.log('[Tatoeba] Request params:', { fromLang, toLang, fromCode, toCode, targetWord });
+        
+        // Fetch sentences from Tatoeba - using correct API format
         const searchUrl = targetWord 
-            ? `https://tatoeba.org/en/api_v0/search?from=${fromCode}&to=${toCode}&query=${encodeURIComponent(targetWord)}&trans_to=${toCode}`
-            : `https://tatoeba.org/en/api_v0/search?from=${fromCode}&to=${toCode}&trans_to=${toCode}&sort=random`;
+            ? `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}`
+            : `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}`;
+        
+        console.log('[Tatoeba] API URL:', searchUrl);
         
         const response = await axios.get(searchUrl);
+        
+        console.log('[Tatoeba] Response status:', response.status);
+        console.log('[Tatoeba] Response data:', response.data);
         
         if (response.data && response.data.results && response.data.results.length > 0) {
             const result = response.data.results[0];
             const nativeSentence = result.text;
-            const targetSentence = result.translations && result.translations[0] 
-                ? result.translations[0][0].text 
-                : null;
+            
+            // Parse translations - Tatoeba API structure
+            let targetSentence = null;
+            if (result.translations && result.translations.length > 0) {
+                // Get the first translation
+                const translation = result.translations[0];
+                if (translation && translation.text) {
+                    targetSentence = translation.text;
+                }
+            }
+            
+            console.log('[Tatoeba] Parsed result:', { nativeSentence, targetSentence, targetWord });
             
             return res.json({
                 nativeSentence,
@@ -653,6 +669,7 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
                 targetWord: targetWord || null
             });
         } else {
+            console.log('[Tatoeba] No results found');
             return res.status(404).json({ error: 'No sentences found' });
         }
     } catch (error) {
