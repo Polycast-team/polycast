@@ -233,8 +233,10 @@ Return only the evaluation result.`;
         const [, oldWord, newWord] = match;
         return (
           <span key={index} className="corr-pair" onClick={(e) => openExplainPopup(e, oldWord, newWord)}>
-            <span className="correction-new">{newWord}</span>
-            <span className="correction-old">{oldWord}</span>
+            <div className="correction-stack">
+              <span className="correction-new">{newWord}</span>
+              <span className="correction-old">{oldWord}</span>
+            </div>
           </span>
         );
       }
@@ -277,7 +279,7 @@ Return only the evaluation result.`;
             <div className="sentence-practice-prompt">
               <h3>{ui?.translateThis || "Translate this sentence"}:</h3>
               <div className="sentence-practice-original">
-                {renderClickableTokens(currentSentence, 'orig')}
+                {currentSentence}
               </div>
               <p className="sentence-practice-instructions">
                 {ui?.translateTo || "Translate to"}: <strong>{targetLanguage}</strong>
@@ -317,10 +319,22 @@ Return only the evaluation result.`;
                     <div className="result-icon">✗</div>
                     <div className="result-text">
                       <h4>{ui?.needsCorrection || "Needs Correction"}</h4>
-                        <p>{ui?.correctedVersion || "Here's the corrected version:"}</p>
-                      <div className="corrected-translation">
-                        {renderCorrectedText(evaluationResult.correctedText)}
-                      </div>
+                      <p>{ui?.correctedVersion || "Here's the corrected version:"}</p>
+                      <button 
+                        className="show-corrections-btn"
+                        onClick={() => setExplainPopup(prev => ({ 
+                          ...prev, 
+                          visible: true, 
+                          position: { x: 0, y: 0 }, 
+                          oldWord: '', 
+                          newWord: '', 
+                          loading: false, 
+                          response: renderCorrectedText(evaluationResult.correctedText), 
+                          input: '' 
+                        }))}
+                      >
+                        Show Corrections
+                      </button>
                       <div className="your-translation">
                         <div className="yt-label">Your attempt (click words):</div>
                         <div className="yt-content">{renderClickableTokens(userTranslation, 'yt')}</div>
@@ -360,10 +374,19 @@ Return only the evaluation result.`;
       )}
 
       {explainPopup.visible && (
-        <div className="explain-popup" style={{ top: explainPopup.position.y + 6, left: explainPopup.position.x }}>
+        <div className="explain-popup" style={{ 
+          top: explainPopup.position.y > 0 ? explainPopup.position.y + 6 : '50%', 
+          left: explainPopup.position.x > 0 ? explainPopup.position.x : '50%',
+          transform: explainPopup.position.x > 0 ? 'none' : 'translate(-50%, -50%)'
+        }}>
           <button className="popup-close-btn" onClick={() => setExplainPopup((p)=> ({ ...p, visible: false }))}>×</button>
           <div className="explain-header">
-            <span className="explain-title">Why {explainPopup.oldWord} → {explainPopup.newWord}?</span>
+            <span className="explain-title">
+              {explainPopup.oldWord && explainPopup.newWord ? 
+                `Why ${explainPopup.oldWord} → ${explainPopup.newWord}?` : 
+                'Corrections'
+              }
+            </span>
           </div>
           <div className="explain-body">
             {explainPopup.loading ? (
@@ -372,13 +395,20 @@ Return only the evaluation result.`;
                 <div className="dict-loading-text">Loading…</div>
               </div>
             ) : (
-              <div className="explain-text">{explainPopup.response}</div>
+              <div className="explain-text">
+                {explainPopup.oldWord && explainPopup.newWord ? 
+                  explainPopup.response : 
+                  <div className="corrections-display">{explainPopup.response}</div>
+                }
+              </div>
             )}
           </div>
-          <form onSubmit={handleExplainFollowUp} className="explain-form">
-            <input type="text" value={explainPopup.input} onChange={(e)=> setExplainPopup((p)=> ({ ...p, input: e.target.value }))} placeholder="Ask a follow-up…" disabled={explainPopup.loading} />
-            <button type="submit" disabled={explainPopup.loading || !explainPopup.input.trim()}>Ask</button>
-          </form>
+          {explainPopup.oldWord && explainPopup.newWord && (
+            <form onSubmit={handleExplainFollowUp} className="explain-form">
+              <input type="text" value={explainPopup.input} onChange={(e)=> setExplainPopup((p)=> ({ ...p, input: e.target.value }))} placeholder="Ask a follow-up…" disabled={explainPopup.loading} />
+              <button type="submit" disabled={explainPopup.loading || !explainPopup.input.trim()}>Ask</button>
+            </form>
+          )}
         </div>
       )}
     </div>
