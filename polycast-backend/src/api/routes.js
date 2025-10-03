@@ -660,6 +660,7 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
             const minWordCount = 5;
             const filteredResults = response.data.results.filter(result => {
                 const wordCount = result.text.trim().split(/\s+/).length;
+                console.log(`[Tatoeba] Sentence: "${result.text}" - Word count: ${wordCount}`);
                 return wordCount >= minWordCount;
             });
             
