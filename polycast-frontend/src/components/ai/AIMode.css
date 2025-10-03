@@ -5,9 +5,9 @@
   width: 100%;
   height: 100%;
   padding: 20px;
-  background: linear-gradient(145deg, var(--pc-bg) 0%, var(--pc-surface) 45%, var(--pc-bg) 100%);
+  background: linear-gradient(145deg, #181926 0%, #23243a 45%, #181926 100%);
   border-radius: 16px;
-  color: var(--pc-text);
+  color: #f7f7fa;
   overflow-y: auto;
 }
 
@@ -119,7 +119,7 @@
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 12px;
   padding: 12px 14px;
-  color: var(--pc-text);
+  color: #f7f7fa;
   font-size: 15px;
   resize: vertical;
   min-height: 80px;
@@ -151,7 +151,7 @@
 }
 
 .ai-send-button {
-  background: linear-gradient(135deg, var(--pc-accent) 0%, var(--pc-accent) 100%);
+  background: linear-gradient(135deg, #5f72ff 0%, #5f72ff 100%);
   color: #f0f9ff;
   box-shadow: 0 8px 18px rgba(99, 102, 241, 0.35);
 }

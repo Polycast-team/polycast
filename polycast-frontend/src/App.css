@@ -10,13 +10,13 @@ html, body, #root {
 }
 
 body, #root {
-  background: var(--pc-bg) !important;
+  background: #181926 !important;
 }
 #root {
   width: 100vw;
   max-width: none;
   padding: 0;
-  background: var(--pc-surface);
+  background: #23243a;
   border-radius: 0;
   box-shadow: none;
   text-align: center;
@@ -24,14 +24,14 @@ body, #root {
 }
 
 h1, h2, h3 {
-  color: var(--pc-text);
+  color: #f7f7fa;
   font-weight: 800;
   letter-spacing: 0.01em;
 }
 
 /* Controls panel update */
 .controls {
-  background: var(--pc-surface);
+  background: #23243a;
   border-radius: 16px;
   box-shadow: 0 2px 8px 0 rgba(80, 98, 255, 0.05);
   padding: 16px 0;
@@ -45,7 +45,7 @@ h1, h2, h3 {
   margin-right: auto;
 }
 .controls button {
-  background: linear-gradient(90deg, var(--pc-accent) 0%, var(--pc-accent) 100%);
+  background: linear-gradient(90deg, #5f72ff 0%, #9a5cff 100%);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -68,7 +68,7 @@ h1, h2, h3 {
 }
 
 .card {
-  background: var(--pc-surface-2);
+  background: #f3f4fa;
   border-radius: 18px;
   box-shadow: 0 2px 12px 0 rgba(80, 98, 255, 0.09);
   padding: 2.5em 2em;
@@ -86,7 +86,7 @@ h1, h2, h3 {
 .transcription-panel {
   flex: 1 1 280px;
   min-width: 250px;
-  background: var(--pc-surface-2);
+  background: #f3f4fa;
   border-radius: 14px;
   box-shadow: 0 2px 8px 0 rgba(80, 98, 255, 0.03);
   padding: 18px 14px 18px 18px;
@@ -98,17 +98,17 @@ h1, h2, h3 {
 .transcription-label {
   font-size: 1.01em;
   font-weight: 600;
-  color: var(--pc-text-muted);
+  color: #6a6a9d;
   margin-bottom: 7px;
   letter-spacing: 0.01em;
 }
 .transcription-panel span, .transcription-panel p {
   font-size: 1.11em;
-  color: var(--pc-text);
+  color: #f7f7fa;
   line-height: 1.6;
 }
 .new-text {
-  background: var(--pc-accent);
+  background: #e6eaff;
   border-radius: 6px;
   padding: 2px 6px;
   margin-right: 2px;
@@ -116,14 +116,14 @@ h1, h2, h3 {
 }
 @keyframes fadeIn {
   from { background: rgba(0,0,0,0.2); opacity: 0.2; }
-  to { background: var(--pc-accent); opacity: 1; }
+  to { background: #e6eaff; opacity: 1; }
 }
 
 /* Audio Recorder Status */
 .audio-status {
   margin: 8px 0 16px 0;
   font-size: 1.02em;
-  color: var(--pc-accent);
+  color: #5f72ff;
   font-weight: 500;
 }
 
@@ -414,7 +414,7 @@ h1, h2, h3 {
   gap: 12px;
 }
 .app-title {
-  color: var(--pc-text);
+  color: #f7f7fa;
   font-size: 1.55rem;
   font-weight: 900;
   letter-spacing: 0.04em;
@@ -425,13 +425,13 @@ h1, h2, h3 {
   display: flex;
   align-items: center;
   font-size: 1rem;
-  color: var(--pc-text);
+  color: #f7f7fa;
   gap: 16px;
   margin-left: 28px;
 }
 .toolbar-label {
   font-weight: 700;
-  color: var(--pc-text-muted);
+  color: #6a6a9d;
   margin-right: 2px;
 }
 .main-toolbar select {
@@ -473,7 +473,7 @@ h1, h2, h3 {
   top: 80px; /* Adjust as needed */
   left: 50%;
   transform: translateX(-50%);
-  background-color: var(--pc-accent); /* accent background */
+  background-color: #5f72ff; /* accent background */
   color: white;
   padding: 10px 20px;
   border-radius: 8px;
