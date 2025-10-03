@@ -638,10 +638,10 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         // Fetch sentences from Tatoeba - get truly random sentences
         let searchUrl;
         if (targetWord) {
-            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
+            searchUrl = `https://api.tatoeba.org/v0/sentences/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
         } else {
             // Get random sentences without any word filtering
-            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
+            searchUrl = `https://api.tatoeba.org/v0/sentences/search?from=${fromCode}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
         }
         
         console.log('[Tatoeba] API URL:', searchUrl);
