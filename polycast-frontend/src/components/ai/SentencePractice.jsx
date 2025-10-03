@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../../utils/profileLanguageMapping';
 import apiService from '../../services/apiService';
+import aiService from '../../services/aiService';
 import tokenizeText from '../../utils/tokenizeText';
 import WordDefinitionPopup from '../WordDefinitionPopup';
 import './SentencePractice.css';
