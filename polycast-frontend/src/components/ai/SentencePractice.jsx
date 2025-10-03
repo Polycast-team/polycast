@@ -31,7 +31,7 @@ function SentencePractice({
       
       const response = await aiService.sendChat({
         messages: [{ role: 'user', content: prompt }],
-        systemPrompt: 'You are a language learning assistant. Generate simple, clear sentences for translation practice.',
+        systemPrompt: "You are a language learning assistant. Generate simple, clear sentences for translation practice.",
       });
 
       if (response?.message?.content) {
@@ -69,12 +69,12 @@ Return only the evaluation result.`;
 
       const response = await aiService.sendChat({
         messages: [{ role: 'user', content: prompt }],
-        systemPrompt: 'You are a language learning assistant. Evaluate translations and provide corrections using the specified format.',
+        systemPrompt: "You are a language learning assistant. Evaluate translations and provide corrections using the specified format.",
       });
 
       if (response?.message?.content) {
         const result = response.message.content.trim();
-        if (result === 'CORRECT') {
+        if (result === "CORRECT") {
           setEvaluationResult({ isCorrect: true, correctedText: null });
           setScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }));
         } else {
@@ -139,12 +139,12 @@ Return only the evaluation result.`;
           onClick={onBack}
           aria-label="Back to AI mode selector"
         >
-          ← {ui?.back || 'Back'}
+          ← {ui?.back || "Back"}
         </button>
         <div className="sentence-practice-title">
-          <h2>{ui?.aiSentencePractice || 'Sentence Practice'}</h2>
+          <h2>{ui?.aiSentencePractice || "Sentence Practice"}</h2>
           <div className="sentence-practice-score">
-            {ui?.score || 'Score'}: {score.correct}/{score.total}
+            {ui?.score || "Score"}: {score.correct}/{score.total}
           </div>
         </div>
       </div>
@@ -153,17 +153,17 @@ Return only the evaluation result.`;
         {isLoading ? (
           <div className="sentence-practice-loading">
             <div className="loading-spinner"></div>
-            <p>{ui?.generatingSentence || 'Generating sentence...'}</p>
+            <p>{ui?.generatingSentence || "Generating sentence..."}</p>
           </div>
         ) : currentSentence ? (
           <>
             <div className="sentence-practice-prompt">
-              <h3>{ui?.translateThis || 'Translate this sentence'}:</h3>
+              <h3>{ui?.translateThis || "Translate this sentence"}:</h3>
               <div className="sentence-practice-original">
                 {currentSentence}
               </div>
               <p className="sentence-practice-instructions">
-                {ui?.translateTo || 'Translate to'}: <strong>{targetLanguage}</strong>
+                {ui?.translateTo || "Translate to"}: <strong>{targetLanguage}</strong>
               </p>
             </div>
 
@@ -171,7 +171,7 @@ Return only the evaluation result.`;
               <textarea
                 value={userTranslation}
                 onChange={(e) => setUserTranslation(e.target.value)}
-                placeholder={ui?.enterTranslation || 'Enter your translation...'}
+                placeholder={ui?.enterTranslation || "Enter your translation..."}
                 rows={3}
                 disabled={isEvaluating}
                 className="sentence-practice-input"
@@ -181,7 +181,7 @@ Return only the evaluation result.`;
                 disabled={!userTranslation.trim() || isEvaluating}
                 className="sentence-practice-submit"
               >
-                {isEvaluating ? (ui?.evaluating || 'Evaluating...') : (ui?.checkTranslation || 'Check Translation')}
+                {isEvaluating ? (ui?.evaluating || "Evaluating...") : (ui?.checkTranslation || "Check Translation")}
               </button>
             </form>
 
@@ -191,16 +191,16 @@ Return only the evaluation result.`;
                   <div className="result-correct">
                     <div className="result-icon">✓</div>
                     <div className="result-text">
-                      <h4>{ui?.correct || 'Correct!'}</h4>
-                      <p>{ui?.wellDone || 'Well done! Your translation is correct.'}</p>
+                      <h4>{ui?.correct || "Correct!"}</h4>
+                      <p>{ui?.wellDone || "Well done! Your translation is correct."}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="result-incorrect">
                     <div className="result-icon">✗</div>
                     <div className="result-text">
-                      <h4>{ui?.needsCorrection || 'Needs Correction'}</h4>
-                      <p>{ui?.correctedVersion || 'Here's the corrected version:'}</p>
+                      <h4>{ui?.needsCorrection || "Needs Correction"}</h4>
+                        <p>{ui?.correctedVersion || "Here's the corrected version:"}</p>
                       <div className="corrected-translation">
                         {renderCorrectedText(evaluationResult.correctedText)}
                       </div>
@@ -211,7 +211,7 @@ Return only the evaluation result.`;
                   onClick={handleNext}
                   className="sentence-practice-next"
                 >
-                  {ui?.nextSentence || 'Next Sentence'}
+                  {ui?.nextSentence || "Next Sentence"}
                 </button>
               </div>
             )}
