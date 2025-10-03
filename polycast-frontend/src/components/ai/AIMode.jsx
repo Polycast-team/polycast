@@ -212,6 +212,7 @@ function AIMode({
       ) : selectedAIMode === 'sentence-practice' ? (
         <SentencePractice
           selectedProfile={selectedProfile}
+          selectedWords={selectedWords}
           onBack={handleBackToSelector}
         />
       ) : (

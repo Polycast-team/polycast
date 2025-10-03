@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../../utils/profileLanguageMapping';
-import aiService from '../../services/aiService';
 import apiService from '../../services/apiService';
 import tokenizeText from '../../utils/tokenizeText';
 import WordDefinitionPopup from '../WordDefinitionPopup';
@@ -9,6 +8,7 @@ import './SentencePractice.css';
 
 function SentencePractice({
   selectedProfile,
+  selectedWords,
   onBack,
 }) {
   const ui = getUITranslationsForProfile(selectedProfile);
@@ -27,23 +27,32 @@ function SentencePractice({
   const [loadingDefinition, setLoadingDefinition] = useState(false);
   const [wordDefinitions, setWordDefinitions] = useState({});
   const [explainPopup, setExplainPopup] = useState({ visible: false, position: { x: 0, y: 0 }, oldWord: '', newWord: '', loading: false, response: '', input: '' });
+  const [targetWord, setTargetWord] = useState(null);
+  const [selectedWords, setSelectedWords] = useState([]);
 
   const generateSentence = useCallback(async () => {
     setIsLoading(true);
     setError('');
     setEvaluationResult(null);
     setUserTranslation('');
+    setTargetWord(null);
 
     try {
-      const prompt = `Generate a simple sentence in ${nativeLanguage} for a language learner to translate into ${targetLanguage}. The sentence should be appropriate for intermediate level and contain common vocabulary. Return only the sentence, no additional text.`;
-      
-      const response = await aiService.sendChat({
-        messages: [{ role: 'user', content: prompt }],
-        systemPrompt: "You are a language learning assistant. Generate simple, clear sentences for translation practice.",
-      });
+      // 30% chance to use a dictionary word if available
+      const userDictionary = selectedWords || [];
+      const shouldUseDictWord = userDictionary.length > 0 && Math.random() < 0.3;
+      const targetWordToUse = shouldUseDictWord 
+        ? userDictionary[Math.floor(Math.random() * userDictionary.length)]
+        : null;
 
-      if (response?.message?.content) {
-        setCurrentSentence(response.message.content.trim());
+      // Fetch sentence from Tatoeba via backend
+      const response = await apiService.fetchJson(
+        `/sentences/tatoeba?fromLang=${encodeURIComponent(nativeLanguage)}&toLang=${encodeURIComponent(targetLanguage)}${targetWordToUse ? `&targetWord=${encodeURIComponent(targetWordToUse)}` : ''}`
+      );
+
+      if (response?.nativeSentence) {
+        setCurrentSentence(response.nativeSentence);
+        setTargetWord(response.targetWord || null);
       } else {
         throw new Error('Failed to generate sentence');
       }
@@ -53,7 +62,7 @@ function SentencePractice({
     } finally {
       setIsLoading(false);
     }
-  }, [nativeLanguage, targetLanguage]);
+  }, [nativeLanguage, targetLanguage, selectedWords]);
 
   const evaluateTranslation = useCallback(async () => {
     if (!userTranslation.trim() || !currentSentence) return;
@@ -281,6 +290,11 @@ Return only the evaluation result.`;
               <div className="sentence-practice-original">
                 {currentSentence}
               </div>
+              {targetWord && (
+                <div className="target-word-hint">
+                  Use the word <strong>{targetWord}</strong> in your translation.
+                </div>
+              )}
               <p className="sentence-practice-instructions">
                 {ui?.translateTo || "Translate to"}: <strong>{targetLanguage}</strong>
               </p>
@@ -417,6 +431,7 @@ Return only the evaluation result.`;
 
 SentencePractice.propTypes = {
   selectedProfile: PropTypes.string.isRequired,
+  selectedWords: PropTypes.array,
   onBack: PropTypes.func.isRequired,
 };
 

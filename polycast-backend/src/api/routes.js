@@ -611,5 +611,55 @@ router.post('/tts', async (req, res) => {
     }
 });
 
+// Tatoeba sentence fetching
+router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
+    try {
+        const { fromLang, toLang, targetWord } = req.query || {};
+        
+        // Map language names to Tatoeba ISO codes
+        const langMap = {
+            'English': 'eng',
+            'Spanish': 'spa',
+            'French': 'fra',
+            'German': 'deu',
+            'Italian': 'ita',
+            'Portuguese': 'por',
+            'Russian': 'rus',
+            'Japanese': 'jpn',
+            'Chinese': 'cmn',
+            'Korean': 'kor'
+        };
+        
+        const fromCode = langMap[fromLang] || 'eng';
+        const toCode = langMap[toLang] || 'spa';
+        
+        // Fetch sentences from Tatoeba
+        const searchUrl = targetWord 
+            ? `https://tatoeba.org/en/api_v0/search?from=${fromCode}&to=${toCode}&query=${encodeURIComponent(targetWord)}&trans_to=${toCode}`
+            : `https://tatoeba.org/en/api_v0/search?from=${fromCode}&to=${toCode}&trans_to=${toCode}&sort=random`;
+        
+        const response = await axios.get(searchUrl);
+        
+        if (response.data && response.data.results && response.data.results.length > 0) {
+            const result = response.data.results[0];
+            const nativeSentence = result.text;
+            const targetSentence = result.translations && result.translations[0] 
+                ? result.translations[0][0].text 
+                : null;
+            
+            return res.json({
+                nativeSentence,
+                targetSentence,
+                targetWord: targetWord || null
+            });
+        } else {
+            return res.status(404).json({ error: 'No sentences found' });
+        }
+    } catch (error) {
+        console.error('[Tatoeba] Error:', error?.response?.data || error?.message || error);
+        res.status(500).json({ error: 'Failed to fetch sentence from Tatoeba' });
+    }
+});
+
 
 module.exports = router;
