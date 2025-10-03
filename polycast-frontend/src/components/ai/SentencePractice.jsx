@@ -28,7 +28,6 @@ function SentencePractice({
   const [wordDefinitions, setWordDefinitions] = useState({});
   const [explainPopup, setExplainPopup] = useState({ visible: false, position: { x: 0, y: 0 }, oldWord: '', newWord: '', loading: false, response: '', input: '' });
   const [targetWord, setTargetWord] = useState(null);
-  const [selectedWords, setSelectedWords] = useState([]);
 
   const generateSentence = useCallback(async () => {
     setIsLoading(true);
