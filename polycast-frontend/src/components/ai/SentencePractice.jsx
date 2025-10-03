@@ -45,9 +45,8 @@ function SentencePractice({
         : null;
 
       // Fetch sentence from Tatoeba via backend
-      const response = await apiService.fetchJson(
-        `/sentences/tatoeba?fromLang=${encodeURIComponent(nativeLanguage)}&toLang=${encodeURIComponent(targetLanguage)}${targetWordToUse ? `&targetWord=${encodeURIComponent(targetWordToUse)}` : ''}`
-      );
+      const url = apiService.getTatoebaSentencesUrl(nativeLanguage, targetLanguage, targetWordToUse);
+      const response = await apiService.fetchJson(url);
 
       if (response?.nativeSentence) {
         setCurrentSentence(response.nativeSentence);

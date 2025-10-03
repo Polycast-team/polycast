@@ -42,6 +42,15 @@ class ApiService {
     return `${this.baseUrl}/api/dictionary/quick?${params}`;
   }
 
+  // TATOEBA SENTENCES - fetch practice sentences
+  getTatoebaSentencesUrl = (fromLang, toLang, targetWord = null) => {
+    const params = new URLSearchParams({ fromLang, toLang });
+    if (targetWord) {
+      params.append('targetWord', targetWord);
+    }
+    return `${this.baseUrl}/api/sentences/tatoeba?${params}`;
+  }
+
   // Helper methods for common API patterns
   async fetchJson(url, options = {}) {
     const token = authClient.getToken?.();
