@@ -635,16 +635,16 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         
         console.log('[Tatoeba] Request params:', { fromLang, toLang, fromCode, toCode, targetWord });
         
-        // Fetch sentences from Tatoeba - using correct API format with word count filtering
+        // Fetch sentences from Tatoeba - try different approaches to get longer sentences
         let searchUrl;
         if (targetWord) {
-            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&min_words=5&limit=100`;
+            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
         } else {
-            // Try searching for common words that are likely to appear in longer sentences
-            const commonWords = ['I', 'you', 'we', 'they', 'this', 'that', 'have', 'will', 'can', 'should'];
-            const randomWord = commonWords[Math.floor(Math.random() * commonWords.length)];
-            console.log('[Tatoeba] Searching for random word:', randomWord);
-            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${randomWord}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&min_words=5&limit=100`;
+            // Try searching for words that are more likely to appear in longer, more complex sentences
+            const complexWords = ['because', 'although', 'however', 'therefore', 'meanwhile', 'furthermore', 'nevertheless', 'consequently', 'additionally', 'specifically'];
+            const randomWord = complexWords[Math.floor(Math.random() * complexWords.length)];
+            console.log('[Tatoeba] Searching for complex word:', randomWord);
+            searchUrl = `https://tatoeba.org/eng/api_v0/search?from=${fromCode}&query=${randomWord}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
         }
         
         console.log('[Tatoeba] API URL:', searchUrl);
@@ -655,11 +655,31 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
         console.log('[Tatoeba] Response data:', response.data);
         
         if (response.data && response.data.results && response.data.results.length > 0) {
-            // Tatoeba API should have already filtered for min_words=5
-            // Just randomly select from the results
-            const randomIndex = Math.floor(Math.random() * response.data.results.length);
-            const result = response.data.results[randomIndex];
-            const nativeSentence = result.text;
+            // Filter sentences to only include those with at least 5 words
+            // (min_words parameter doesn't work in Tatoeba API)
+            const minWordCount = 5;
+            const filteredResults = response.data.results.filter(result => {
+                const wordCount = result.text.trim().split(/\s+/).length;
+                console.log(`[Tatoeba] Sentence: "${result.text}" - Word count: ${wordCount}`);
+                return wordCount >= minWordCount;
+            });
+            
+            console.log(`[Tatoeba] Filtered ${filteredResults.length} sentences with >= ${minWordCount} words from ${response.data.results.length} total results`);
+            
+            let result, nativeSentence, randomIndex;
+            
+            if (filteredResults.length === 0) {
+                console.log('[Tatoeba] No sentences found with minimum word count, falling back to all results');
+                // Fallback to all results if no sentences meet the minimum length
+                randomIndex = Math.floor(Math.random() * response.data.results.length);
+                result = response.data.results[randomIndex];
+                nativeSentence = result.text;
+            } else {
+                // Randomly select a sentence from the filtered results
+                randomIndex = Math.floor(Math.random() * filteredResults.length);
+                result = filteredResults[randomIndex];
+                nativeSentence = result.text;
+            }
             
             // Log the word count for verification
             const wordCount = nativeSentence.trim().split(/\s+/).length;
@@ -678,6 +698,7 @@ router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
             console.log('[Tatoeba] Parsed result:', { 
                 selectedIndex: randomIndex, 
                 totalResults: response.data.results.length,
+                filteredResults: filteredResults.length,
                 wordCount,
                 nativeSentence, 
                 targetSentence, 
