@@ -7,11 +7,26 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
 async function createUser({ username, password, nativeLanguage, targetLanguage, proficiencyLevel = 3 }) {
   const passwordHash = await bcrypt.hash(password, ROUNDS);
-  const sql = `INSERT INTO profiles (username, password_hash, native_language, target_language, proficiency_level)
-               VALUES ($1, $2, $3, $4, $5)
-               RETURNING id, username, native_language, target_language, proficiency_level, created_at, updated_at`;
-  const { rows } = await pool.query(sql, [username, passwordHash, nativeLanguage, targetLanguage, proficiencyLevel]);
-  return rows[0];
+  // First, try inserting with proficiency_level (new schema)
+  try {
+    const sqlNew = `INSERT INTO profiles (username, password_hash, native_language, target_language, proficiency_level)
+                    VALUES ($1, $2, $3, $4, $5)
+                    RETURNING id, username, native_language, target_language, proficiency_level, created_at, updated_at`;
+    const { rows } = await pool.query(sqlNew, [username, passwordHash, nativeLanguage, targetLanguage, proficiencyLevel]);
+    return rows[0];
+  } catch (e) {
+    // If the column doesn't exist yet (migration not applied), fall back to old schema
+    if (e && (e.code === '42703' || /proficiency_level/.test(e.message || ''))) {
+      const sqlOld = `INSERT INTO profiles (username, password_hash, native_language, target_language)
+                      VALUES ($1, $2, $3, $4)
+                      RETURNING id, username, native_language, target_language, created_at, updated_at`;
+      const { rows } = await pool.query(sqlOld, [username, passwordHash, nativeLanguage, targetLanguage]);
+      // Return with default level 3 for compatibility
+      const row = rows[0];
+      return { ...row, proficiency_level: 3 };
+    }
+    throw e;
+  }
 }
 
 async function findUserByUsername(username) {
