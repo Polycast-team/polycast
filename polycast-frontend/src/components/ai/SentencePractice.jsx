@@ -38,6 +38,7 @@ function SentencePractice({
   const [selectedTenseKeys, setSelectedTenseKeys] = useState([]);
   const [activeHintIndex, setActiveHintIndex] = useState(null); // single active index
   const [activeHintText, setActiveHintText] = useState('');
+  const [activeHintWord, setActiveHintWord] = useState(''); // the source token clicked
   const [clickedHints, setClickedHints] = useState([]); // [{index, word, translation}]
   const [showAddClickedWords, setShowAddClickedWords] = useState(false);
   // No separate AddWordPopup; chips open the standard WordDefinitionPopup flow
@@ -51,6 +52,7 @@ function SentencePractice({
     // Clear inline hints when moving to a new sentence
     setActiveHintIndex(null);
     setActiveHintText('');
+    setActiveHintWord('');
     setHintMessage('');
     setClickedHints([]);
     setShowAddClickedWords(false);
@@ -142,6 +144,7 @@ Return only the evaluation result.`;
     setUserTranslation('');
     setActiveHintIndex(null);
     setActiveHintText('');
+    setActiveHintWord('');
     setHintMessage('');
     setClickedHints([]);
     setShowAddClickedWords(false);
@@ -190,6 +193,7 @@ Return only the evaluation result.`;
       const translationOnly = (resp?.message?.content || '').trim().replace(/^"|"$/g, '');
       setActiveHintIndex(Number.isInteger(tokenIndex) ? tokenIndex : null);
       setActiveHintText(translationOnly);
+      setActiveHintWord(word);
       setHintMessage('');
       // Track clicked translation for later addition
       if (Number.isInteger(tokenIndex) && tokenIndex >= 0 && translationOnly) {
@@ -257,6 +261,7 @@ Return only the evaluation result.`;
 
   const renderClickableTokens = useCallback((text, keyPrefix, clickable = false) => {
     const tokens = tokenizeText(text || '');
+    const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return tokens.map((token, index) => {
       const isWord = /^[\p{L}\p{M}\d']+$/u.test(token);
       const tokenKey = `${keyPrefix}-${index}`;
@@ -294,26 +299,20 @@ Return only the evaluation result.`;
                 onClick={async (e) => {
                   e.stopPropagation();
                   try {
-                    const head = (activeHintText || '').split(/[,;\s]+/)[0];
-                    if (!head) return;
-                    const gen = await aiService.sendChat({
-                      messages: [{ role: 'user', content: `Write one natural sentence in ${targetLanguage} that uses the word "${head}" exactly once. Wrap the word with tildes like ~${head}~. Respond with only the sentence.` }],
-                      systemPrompt: 'Return only the sentence with the word wrapped in tildes.'
-                    });
-                    let sentenceWithMarkedWord = (gen?.message?.content || '').trim();
-                    if (!/~[^~]+~/.test(sentenceWithMarkedWord)) {
-                      sentenceWithMarkedWord = `~${head}~`;
-                    }
-                    const url = apiService.getUnifiedWordDataUrl(head.toLowerCase(), sentenceWithMarkedWord, nativeLanguage, targetLanguage);
+                    const srcToken = activeHintWord || token; // add the source-language token
+                    const marked = (text || '').replace(new RegExp(`\\b${escapeRegExp(srcToken)}\\b`, 'i'), `~${srcToken}~`);
+                    const url = apiService.getUnifiedWordDataUrl(srcToken.toLowerCase(), marked, nativeLanguage, targetLanguage);
                     const unifiedData = await apiService.fetchJson(url);
                     await apiService.postJson(`${apiService.baseUrl}/api/dictionary`, {
-                      word: head.toLowerCase(),
-                      senseKey: `${head.toLowerCase()}-${Date.now()}`,
+                      word: srcToken.toLowerCase(),
+                      senseKey: `${srcToken.toLowerCase()}-${Date.now()}`,
                       geminiUnifiedText: unifiedData.rawText || '',
                       geminiUnifiedJson: unifiedData || null,
                       studyIntervalLevel: 1,
                       dueAt: null,
                     });
+                    // Replace plus with a checkmark
+                    setClickedHints(prev => prev.map(h => h.index === index ? { ...h, added: true } : h));
                   } catch (err) {
                     console.warn('Inline add failed:', err);
                   }
@@ -329,7 +328,7 @@ Return only the evaluation result.`;
                 }}
                 title="Add to dictionary"
               >
-                +
+                {clickedHints.find(h => h.index === index && h.added) ? '✓' : '+'}
               </button>
             </span>
           ) : null}
