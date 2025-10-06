@@ -238,51 +238,53 @@ function App({
     return () => window.removeEventListener("keydown", handlePageKey);
   }, [roomSetup]); // Reverted dependencies
 
-  // Load dictionary from server after login (no localStorage)
+  // Load dictionary from server after login and on refresh events
+  const reloadServerDictionary = useCallback(async () => {
+    try {
+      const rows = await apiService.fetchJson(`${apiService.baseUrl}/api/dictionary`);
+      const map = {};
+      (rows || []).forEach(r => {
+        const u = r.gemini_unified_json || {};
+        const isNewFromDb = !r.due_at;
+        map[r.sense_key] = {
+          dbId: r.id,
+          word: r.word,
+          wordSenseId: r.sense_key,
+          translation: u.translation || '',
+          definition: u.definition || '',
+          frequency: u.frequency || 5,
+          exampleSentencesGenerated: u.exampleSentencesGenerated || '',
+          exampleForDictionary: u.exampleForDictionary || '',
+          contextualExplanation: u.definition || '',
+          inFlashcards: true,
+          srsData: {
+            status: isNewFromDb ? 'new' : 'review',
+            isNew: isNewFromDb,
+            gotWrongThisSession: false,
+            SRS_interval: r.study_interval_level || 1,
+            dueDate: r.due_at || null,
+            nextReviewDate: r.due_at || null,
+          }
+        };
+      });
+      setWordDefinitions(map);
+      setSelectedWords(Array.from(new Set((rows || []).map(r => r.word))));
+    } catch (e) {
+      console.error('Failed to load server dictionary:', e);
+    }
+  }, []);
+
   useEffect(() => {
     const token = authClient.getToken && authClient.getToken();
-    if (!token) {
-      // Skip server dictionary fetch if not authenticated to avoid 401 noise
-      return;
-    }
-    async function loadServerDictionary() {
-      try {
-        const rows = await apiService.fetchJson(`${apiService.baseUrl}/api/dictionary`);
-        const map = {};
-        (rows || []).forEach(r => {
-          // Reconstruct display fields from gemini_unified_json if available
-          const u = r.gemini_unified_json || {};
-          const isNewFromDb = !r.due_at; // Persisted notion: no due_at means never reviewed
-          map[r.sense_key] = {
-            dbId: r.id,
-            word: r.word,
-            wordSenseId: r.sense_key,
-            translation: u.translation || '',
-            definition: u.definition || '',
-            frequency: u.frequency || 5,
-            exampleSentencesGenerated: u.exampleSentencesGenerated || '',
-            exampleForDictionary: u.exampleForDictionary || '',
-            contextualExplanation: u.definition || '',
-            inFlashcards: true,
-            srsData: {
-              // Map DB SRS to client shape based on persisted fields
-              status: isNewFromDb ? 'new' : 'review',
-              isNew: isNewFromDb,
-              gotWrongThisSession: false,
-              SRS_interval: r.study_interval_level || 1,
-              dueDate: r.due_at || null,
-              nextReviewDate: r.due_at || null,
-            }
-          };
-        });
-        setWordDefinitions(map);
-        setSelectedWords(Array.from(new Set((rows || []).map(r => r.word))));
-      } catch (e) {
-        console.error('Failed to load server dictionary:', e);
-      }
-    }
-    loadServerDictionary();
-  }, []);
+    if (!token) return;
+    reloadServerDictionary();
+  }, [reloadServerDictionary]);
+
+  useEffect(() => {
+    const handler = () => { reloadServerDictionary(); };
+    window.addEventListener('dictionary:refresh', handler);
+    return () => window.removeEventListener('dictionary:refresh', handler);
+  }, [reloadServerDictionary]);
 
   // Global listener to open/close the flashcard calendar from any mode
   useEffect(() => {

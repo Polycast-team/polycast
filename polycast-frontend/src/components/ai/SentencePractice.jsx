@@ -316,6 +316,7 @@ Return only the evaluation result.`;
                     });
                     // Replace plus with a checkmark
                     setClickedHints(prev => prev.map(h => h.index === index ? { ...h, added: true } : h));
+                    try { window.dispatchEvent(new CustomEvent('dictionary:refresh')); } catch (_) {}
                   } catch (err) {
                     console.warn('Inline add failed:', err);
                   } finally {
