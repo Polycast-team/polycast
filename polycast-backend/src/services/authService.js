@@ -28,8 +28,27 @@ function issueToken(profile) {
 }
 
 async function getProfileById(id) {
-  const { rows } = await pool.query('SELECT id, username, native_language, target_language, proficiency_level, created_at, updated_at FROM profiles WHERE id=$1', [id]);
-  return rows[0] || null;
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, username, native_language, target_language, proficiency_level, created_at, updated_at FROM profiles WHERE id=$1',
+      [id]
+    );
+    return rows[0] || null;
+  } catch (e) {
+    // Fallback for deployments where migration hasn't added proficiency_level yet
+    try {
+      const { rows } = await pool.query(
+        'SELECT id, username, native_language, target_language, created_at, updated_at FROM profiles WHERE id=$1',
+        [id]
+      );
+      if (rows[0]) {
+        return { ...rows[0], proficiency_level: 3 };
+      }
+      return null;
+    } catch (_) {
+      throw e;
+    }
+  }
 }
 
 async function updateProfileLanguages(id, { nativeLanguage, targetLanguage, proficiencyLevel }) {
