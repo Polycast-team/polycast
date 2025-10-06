@@ -6,6 +6,7 @@ import aiService from '../../services/aiService';
 import tokenizeText from '../../utils/tokenizeText';
 import WordDefinitionPopup from '../WordDefinitionPopup';
 import { getConjugationBundle } from '../../utils/conjugations/index.js';
+import { getLanguageCodeForProfile } from '../../utils/profileLanguageMapping';
 import './SentencePractice.css';
 
 function SentencePractice({
@@ -33,7 +34,7 @@ function SentencePractice({
   const [hintMode, setHintMode] = useState(false);
   const [hintMessage, setHintMessage] = useState('');
   const [showConjugationHelp, setShowConjugationHelp] = useState(false);
-  const [detectedTense, setDetectedTense] = useState(null);
+  const [selectedTenseKeys, setSelectedTenseKeys] = useState([]);
   const [activeHintIndex, setActiveHintIndex] = useState(null); // single active index
   const [activeHintText, setActiveHintText] = useState('');
 
@@ -43,6 +44,10 @@ function SentencePractice({
     setEvaluationResult(null);
     setUserTranslation('');
     setTargetWord(null);
+    // Clear inline hints when moving to a new sentence
+    setActiveHintIndex(null);
+    setActiveHintText('');
+    setHintMessage('');
 
     try {
       // 30% chance to use a dictionary word if available
@@ -129,6 +134,9 @@ Return only the evaluation result.`;
   const handleNext = useCallback(() => {
     setEvaluationResult(null);
     setUserTranslation('');
+    setActiveHintIndex(null);
+    setActiveHintText('');
+    setHintMessage('');
     generateSentence();
   }, [generateSentence]);
 
@@ -366,21 +374,26 @@ Return only the evaluation result.`;
           >
             {hintMode ? (ui?.hintsOn || 'Hints: ON') : (ui?.needHint || 'I need a hint!')}
           </button>
-          {hintMode && getConjugationBundle(getLanguageForProfile(selectedProfile).toLowerCase().startsWith('spanish') ? 'es' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('french') ? 'fr' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('italian') ? 'it' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('portuguese') ? 'pt' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('german') ? 'de' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('russian') ? 'ru' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('turkish') ? 'tr' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('japanese') ? 'ja' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('korean') ? 'ko' : null) && (
+          {hintMode && (() => { const code = getLanguageCodeForProfile(selectedProfile); return getConjugationBundle(code); })() && (
             <button
               className="conjugation-help-button"
               onClick={async () => {
                 try {
-                  // Lightweight tense detection prompt
-                  const detectPrompt = `Given this ${nativeLanguage} sentence: "${currentSentence}" and the target language ${targetLanguage}, identify which Spanish tense is primarily required for an accurate translation. Reply with one key: present | preterite | imperfect | future | conditional | present_subjunctive | imperfect_subjunctive | present_perfect. Reply ONLY the key.`;
+                  const code = getLanguageCodeForProfile(selectedProfile);
+                  const bundle = getConjugationBundle(code);
+                  const keys = Object.keys(bundle?.tenses || {});
+                  const numbered = keys.map((k, i) => `${i + 1}. ${k} - ${bundle.tenses[k].label}`).join('\n');
+                  const detectPrompt = `Choose the best conjugation tense(s) for translating this ${nativeLanguage} sentence into ${targetLanguage}. Respond ONLY with the number(s) (comma-separated if multiple).\n\nSentence: ${currentSentence}\nOptions:\n${numbered}`;
                   const resp = await aiService.sendChat({
                     messages: [{ role: 'user', content: detectPrompt }],
-                    systemPrompt: 'Reply only with the key name from the provided list.'
+                    systemPrompt: 'Return only numbers referencing the best matching options, comma-separated if multiple.'
                   });
-                  const key = (resp?.message?.content || '').trim().toLowerCase();
-                  setDetectedTense(key);
+                  const raw = (resp?.message?.content || '').trim();
+                  const nums = raw.split(/[^\d]+/).map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 1 && n <= keys.length);
+                  const chosen = nums.length ? Array.from(new Set(nums)).map(n => keys[n - 1]) : [keys[0]];
+                  setSelectedTenseKeys(chosen);
                 } catch (_) {
-                  setDetectedTense('present');
+                  setSelectedTenseKeys([]);
                 }
                 setShowConjugationHelp(true);
               }}
@@ -506,53 +519,53 @@ Return only the evaluation result.`;
       )}
 
       {showConjugationHelp && (() => {
-        const langName = getLanguageForProfile(selectedProfile).toLowerCase();
-        const code = langName.startsWith('spanish') ? 'es' : langName.startsWith('french') ? 'fr' : langName.startsWith('italian') ? 'it' : langName.startsWith('portuguese') ? 'pt' : langName.startsWith('german') ? 'de' : langName.startsWith('russian') ? 'ru' : langName.startsWith('turkish') ? 'tr' : langName.startsWith('japanese') ? 'ja' : langName.startsWith('korean') ? 'ko' : null;
+        const code = getLanguageCodeForProfile(selectedProfile);
         const bundle = code ? getConjugationBundle(code) : null;
         if (!bundle) return null;
         return (
-        <div className="conjugation-modal">
-          <div className="conjugation-modal-content">
+        <div className="conjugation-modal" onClick={() => setShowConjugationHelp(false)}>
+          <div className="conjugation-modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="popup-close-btn" onClick={() => setShowConjugationHelp(false)}>×</button>
             {(() => {
               const tenses = bundle.tenses;
               const persons = bundle.persons;
-              const tenseKey = detectedTense && tenses[detectedTense] ? detectedTense : Object.keys(tenses)[0];
-              const table = tenses[tenseKey];
-              if (!table) return <div>No table found.</div>;
+              const keysToShow = (selectedTenseKeys && selectedTenseKeys.length) ? selectedTenseKeys.filter(k => tenses[k]) : [Object.keys(tenses)[0]];
               return (
                 <div>
-                  <h3>{table.label}</h3>
-                  <p style={{ marginTop: 4 }}>{table.description}</p>
-                  {persons ? (
-                    <div className="conjugation-table">
-                      <div className="conj-header">Person</div>
-                      {table.ar && <div className="conj-header">-ar</div>}
-                      {table.er && <div className="conj-header">-er</div>}
-                      {table.ir && <div className="conj-header">-ir</div>}
-                      {table.er && !table.ar && !table.ir && <div className="conj-header">-er</div>}
-                      {table.common && <div className="conj-header" style={{ gridColumn: 'span 3' }}>Common</div>}
-                      {persons.map((person, idx) => (
-                        <React.Fragment key={`row-${idx}`}>
-                          <div className="conj-cell person">{person}</div>
-                          {table.ar && <div className="conj-cell">{table.ar[idx]}</div>}
-                          {table.er && <div className="conj-cell">{table.er[idx]}</div>}
-                          {table.ir && <div className="conj-cell">{table.ir[idx]}</div>}
-                          {table.regular && <div className="conj-cell" style={{ gridColumn: 'span 3' }}>{table.regular[idx]}</div>}
-                          {table.common && <div className="conj-cell" style={{ gridColumn: 'span 3' }}>{table.common[idx]}</div>}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: 8 }}>
-                      {Object.keys(tenses).map((key) => (
-                        <div key={key} style={{ marginBottom: 8 }}>
-                          <div style={{ fontWeight: 600 }}>{tenses[key].label}</div>
-                          <div style={{ opacity: 0.8 }}>{tenses[key].description}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {keysToShow.map((tenseKey) => {
+                    const table = tenses[tenseKey];
+                    return (
+                      <div key={tenseKey} style={{ marginBottom: 16 }}>
+                        <h3>{table.label}</h3>
+                        <p style={{ marginTop: 4 }}>{table.description}</p>
+                        {persons ? (
+                          <div className="conjugation-table">
+                            <div className="conj-header">Person</div>
+                            {table.ar && <div className="conj-header">-ar</div>}
+                            {table.er && <div className="conj-header">-er</div>}
+                            {table.ir && <div className="conj-header">-ir</div>}
+                            {table.regular && <div className="conj-header" style={{ gridColumn: 'span 3' }}>Regular</div>}
+                            {table.common && <div className="conj-header" style={{ gridColumn: 'span 3' }}>Common</div>}
+                            {persons.map((person, idx) => (
+                              <React.Fragment key={`${tenseKey}-${idx}`}>
+                                <div className="conj-cell person">{person}</div>
+                                {table.ar && <div className="conj-cell">{table.ar[idx]}</div>}
+                                {table.er && <div className="conj-cell">{table.er[idx]}</div>}
+                                {table.ir && <div className="conj-cell">{table.ir[idx]}</div>}
+                                {table.regular && <div className="conj-cell" style={{ gridColumn: 'span 3' }}>{table.regular[idx]}</div>}
+                                {table.common && <div className="conj-cell" style={{ gridColumn: 'span 3' }}>{table.common[idx]}</div>}
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ fontWeight: 600 }}>{table.label}</div>
+                            <div style={{ opacity: 0.8 }}>{table.description}</div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })()}
