@@ -383,7 +383,6 @@ Return only the evaluation result.`;
             {hintMessage}
           </div>
         )}
-        </div>
         {isLoading ? (
           <div className="sentence-practice-loading">
             <div className="loading-spinner"></div>
