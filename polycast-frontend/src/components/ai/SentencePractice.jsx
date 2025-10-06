@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile, getProficiencyForProfile } from '../../utils/profileLanguageMapping';
 import apiService from '../../services/apiService';
@@ -160,8 +160,12 @@ Return only the evaluation result.`;
   }, [userTranslation, isEvaluating, evaluateTranslation]);
 
   // Generate first sentence on mount
+  const didInitRef = useRef(false);
   useEffect(() => {
-    generateSentence();
+    if (!didInitRef.current) {
+      didInitRef.current = true;
+      generateSentence();
+    }
   }, [generateSentence]);
 
   const handleWordClick = useCallback(async (word, event, surroundingText = '', tokenIndex = -1) => {
@@ -331,9 +335,13 @@ Return only the evaluation result.`;
                 }}
                 title="Add to dictionary"
               >
-                {addingIndices.includes(index)
-                  ? <span className="sp-inline-add-spinner" />
-                  : (clickedHints.find(h => h.index === index && h.added) ? '✓' : '+')}
+                {addingIndices.includes(index) ? (
+                  <span className="sp-inline-add-spinner" />
+                ) : clickedHints.find(h => h.index === index && h.added) ? (
+                  '✓'
+                ) : (
+                  '+'
+                )}
               </button>
             </span>
           ) : null}
