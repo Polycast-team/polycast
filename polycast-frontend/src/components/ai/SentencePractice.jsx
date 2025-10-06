@@ -13,6 +13,7 @@ function SentencePractice({
   selectedProfile,
   selectedWords,
   onBack,
+  onAddWord,
 }) {
   const ui = getUITranslationsForProfile(selectedProfile);
   const nativeLanguage = getNativeLanguageForProfile(selectedProfile);
@@ -37,6 +38,8 @@ function SentencePractice({
   const [selectedTenseKeys, setSelectedTenseKeys] = useState([]);
   const [activeHintIndex, setActiveHintIndex] = useState(null); // single active index
   const [activeHintText, setActiveHintText] = useState('');
+  const [clickedHints, setClickedHints] = useState([]); // [{index, word, translation}]
+  const [showAddClickedWords, setShowAddClickedWords] = useState(false);
 
   const generateSentence = useCallback(async () => {
     setIsLoading(true);
@@ -48,6 +51,8 @@ function SentencePractice({
     setActiveHintIndex(null);
     setActiveHintText('');
     setHintMessage('');
+    setClickedHints([]);
+    setShowAddClickedWords(false);
 
     try {
       // 30% chance to use a dictionary word if available
@@ -137,6 +142,8 @@ Return only the evaluation result.`;
     setActiveHintIndex(null);
     setActiveHintText('');
     setHintMessage('');
+    setClickedHints([]);
+    setShowAddClickedWords(false);
     generateSentence();
   }, [generateSentence]);
 
@@ -183,6 +190,13 @@ Return only the evaluation result.`;
       setActiveHintIndex(Number.isInteger(tokenIndex) ? tokenIndex : null);
       setActiveHintText(translationOnly);
       setHintMessage('');
+      // Track clicked translation for later addition
+      if (Number.isInteger(tokenIndex) && tokenIndex >= 0 && translationOnly) {
+        setClickedHints((prev) => {
+          const withoutDup = prev.filter((p) => p.index !== tokenIndex && p.word?.toLowerCase() !== word.toLowerCase());
+          return [...withoutDup, { index: tokenIndex, word, translation: translationOnly }];
+        });
+      }
     } catch (err) {
       // On error, clear hint
       setActiveHintIndex(null);
@@ -197,12 +211,13 @@ Return only the evaluation result.`;
     return tokens.map((token, index) => {
       const isWord = /^[\p{L}\p{M}\d']+$/u.test(token);
       const tokenKey = `${keyPrefix}-${index}`;
+      const wasClicked = clickedHints.some((c) => c.index === index);
       return (
         <span
           key={tokenKey}
           onClick={isWord && clickable ? (e) => handleWordClick(token, e, text, index) : undefined}
           className={isWord && clickable ? 'sp-clickable-word' : ''}
-          style={isWord && clickable ? { position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' } : undefined}
+          style={isWord && clickable ? { position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', color: wasClicked ? '#7dd3fc' : undefined } : undefined}
         >
           {isWord && clickable && activeHintIndex === index && activeHintText ? (
             <span
@@ -229,7 +244,7 @@ Return only the evaluation result.`;
         </span>
       );
     });
-  }, [handleWordClick, activeHintIndex, activeHintText]);
+  }, [handleWordClick, activeHintIndex, activeHintText, clickedHints]);
 
   const openExplainPopup = async (event, oldWord, newWord) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -493,6 +508,35 @@ Return only the evaluation result.`;
                 >
                   {ui?.nextSentence || "Next Sentence"}
                 </button>
+                {!evaluationResult.isCorrect && clickedHints.length > 0 && (
+                  <div className="add-clicked-words-panel" style={{ marginTop: 12, padding: '10px 12px', background: 'rgba(16,185,129,0.08)', borderRadius: 8 }}>
+                    <div style={{ marginBottom: 8, fontWeight: 600 }}>Add unknown words to dictionary?</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {clickedHints.map((item, idx) => (
+                        <span key={`cw-${item.index}-${idx}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: '#0b1728', border: '1px solid #1f2a37', borderRadius: 6 }}>
+                          <span style={{ color: '#7dd3fc', fontStyle: 'italic' }}>{item.translation}</span>
+                          <button onClick={() => setClickedHints(prev => prev.filter(p => p.index !== item.index))} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        // Add each translation headword to dictionary
+                        for (const item of clickedHints) {
+                          const head = (item.translation || '').split(/[,;\s]+/)[0];
+                          if (head) {
+                            try { await onAddWord?.(head.toLowerCase()); } catch (e) { console.warn('add word failed', e); }
+                          }
+                        }
+                        setClickedHints([]);
+                        setShowAddClickedWords(false);
+                      }}
+                      style={{ marginTop: 10, padding: '8px 12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                    >
+                      Add all
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </>
