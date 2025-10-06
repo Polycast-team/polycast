@@ -34,7 +34,8 @@ function SentencePractice({
   const [hintMessage, setHintMessage] = useState('');
   const [showConjugationHelp, setShowConjugationHelp] = useState(false);
   const [detectedTense, setDetectedTense] = useState(null);
-  const [inlineHints, setInlineHints] = useState({}); // index -> translation string
+  const [activeHintIndex, setActiveHintIndex] = useState(null); // single active index
+  const [activeHintText, setActiveHintText] = useState('');
 
   const generateSentence = useCallback(async () => {
     setIsLoading(true);
@@ -145,70 +146,48 @@ Return only the evaluation result.`;
 
   const handleWordClick = useCallback(async (word, event, surroundingText = '', tokenIndex = -1) => {
     if (!event) return;
+    if (!hintMode) return; // No interactions unless in hint mode
     const rect = event.currentTarget.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const popupWidth = 380;
     const spaceOnRight = viewportWidth - rect.right;
     const fitsOnRight = spaceOnRight >= popupWidth + 10;
     const xPos = fitsOnRight ? rect.right + 5 : rect.left - popupWidth - 5;
-    if (!hintMode) {
-      setPopupInfo({
-        visible: true,
-        word,
-        position: { x: Math.max(5, Math.min(viewportWidth - popupWidth - 5, xPos)), y: rect.top - 5 },
-      });
-    }
+    // When hint mode is on, we never show the dictionary popup
 
     setLoadingDefinition(true);
     try {
-      if (hintMode) {
-        // Minimal word translation to target language (no popup)
-        const prompt = `Translate only the word "${word}" from ${nativeLanguage} to ${targetLanguage}. Respond with only the ${targetLanguage} translation (one or two words), no punctuation or quotes.`;
-        const resp = await aiService.sendChat({
-          messages: [{ role: 'user', content: prompt }],
-          systemPrompt: 'Return only the translation text.'
-        });
-        const translationOnly = (resp?.message?.content || '').trim().replace(/^"|"$/g, '');
-        if (Number.isInteger(tokenIndex) && tokenIndex >= 0 && translationOnly) {
-          setInlineHints((prev) => ({ ...prev, [tokenIndex]: translationOnly }));
-        }
-        setHintMessage('');
-      } else {
-        const sentenceWithMarkedWord = (surroundingText || '').replace(new RegExp(`\\b(${word})\\b`, 'i'), '~$1~');
-        const url = apiService.getUnifiedWordDataUrl(word, sentenceWithMarkedWord, nativeLanguage, targetLanguage);
-        const unifiedData = await apiService.fetchJson(url);
-        setWordDefinitions((prev) => ({
-          ...prev,
-          [word.toLowerCase()]: {
-            ...unifiedData,
-            word,
-            translation: unifiedData.translation || word,
-            contextualExplanation: unifiedData.definition || 'Definition unavailable',
-            definition: unifiedData.definition || 'Definition unavailable',
-            example: unifiedData.exampleForDictionary || unifiedData.example || '',
-            frequency: unifiedData.frequency || 5,
-          },
-        }));
+      // Toggle behavior: clicking same word again removes hint
+      if (activeHintIndex === tokenIndex) {
+        setActiveHintIndex(null);
+        setActiveHintText('');
+        return;
       }
+
+      // Contextual translation using full sentence and marked word
+      const sentenceWithMarkedWord = (surroundingText || '').replace(new RegExp(`\\b(${word})\\b`, 'i'), '~$1~');
+      const prompt = `Translate ONLY the ~marked~ word from the following ${nativeLanguage} sentence into ${targetLanguage}. Provide the best translation for THIS CONTEXT.
+
+Sentence: ${surroundingText}
+Return only the ${targetLanguage} word or two-word phrase, no punctuation or quotes.`;
+      const resp = await aiService.sendChat({
+        messages: [{ role: 'user', content: prompt }],
+        systemPrompt: 'Return only the translation text.'
+      });
+      const translationOnly = (resp?.message?.content || '').trim().replace(/^"|"$/g, '');
+      setActiveHintIndex(Number.isInteger(tokenIndex) ? tokenIndex : null);
+      setActiveHintText(translationOnly);
+      setHintMessage('');
     } catch (err) {
-      if (!hintMode) {
-        setWordDefinitions((prev) => ({
-          ...prev,
-          [word.toLowerCase()]: {
-            word,
-            translation: word,
-            contextualExplanation: 'Definition unavailable',
-            definition: 'Definition unavailable',
-            example: `~${word}~`,
-          },
-        }));
-      }
+      // On error, clear hint
+      setActiveHintIndex(null);
+      setActiveHintText('');
     } finally {
       setLoadingDefinition(false);
     }
-  }, [nativeLanguage, targetLanguage, hintMode]);
+  }, [nativeLanguage, targetLanguage, hintMode, activeHintIndex]);
 
-  const renderClickableTokens = useCallback((text, keyPrefix) => {
+  const renderClickableTokens = useCallback((text, keyPrefix, clickable = false) => {
     const tokens = tokenizeText(text || '');
     return tokens.map((token, index) => {
       const isWord = /^[\p{L}\p{M}\d']+$/u.test(token);
@@ -216,11 +195,11 @@ Return only the evaluation result.`;
       return (
         <span
           key={tokenKey}
-          onClick={isWord ? (e) => handleWordClick(token, e, text, index) : undefined}
-          className={isWord ? 'sp-clickable-word' : ''}
-          style={isWord ? { position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' } : undefined}
+          onClick={isWord && clickable ? (e) => handleWordClick(token, e, text, index) : undefined}
+          className={isWord && clickable ? 'sp-clickable-word' : ''}
+          style={isWord && clickable ? { position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' } : undefined}
         >
-          {isWord && inlineHints[index] ? (
+          {isWord && clickable && activeHintIndex === index && activeHintText ? (
             <span
               style={{
                 position: 'absolute',
@@ -238,14 +217,14 @@ Return only the evaluation result.`;
                 whiteSpace: 'nowrap'
               }}
             >
-              {inlineHints[index]}
+              {activeHintText}
             </span>
           ) : null}
           {token}
         </span>
       );
     });
-  }, [handleWordClick, inlineHints]);
+  }, [handleWordClick, activeHintIndex, activeHintText]);
 
   const openExplainPopup = async (event, oldWord, newWord) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -428,7 +407,7 @@ Return only the evaluation result.`;
             <div className="sentence-practice-prompt">
               <h3>{ui?.translateThis || "Translate this sentence"}:</h3>
               <div className="sentence-practice-original">
-                {renderClickableTokens(currentSentence, 'orig')}
+                {renderClickableTokens(currentSentence, 'orig', hintMode)}
               </div>
               {targetWord && (
                 <div className="target-word-hint">
@@ -482,7 +461,7 @@ Return only the evaluation result.`;
                               <div className="corrected-version">
                                 <div className="correction-label">Corrected sentence:</div>
                                 <div className="correction-text">
-                                  {renderClickableTokens(correctedFull, 'corr-full')}
+                                  {renderClickableTokens(correctedFull, 'corr-full', false)}
                                 </div>
                               </div>
                               <div className="your-translation">

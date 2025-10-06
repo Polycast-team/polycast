@@ -1,3 +1,37 @@
+.conjugation-table {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  gap: 6px 10px;
+  margin-top: 8px;
+}
+.conj-header {
+  font-weight: 600;
+  opacity: 0.9;
+}
+.conj-cell {
+  padding: 2px 0;
+}
+.conj-cell.person {
+  opacity: 0.9;
+}
+.conjugation-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.conjugation-modal-content {
+  background: #141824;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 16px;
+  width: min(680px, 92vw);
+  max-height: 80vh;
+  overflow: auto;
+}
 .sentence-practice-container {
   display: flex;
   flex-direction: column;
