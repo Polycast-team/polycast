@@ -281,12 +281,56 @@ Return only the evaluation result.`;
                 lineHeight: 1,
                 color: '#93c5fd',
                 background: 'transparent',
-                pointerEvents: 'none',
+                pointerEvents: 'auto',
                 zIndex: 1,
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                gap: 6,
+                alignItems: 'center'
               }}
             >
               {activeHintText}
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    const head = (activeHintText || '').split(/[,;\s]+/)[0];
+                    if (!head) return;
+                    const gen = await aiService.sendChat({
+                      messages: [{ role: 'user', content: `Write one natural sentence in ${targetLanguage} that uses the word "${head}" exactly once. Wrap the word with tildes like ~${head}~. Respond with only the sentence.` }],
+                      systemPrompt: 'Return only the sentence with the word wrapped in tildes.'
+                    });
+                    let sentenceWithMarkedWord = (gen?.message?.content || '').trim();
+                    if (!/~[^~]+~/.test(sentenceWithMarkedWord)) {
+                      sentenceWithMarkedWord = `~${head}~`;
+                    }
+                    const url = apiService.getUnifiedWordDataUrl(head.toLowerCase(), sentenceWithMarkedWord, nativeLanguage, targetLanguage);
+                    const unifiedData = await apiService.fetchJson(url);
+                    await apiService.postJson(`${apiService.baseUrl}/api/dictionary`, {
+                      word: head.toLowerCase(),
+                      senseKey: `${head.toLowerCase()}-${Date.now()}`,
+                      geminiUnifiedText: unifiedData.rawText || '',
+                      geminiUnifiedJson: unifiedData || null,
+                      studyIntervalLevel: 1,
+                      dueAt: null,
+                    });
+                  } catch (err) {
+                    console.warn('Inline add failed:', err);
+                  }
+                }}
+                style={{
+                  border: 'none',
+                  background: '#10b981',
+                  color: '#0b1728',
+                  fontWeight: 700,
+                  padding: '0 6px',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                }}
+                title="Add to dictionary"
+              >
+                +
+              </button>
             </span>
           ) : null}
           {token}
