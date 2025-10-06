@@ -5,6 +5,7 @@ import apiService from '../../services/apiService';
 import aiService from '../../services/aiService';
 import tokenizeText from '../../utils/tokenizeText';
 import WordDefinitionPopup from '../WordDefinitionPopup';
+import AddWordPopup from '../popups/AddWordPopup';
 import { getConjugationBundle } from '../../utils/conjugations/index.js';
 import { getLanguageCodeForProfile } from '../../utils/profileLanguageMapping';
 import './SentencePractice.css';
@@ -40,6 +41,8 @@ function SentencePractice({
   const [activeHintText, setActiveHintText] = useState('');
   const [clickedHints, setClickedHints] = useState([]); // [{index, word, translation}]
   const [showAddClickedWords, setShowAddClickedWords] = useState(false);
+  const [addPopupOpen, setAddPopupOpen] = useState(false);
+  const [addPopupSeed, setAddPopupSeed] = useState('');
 
   const generateSentence = useCallback(async () => {
     setIsLoading(true);
@@ -516,30 +519,15 @@ Return only the evaluation result.`;
                         <span key={`cw-${item.index}-${idx}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: '#0b1728', border: '1px solid #1f2a37', borderRadius: 6 }}>
                           <span style={{ color: '#7dd3fc', fontStyle: 'italic' }}>{item.translation}</span>
                           <button onClick={() => setClickedHints(prev => prev.filter(p => p.index !== item.index))} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>×</button>
+                          <button
+                            onClick={() => { setAddPopupSeed((item.translation || '').split(/[,;\s]+/)[0] || ''); setAddPopupOpen(true); }}
+                            style={{ border: 'none', background: '#10b981', color: '#fff', padding: '2px 6px', borderRadius: 4, cursor: 'pointer' }}
+                          >
+                            + Add
+                          </button>
                         </span>
                       ))}
                     </div>
-                    <button
-                      onClick={async () => {
-                        // Add each translation headword to dictionary
-                        for (const item of clickedHints) {
-                          const head = (item.translation || '').split(/[,;\s]+/)[0];
-                          if (head) {
-                            try {
-                              // Build context with the original sentence and English token
-                              const englishContext = currentSentence || '';
-                              // Prefer adding the target-language headword, letting backend fetch full details
-                              await onAddWord?.(head.toLowerCase());
-                            } catch (e) { console.warn('add word failed', e); }
-                          }
-                        }
-                        setClickedHints([]);
-                        setShowAddClickedWords(false);
-                      }}
-                      style={{ marginTop: 10, padding: '8px 12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                    >
-                      Add all
-                    </button>
                   </div>
                 )}
               </div>
@@ -660,6 +648,17 @@ Return only the evaluation result.`;
             </form>
           )}
         </div>
+      )}
+      {addPopupOpen && (
+        <AddWordPopup
+          isOpen={addPopupOpen}
+          onClose={() => setAddPopupOpen(false)}
+          selectedProfile={selectedProfile}
+          onSelectSenses={(word, senses) => {
+            // Use the existing onAddWordSenses provided via parent App.jsx (plumbed through onAddWord?)
+            try { onAddWord && onAddWord(word); } catch (_) {}
+          }}
+        />
       )}
     </div>
   );
