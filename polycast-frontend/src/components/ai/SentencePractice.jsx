@@ -694,17 +694,6 @@ Return only the evaluation result.`;
           )}
         </div>
       )}
-      {addPopupOpen && (
-        <AddWordPopup
-          isOpen={addPopupOpen}
-          onClose={() => setAddPopupOpen(false)}
-          selectedProfile={selectedProfile}
-          onSelectSenses={(word, senses) => {
-            // Use the existing onAddWordSenses provided via parent App.jsx (plumbed through onAddWord?)
-            try { onAddWord && onAddWord(word); } catch (_) {}
-          }}
-        />
-      )}
     </div>
   );
 }
