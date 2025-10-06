@@ -34,6 +34,7 @@ function SentencePractice({
   const [hintMessage, setHintMessage] = useState('');
   const [showConjugationHelp, setShowConjugationHelp] = useState(false);
   const [detectedTense, setDetectedTense] = useState(null);
+  const [inlineHints, setInlineHints] = useState({}); // index -> translation string
 
   const generateSentence = useCallback(async () => {
     setIsLoading(true);
@@ -142,7 +143,7 @@ Return only the evaluation result.`;
     generateSentence();
   }, [generateSentence]);
 
-  const handleWordClick = useCallback(async (word, event, surroundingText = '') => {
+  const handleWordClick = useCallback(async (word, event, surroundingText = '', tokenIndex = -1) => {
     if (!event) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
@@ -150,50 +151,62 @@ Return only the evaluation result.`;
     const spaceOnRight = viewportWidth - rect.right;
     const fitsOnRight = spaceOnRight >= popupWidth + 10;
     const xPos = fitsOnRight ? rect.right + 5 : rect.left - popupWidth - 5;
-    setPopupInfo({
-      visible: true,
-      word,
-      position: { x: Math.max(5, Math.min(viewportWidth - popupWidth - 5, xPos)), y: rect.top - 5 },
-    });
+    if (!hintMode) {
+      setPopupInfo({
+        visible: true,
+        word,
+        position: { x: Math.max(5, Math.min(viewportWidth - popupWidth - 5, xPos)), y: rect.top - 5 },
+      });
+    }
 
     setLoadingDefinition(true);
     try {
-      const sentenceWithMarkedWord = (surroundingText || '').replace(new RegExp(`\\b(${word})\\b`, 'i'), '~$1~');
-      const url = apiService.getUnifiedWordDataUrl(word, sentenceWithMarkedWord, nativeLanguage, targetLanguage);
-      const unifiedData = await apiService.fetchJson(url);
-      setWordDefinitions((prev) => ({
-        ...prev,
-        [word.toLowerCase()]: {
-          ...unifiedData,
-          word,
-          translation: unifiedData.translation || word,
-          contextualExplanation: unifiedData.definition || 'Definition unavailable',
-          definition: unifiedData.definition || 'Definition unavailable',
-          example: unifiedData.exampleForDictionary || unifiedData.example || '',
-          frequency: unifiedData.frequency || 5,
-        },
-      }));
       if (hintMode) {
-        setHintMessage(`${word}: ${unifiedData?.translation || word}`);
+        // Minimal word translation to target language (no popup)
+        const prompt = `Translate only the word "${word}" from ${nativeLanguage} to ${targetLanguage}. Respond with only the ${targetLanguage} translation (one or two words), no punctuation or quotes.`;
+        const resp = await aiService.sendChat({
+          messages: [{ role: 'user', content: prompt }],
+          systemPrompt: 'Return only the translation text.'
+        });
+        const translationOnly = (resp?.message?.content || '').trim().replace(/^"|"$/g, '');
+        if (Number.isInteger(tokenIndex) && tokenIndex >= 0 && translationOnly) {
+          setInlineHints((prev) => ({ ...prev, [tokenIndex]: translationOnly }));
+        }
+        setHintMessage('');
+      } else {
+        const sentenceWithMarkedWord = (surroundingText || '').replace(new RegExp(`\\b(${word})\\b`, 'i'), '~$1~');
+        const url = apiService.getUnifiedWordDataUrl(word, sentenceWithMarkedWord, nativeLanguage, targetLanguage);
+        const unifiedData = await apiService.fetchJson(url);
+        setWordDefinitions((prev) => ({
+          ...prev,
+          [word.toLowerCase()]: {
+            ...unifiedData,
+            word,
+            translation: unifiedData.translation || word,
+            contextualExplanation: unifiedData.definition || 'Definition unavailable',
+            definition: unifiedData.definition || 'Definition unavailable',
+            example: unifiedData.exampleForDictionary || unifiedData.example || '',
+            frequency: unifiedData.frequency || 5,
+          },
+        }));
       }
     } catch (err) {
-      setWordDefinitions((prev) => ({
-        ...prev,
-        [word.toLowerCase()]: {
-          word,
-          translation: word,
-          contextualExplanation: 'Definition unavailable',
-          definition: 'Definition unavailable',
-          example: `~${word}~`,
-        },
-      }));
-      if (hintMode) {
-        setHintMessage(`${word}`);
+      if (!hintMode) {
+        setWordDefinitions((prev) => ({
+          ...prev,
+          [word.toLowerCase()]: {
+            word,
+            translation: word,
+            contextualExplanation: 'Definition unavailable',
+            definition: 'Definition unavailable',
+            example: `~${word}~`,
+          },
+        }));
       }
     } finally {
       setLoadingDefinition(false);
     }
-  }, [nativeLanguage, targetLanguage]);
+  }, [nativeLanguage, targetLanguage, hintMode]);
 
   const renderClickableTokens = useCallback((text, keyPrefix) => {
     const tokens = tokenizeText(text || '');
@@ -203,14 +216,20 @@ Return only the evaluation result.`;
       return (
         <span
           key={tokenKey}
-          onClick={isWord ? (e) => handleWordClick(token, e, text) : undefined}
+          onClick={isWord ? (e) => handleWordClick(token, e, text, index) : undefined}
           className={isWord ? 'sp-clickable-word' : ''}
+          style={isWord ? { position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' } : undefined}
         >
+          {isWord && inlineHints[index] ? (
+            <span style={{ position: 'absolute', bottom: '100%', marginBottom: 2, fontSize: 12, color: '#93c5fd', background: 'transparent', pointerEvents: 'none' }}>
+              {inlineHints[index]}
+            </span>
+          ) : null}
           {token}
         </span>
       );
     });
-  }, [handleWordClick]);
+  }, [handleWordClick, inlineHints]);
 
   const openExplainPopup = async (event, oldWord, newWord) => {
     const rect = event.currentTarget.getBoundingClientRect();
