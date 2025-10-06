@@ -221,7 +221,23 @@ Return only the evaluation result.`;
           style={isWord ? { position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' } : undefined}
         >
           {isWord && inlineHints[index] ? (
-            <span style={{ position: 'absolute', bottom: '100%', marginBottom: 2, fontSize: 12, color: '#93c5fd', background: 'transparent', pointerEvents: 'none' }}>
+            <span
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginBottom: 1,
+                fontSize: '1em',
+                fontStyle: 'italic',
+                lineHeight: 1,
+                color: '#93c5fd',
+                background: 'transparent',
+                pointerEvents: 'none',
+                zIndex: 1,
+                whiteSpace: 'nowrap'
+              }}
+            >
               {inlineHints[index]}
             </span>
           ) : null}
