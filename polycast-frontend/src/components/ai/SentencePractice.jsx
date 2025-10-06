@@ -166,10 +166,7 @@ Return only the evaluation result.`;
 
       // Contextual translation using full sentence and marked word
       const sentenceWithMarkedWord = (surroundingText || '').replace(new RegExp(`\\b(${word})\\b`, 'i'), '~$1~');
-      const prompt = `Translate ONLY the ~marked~ word from the following ${nativeLanguage} sentence into ${targetLanguage}. Provide the best translation for THIS CONTEXT.
-
-Sentence: ${surroundingText}
-Return only the ${targetLanguage} word or two-word phrase, no punctuation or quotes.`;
+      const prompt = `Translate ONLY the ~marked~ word from the following ${nativeLanguage} sentence into ${targetLanguage}. Provide the best translation for THIS CONTEXT.\n\nSentence: ${sentenceWithMarkedWord}\nTarget word (marked with tildes): ${word}\nReturn only the ${targetLanguage} word or two-word phrase, no punctuation or quotes.`;
       const resp = await aiService.sendChat({
         messages: [{ role: 'user', content: prompt }],
         systemPrompt: 'Return only the translation text.'
