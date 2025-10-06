@@ -219,6 +219,7 @@ function AIMode({
           selectedProfile={selectedProfile}
           selectedWords={selectedWords}
           onBack={handleBackToSelector}
+          onAddWord={onAddWord}
         />
       ) : (
         <>

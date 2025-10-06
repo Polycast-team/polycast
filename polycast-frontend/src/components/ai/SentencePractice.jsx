@@ -525,7 +525,12 @@ Return only the evaluation result.`;
                         for (const item of clickedHints) {
                           const head = (item.translation || '').split(/[,;\s]+/)[0];
                           if (head) {
-                            try { await onAddWord?.(head.toLowerCase()); } catch (e) { console.warn('add word failed', e); }
+                            try {
+                              // Build context with the original sentence and English token
+                              const englishContext = currentSentence || '';
+                              // Prefer adding the target-language headword, letting backend fetch full details
+                              await onAddWord?.(head.toLowerCase());
+                            } catch (e) { console.warn('add word failed', e); }
                           }
                         }
                         setClickedHints([]);
@@ -664,6 +669,7 @@ SentencePractice.propTypes = {
   selectedProfile: PropTypes.string.isRequired,
   selectedWords: PropTypes.array,
   onBack: PropTypes.func.isRequired,
+  onAddWord: PropTypes.func,
 };
 
 export default SentencePractice;
