@@ -5,7 +5,7 @@ import apiService from '../../services/apiService';
 import aiService from '../../services/aiService';
 import tokenizeText from '../../utils/tokenizeText';
 import WordDefinitionPopup from '../WordDefinitionPopup';
-import { getConjugationTable, SPANISH_PERSON_LABELS } from '../../utils/spanishConjugations';
+import { getConjugationBundle } from '../../utils/conjugations/index.js';
 import './SentencePractice.css';
 
 function SentencePractice({
@@ -366,7 +366,7 @@ Return only the evaluation result.`;
           >
             {hintMode ? (ui?.hintsOn || 'Hints: ON') : (ui?.needHint || 'I need a hint!')}
           </button>
-          {hintMode && (
+          {hintMode && getConjugationBundle(getLanguageForProfile(selectedProfile).toLowerCase().startsWith('spanish') ? 'es' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('french') ? 'fr' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('italian') ? 'it' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('portuguese') ? 'pt' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('german') ? 'de' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('russian') ? 'ru' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('turkish') ? 'tr' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('japanese') ? 'ja' : getLanguageForProfile(selectedProfile).toLowerCase().startsWith('korean') ? 'ko' : null) && (
             <button
               className="conjugation-help-button"
               onClick={async () => {
@@ -505,37 +505,61 @@ Return only the evaluation result.`;
         />
       )}
 
-      {showConjugationHelp && (
+      {showConjugationHelp && (() => {
+        const langName = getLanguageForProfile(selectedProfile).toLowerCase();
+        const code = langName.startsWith('spanish') ? 'es' : langName.startsWith('french') ? 'fr' : langName.startsWith('italian') ? 'it' : langName.startsWith('portuguese') ? 'pt' : langName.startsWith('german') ? 'de' : langName.startsWith('russian') ? 'ru' : langName.startsWith('turkish') ? 'tr' : langName.startsWith('japanese') ? 'ja' : langName.startsWith('korean') ? 'ko' : null;
+        const bundle = code ? getConjugationBundle(code) : null;
+        if (!bundle) return null;
+        return (
         <div className="conjugation-modal">
           <div className="conjugation-modal-content">
             <button className="popup-close-btn" onClick={() => setShowConjugationHelp(false)}>×</button>
             {(() => {
-              const table = getConjugationTable(detectedTense || 'present');
+              const tenses = bundle.tenses;
+              const persons = bundle.persons;
+              const tenseKey = detectedTense && tenses[detectedTense] ? detectedTense : Object.keys(tenses)[0];
+              const table = tenses[tenseKey];
               if (!table) return <div>No table found.</div>;
               return (
                 <div>
                   <h3>{table.label}</h3>
                   <p style={{ marginTop: 4 }}>{table.description}</p>
-                  <div className="conjugation-table">
-                    <div className="conj-header">Person</div>
-                    <div className="conj-header">-ar</div>
-                    <div className="conj-header">-er</div>
-                    <div className="conj-header">-ir</div>
-                    {SPANISH_PERSON_LABELS.map((person, idx) => (
-                      <React.Fragment key={`row-${idx}`}>
-                        <div className="conj-cell person">{person}</div>
-                        <div className="conj-cell">{table.ar[idx]}</div>
-                        <div className="conj-cell">{table.er[idx]}</div>
-                        <div className="conj-cell">{table.ir[idx]}</div>
-                      </React.Fragment>
-                    ))}
-                  </div>
+                  {persons ? (
+                    <div className="conjugation-table">
+                      <div className="conj-header">Person</div>
+                      {table.ar && <div className="conj-header">-ar</div>}
+                      {table.er && <div className="conj-header">-er</div>}
+                      {table.ir && <div className="conj-header">-ir</div>}
+                      {table.er && !table.ar && !table.ir && <div className="conj-header">-er</div>}
+                      {table.common && <div className="conj-header" style={{ gridColumn: 'span 3' }}>Common</div>}
+                      {persons.map((person, idx) => (
+                        <React.Fragment key={`row-${idx}`}>
+                          <div className="conj-cell person">{person}</div>
+                          {table.ar && <div className="conj-cell">{table.ar[idx]}</div>}
+                          {table.er && <div className="conj-cell">{table.er[idx]}</div>}
+                          {table.ir && <div className="conj-cell">{table.ir[idx]}</div>}
+                          {table.regular && <div className="conj-cell" style={{ gridColumn: 'span 3' }}>{table.regular[idx]}</div>}
+                          {table.common && <div className="conj-cell" style={{ gridColumn: 'span 3' }}>{table.common[idx]}</div>}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 8 }}>
+                      {Object.keys(tenses).map((key) => (
+                        <div key={key} style={{ marginBottom: 8 }}>
+                          <div style={{ fontWeight: 600 }}>{tenses[key].label}</div>
+                          <div style={{ opacity: 0.8 }}>{tenses[key].description}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })()}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {explainPopup.visible && (
         <div className="explain-popup" style={{ 
