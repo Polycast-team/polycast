@@ -5,6 +5,7 @@ import apiService from '../../services/apiService';
 import aiService from '../../services/aiService';
 import tokenizeText from '../../utils/tokenizeText';
 import WordDefinitionPopup from '../WordDefinitionPopup';
+import { getConjugationTable, SPANISH_PERSON_LABELS } from '../../utils/spanishConjugations';
 import './SentencePractice.css';
 
 function SentencePractice({
@@ -29,6 +30,10 @@ function SentencePractice({
   const [wordDefinitions, setWordDefinitions] = useState({});
   const [explainPopup, setExplainPopup] = useState({ visible: false, position: { x: 0, y: 0 }, oldWord: '', newWord: '', loading: false, response: '', input: '' });
   const [targetWord, setTargetWord] = useState(null);
+  const [hintMode, setHintMode] = useState(false);
+  const [hintMessage, setHintMessage] = useState('');
+  const [showConjugationHelp, setShowConjugationHelp] = useState(false);
+  const [detectedTense, setDetectedTense] = useState(null);
 
   const generateSentence = useCallback(async () => {
     setIsLoading(true);
@@ -168,6 +173,9 @@ Return only the evaluation result.`;
           frequency: unifiedData.frequency || 5,
         },
       }));
+      if (hintMode) {
+        setHintMessage(`${word}: ${unifiedData?.translation || word}`);
+      }
     } catch (err) {
       setWordDefinitions((prev) => ({
         ...prev,
@@ -179,6 +187,9 @@ Return only the evaluation result.`;
           example: `~${word}~`,
         },
       }));
+      if (hintMode) {
+        setHintMessage(`${word}`);
+      }
     } finally {
       setLoadingDefinition(false);
     }
@@ -333,6 +344,43 @@ Return only the evaluation result.`;
             <input type="checkbox" checked={ignoreAccents} onChange={(e)=> setIgnoreAccents(e.target.checked)} />
             <span>Ignore accents when checking</span>
           </label>
+          <button
+            className="hint-button"
+            onClick={() => {
+              setHintMode((v) => !v);
+              setHintMessage('Click any word in the sentence to see a brief translation.');
+            }}
+          >
+            {hintMode ? 'Hints: ON' : 'I need a hint!'}
+          </button>
+          {hintMode && (
+            <button
+              className="conjugation-help-button"
+              onClick={async () => {
+                try {
+                  // Lightweight tense detection prompt
+                  const detectPrompt = `Given this ${nativeLanguage} sentence: "${currentSentence}" and the target language ${targetLanguage}, identify which Spanish tense is primarily required for an accurate translation. Reply with one key: present | preterite | imperfect | future | conditional | present_subjunctive | imperfect_subjunctive | present_perfect. Reply ONLY the key.`;
+                  const resp = await aiService.sendChat({
+                    messages: [{ role: 'user', content: detectPrompt }],
+                    systemPrompt: 'Reply only with the key name from the provided list.'
+                  });
+                  const key = (resp?.message?.content || '').trim().toLowerCase();
+                  setDetectedTense(key);
+                } catch (_) {
+                  setDetectedTense('present');
+                }
+                setShowConjugationHelp(true);
+              }}
+            >
+              Conjugation help
+            </button>
+          )}
+        </div>
+        {hintMode && hintMessage && (
+          <div className="hint-banner">
+            {hintMessage}
+          </div>
+        )}
         </div>
         {isLoading ? (
           <div className="sentence-practice-loading">
@@ -344,7 +392,7 @@ Return only the evaluation result.`;
             <div className="sentence-practice-prompt">
               <h3>{ui?.translateThis || "Translate this sentence"}:</h3>
               <div className="sentence-practice-original">
-                {currentSentence}
+                {renderClickableTokens(currentSentence, 'orig')}
               </div>
               {targetWord && (
                 <div className="target-word-hint">
@@ -443,6 +491,38 @@ Return only the evaluation result.`;
           nativeLanguage={nativeLanguage}
           onClose={() => setPopupInfo((prev) => ({ ...prev, visible: false }))}
         />
+      )}
+
+      {showConjugationHelp && (
+        <div className="conjugation-modal">
+          <div className="conjugation-modal-content">
+            <button className="popup-close-btn" onClick={() => setShowConjugationHelp(false)}>×</button>
+            {(() => {
+              const table = getConjugationTable(detectedTense || 'present');
+              if (!table) return <div>No table found.</div>;
+              return (
+                <div>
+                  <h3>{table.label}</h3>
+                  <p style={{ marginTop: 4 }}>{table.description}</p>
+                  <div className="conjugation-table">
+                    <div className="conj-header">Person</div>
+                    <div className="conj-header">-ar</div>
+                    <div className="conj-header">-er</div>
+                    <div className="conj-header">-ir</div>
+                    {SPANISH_PERSON_LABELS.map((person, idx) => (
+                      <React.Fragment key={`row-${idx}`}>
+                        <div className="conj-cell person">{person}</div>
+                        <div className="conj-cell">{table.ar[idx]}</div>
+                        <div className="conj-cell">{table.er[idx]}</div>
+                        <div className="conj-cell">{table.ir[idx]}</div>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       )}
 
       {explainPopup.visible && (
