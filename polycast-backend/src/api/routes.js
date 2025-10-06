@@ -647,11 +647,13 @@ router.get('/sentences/practice', authMiddleware, async (req, res) => {
         }
 
         const genAI = new GoogleGenerativeAI(config.geminiApiKey);
-        const model = genAI.getGenerativeModel({ model: GEMINI_CHAT_MODEL, systemInstruction: `You generate a single natural sentence in ${fromLang}. Target language for translation practice is ${toLang}. The learner proficiency level is ${effectiveLevel} (1=absolute beginner, 5=advanced). Avoid profanity and sensitive content. Keep length 8-18 words. If targetWord is provided, include it naturally. Output only the sentence, no quotes.` });
+        const model = genAI.getGenerativeModel({ model: GEMINI_CHAT_MODEL, systemInstruction: `You generate a single natural sentence in ${fromLang}. Target language for translation practice is ${toLang}. The learner proficiency level is ${effectiveLevel} (1=absolute beginner, 5=advanced). Avoid profanity and sensitive content. Keep length 8-18 words.
+
+IMPORTANT: The sentence must be written entirely in ${fromLang} with no code-switching into ${toLang}. If a targetWord is provided, craft a scenario that would lead a translator to use that ${toLang} word, but do NOT include ${toLang} vocabulary in the ${fromLang} sentence itself. Output only the sentence, no quotes.` });
 
         // Build prompt
         const safeWord = (typeof targetWord === 'string' && targetWord.trim()) ? targetWord.trim() : '';
-        const prompt = `Generate one ${fromLang} sentence suitable for a ${toLang} learner at level ${effectiveLevel}. ${safeWord ? `Include the word "${safeWord}" naturally.` : ''} No offensive content. 8-18 words. Respond with only the sentence.`;
+        const prompt = `Generate one ${fromLang} sentence suitable for a ${toLang} learner at level ${effectiveLevel}. ${safeWord ? `Create a context where the ${toLang} word "${safeWord}" would be used in translation, but write entirely in ${fromLang} without inserting ${toLang} words.` : ''} No offensive content. 8-18 words. Respond with only the sentence.`;
 
         // Uniqueness guard: try a few times to get unseen sentence
         const seenSet = new Set();
