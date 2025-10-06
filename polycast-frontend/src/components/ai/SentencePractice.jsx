@@ -260,6 +260,55 @@ Return only the evaluation result.`;
     });
   };
 
+  // Helpers to render full corrected sentence and original with strike-through
+  const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const extractCorrectionPairs = (text) => {
+    if (!text || typeof text !== 'string') return [];
+    const regex = /--([^\[]+)\[([^\]]+)\]/g;
+    const pairs = [];
+    let m;
+    while ((m = regex.exec(text)) !== null) {
+      const oldWord = (m[1] || '').trim();
+      const newWord = (m[2] || '').trim();
+      if (oldWord && newWord) pairs.push({ oldWord, newWord });
+    }
+    return pairs;
+  };
+
+  const buildCorrectedSentence = (original, pairs) => {
+    if (!original || !pairs || pairs.length === 0) return original || '';
+    let output = original;
+    pairs.forEach(({ oldWord, newWord }) => {
+      if (!oldWord) return;
+      const pattern = new RegExp(`\\b${escapeRegExp(oldWord)}\\b`, 'gi');
+      output = output.replace(pattern, (match) => {
+        // Preserve capitalization style of the original token
+        const isCapitalized = /^[A-ZÁÉÍÓÚÑÜ]/.test(match);
+        if (isCapitalized && newWord) {
+          return newWord.charAt(0).toUpperCase() + newWord.slice(1);
+        }
+        return newWord;
+      });
+    });
+    return output;
+  };
+
+  const renderOriginalWithStrikes = (original, pairs) => {
+    if (!original) return null;
+    const tokens = tokenizeText(original || '');
+    const toStrike = new Set((pairs || []).map(p => (p.oldWord || '').toLowerCase()));
+    return tokens.map((token, index) => {
+      const isWord = /^[\p{L}\p{M}\d']+$/u.test(token);
+      const shouldStrike = isWord && toStrike.has(token.toLowerCase());
+      return (
+        <span key={`strike-${index}`} style={shouldStrike ? { textDecoration: 'line-through', color: '#ef4444' } : undefined}>
+          {token}
+        </span>
+      );
+    });
+  };
+
   return (
     <div className="sentence-practice-container">
       <div className="sentence-practice-header">
@@ -341,14 +390,26 @@ Return only the evaluation result.`;
                     <div className="result-text">
                       <h4>{ui?.needsCorrection || "Needs Correction"}</h4>
                       <div className="correction-display">
-                        <div className="corrected-version">
-                          <div className="correction-label">Corrected version:</div>
-                          <div className="correction-text">{renderCorrectedText(evaluationResult.correctedText)}</div>
-                        </div>
-                        <div className="your-translation">
-                          <div className="yt-label">Your attempt (click words):</div>
-                          <div className="yt-content">{renderClickableTokens(userTranslation, 'yt')}</div>
-                        </div>
+                        {(() => {
+                          const pairs = extractCorrectionPairs(evaluationResult.correctedText || '');
+                          const correctedFull = buildCorrectedSentence(userTranslation, pairs);
+                          return (
+                            <>
+                              <div className="corrected-version">
+                                <div className="correction-label">Corrected sentence:</div>
+                                <div className="correction-text">
+                                  {renderClickableTokens(correctedFull, 'corr-full')}
+                                </div>
+                              </div>
+                              <div className="your-translation">
+                                <div className="yt-label">Your sentence (errors struck):</div>
+                                <div className="yt-content">
+                                  {renderOriginalWithStrikes(userTranslation, pairs)}
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
