@@ -272,8 +272,6 @@ Return only the evaluation result.`;
   };
 
   // Helpers to render full corrected sentence and original with strike-through
-  const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
   const extractCorrectionPairs = (text) => {
     if (!text || typeof text !== 'string') return [];
     const regex = /--([^\[]+)\[([^\]]+)\]/g;
@@ -289,20 +287,24 @@ Return only the evaluation result.`;
 
   const buildCorrectedSentence = (original, pairs) => {
     if (!original || !pairs || pairs.length === 0) return original || '';
-    let output = original;
-    pairs.forEach(({ oldWord, newWord }) => {
-      if (!oldWord) return;
-      const pattern = new RegExp(`\\b${escapeRegExp(oldWord)}\\b`, 'gi');
-      output = output.replace(pattern, (match) => {
-        // Preserve capitalization style of the original token
-        const isCapitalized = /^[A-ZÁÉÍÓÚÑÜ]/.test(match);
-        if (isCapitalized && newWord) {
-          return newWord.charAt(0).toUpperCase() + newWord.slice(1);
-        }
-        return newWord;
-      });
+    const replacementMap = new Map(
+      pairs
+        .filter(p => p.oldWord && p.newWord)
+        .map(({ oldWord, newWord }) => [String(oldWord).toLowerCase(), String(newWord)])
+    );
+    const tokens = tokenizeText(original || '');
+    const replaced = tokens.map((token) => {
+      const isWord = /^[\p{L}\p{M}\d']+$/u.test(token);
+      if (!isWord) return token;
+      const lower = token.toLowerCase();
+      if (!replacementMap.has(lower)) return token;
+      const newWord = replacementMap.get(lower);
+      const isCapitalized = /^[A-ZÁÉÍÓÚÑÜ]/.test(token);
+      return isCapitalized && newWord
+        ? newWord.charAt(0).toUpperCase() + newWord.slice(1)
+        : newWord;
     });
-    return output;
+    return replaced.join('');
   };
 
   const renderOriginalWithStrikes = (original, pairs) => {
