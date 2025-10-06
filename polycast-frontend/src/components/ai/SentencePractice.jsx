@@ -5,7 +5,6 @@ import apiService from '../../services/apiService';
 import aiService from '../../services/aiService';
 import tokenizeText from '../../utils/tokenizeText';
 import WordDefinitionPopup from '../WordDefinitionPopup';
-import AddWordPopup from '../popups/AddWordPopup';
 import { getConjugationBundle } from '../../utils/conjugations/index.js';
 import { getLanguageCodeForProfile } from '../../utils/profileLanguageMapping';
 import './SentencePractice.css';
@@ -41,8 +40,7 @@ function SentencePractice({
   const [activeHintText, setActiveHintText] = useState('');
   const [clickedHints, setClickedHints] = useState([]); // [{index, word, translation}]
   const [showAddClickedWords, setShowAddClickedWords] = useState(false);
-  const [addPopupOpen, setAddPopupOpen] = useState(false);
-  const [addPopupSeed, setAddPopupSeed] = useState('');
+  // No separate AddWordPopup; chips open the standard WordDefinitionPopup flow
 
   const generateSentence = useCallback(async () => {
     setIsLoading(true);
@@ -208,6 +206,54 @@ Return only the evaluation result.`;
       setLoadingDefinition(false);
     }
   }, [nativeLanguage, targetLanguage, hintMode, activeHintIndex]);
+
+  const handleChipClick = useCallback(async (targetWord, event) => {
+    if (!event) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const popupWidth = 380;
+    const spaceOnRight = viewportWidth - rect.right;
+    const fitsOnRight = spaceOnRight >= popupWidth + 10;
+    const xPos = fitsOnRight ? rect.right + 5 : rect.left - popupWidth - 5;
+    setPopupInfo({
+      visible: true,
+      word: targetWord,
+      position: { x: Math.max(5, Math.min(viewportWidth - popupWidth - 5, xPos)), y: rect.top - 5 },
+    });
+
+    setLoadingDefinition(true);
+    try {
+      // Use minimal context with the headword marked for unified API
+      const sentenceWithMarkedWord = `~${targetWord}~`;
+      const url = apiService.getUnifiedWordDataUrl(targetWord, sentenceWithMarkedWord, nativeLanguage, targetLanguage);
+      const unifiedData = await apiService.fetchJson(url);
+      setWordDefinitions((prev) => ({
+        ...prev,
+        [targetWord.toLowerCase()]: {
+          ...unifiedData,
+          word: targetWord,
+          translation: unifiedData.translation || targetWord,
+          contextualExplanation: unifiedData.definition || 'Definition unavailable',
+          definition: unifiedData.definition || 'Definition unavailable',
+          example: unifiedData.exampleForDictionary || unifiedData.example || '',
+          frequency: unifiedData.frequency || 5,
+        },
+      }));
+    } catch (_) {
+      setWordDefinitions((prev) => ({
+        ...prev,
+        [targetWord.toLowerCase()]: {
+          word: targetWord,
+          translation: targetWord,
+          contextualExplanation: 'Definition unavailable',
+          definition: 'Definition unavailable',
+          example: `~${targetWord}~`,
+        },
+      }));
+    } finally {
+      setLoadingDefinition(false);
+    }
+  }, [nativeLanguage, targetLanguage]);
 
   const renderClickableTokens = useCallback((text, keyPrefix, clickable = false) => {
     const tokens = tokenizeText(text || '');
@@ -516,16 +562,15 @@ Return only the evaluation result.`;
                     <div style={{ marginBottom: 8, fontWeight: 600 }}>Add unknown words to dictionary?</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {clickedHints.map((item, idx) => (
-                        <span key={`cw-${item.index}-${idx}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: '#0b1728', border: '1px solid #1f2a37', borderRadius: 6 }}>
-                          <span style={{ color: '#7dd3fc', fontStyle: 'italic' }}>{item.translation}</span>
-                          <button onClick={() => setClickedHints(prev => prev.filter(p => p.index !== item.index))} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>×</button>
-                          <button
-                            onClick={() => { setAddPopupSeed((item.translation || '').split(/[,;\s]+/)[0] || ''); setAddPopupOpen(true); }}
-                            style={{ border: 'none', background: '#10b981', color: '#fff', padding: '2px 6px', borderRadius: 4, cursor: 'pointer' }}
-                          >
-                            + Add
-                          </button>
-                        </span>
+                        <button
+                          key={`cw-${item.index}-${idx}`}
+                          onClick={(e) => handleChipClick((item.translation || '').split(/[,;\s]+/)[0] || item.translation, e)}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: '#0b1728', border: '1px solid #1f2a37', borderRadius: 6, color: '#7dd3fc', fontStyle: 'italic', cursor: 'pointer' }}
+                          title="Open details and add to dictionary"
+                        >
+                          <span>{item.translation}</span>
+                          <span style={{ color: '#ef4444', fontStyle: 'normal' }} onClick={(e) => { e.stopPropagation(); setClickedHints(prev => prev.filter(p => p.index !== item.index)); }}>×</span>
+                        </button>
                       ))}
                     </div>
                   </div>
