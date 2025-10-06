@@ -41,6 +41,7 @@ function SentencePractice({
   const [activeHintWord, setActiveHintWord] = useState(''); // the source token clicked
   const [clickedHints, setClickedHints] = useState([]); // [{index, word, translation}]
   const [showAddClickedWords, setShowAddClickedWords] = useState(false);
+  const [addingIndices, setAddingIndices] = useState([]); // indices currently saving
   // No separate AddWordPopup; chips open the standard WordDefinitionPopup flow
 
   const generateSentence = useCallback(async () => {
@@ -299,6 +300,8 @@ Return only the evaluation result.`;
                 onClick={async (e) => {
                   e.stopPropagation();
                   try {
+                    if (addingIndices.includes(index)) return;
+                    setAddingIndices((prev) => [...prev, index]);
                     const srcToken = activeHintWord || token; // add the source-language token
                     const marked = (text || '').replace(new RegExp(`\\b${escapeRegExp(srcToken)}\\b`, 'i'), `~${srcToken}~`);
                     const url = apiService.getUnifiedWordDataUrl(srcToken.toLowerCase(), marked, nativeLanguage, targetLanguage);
@@ -315,6 +318,8 @@ Return only the evaluation result.`;
                     setClickedHints(prev => prev.map(h => h.index === index ? { ...h, added: true } : h));
                   } catch (err) {
                     console.warn('Inline add failed:', err);
+                  } finally {
+                    setAddingIndices((prev) => prev.filter((i) => i !== index));
                   }
                 }}
                 style={{
@@ -324,11 +329,11 @@ Return only the evaluation result.`;
                   fontWeight: 700,
                   padding: '0 6px',
                   borderRadius: 4,
-                  cursor: 'pointer',
+                  cursor: addingIndices.includes(index) ? 'default' : 'pointer',
                 }}
                 title="Add to dictionary"
               >
-                {clickedHints.find(h => h.index === index && h.added) ? '✓' : '+'}
+                {addingIndices.includes(index) ? '…' : (clickedHints.find(h => h.index === index && h.added) ? '✓' : '+')}
               </button>
             </span>
           ) : null}
