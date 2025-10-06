@@ -94,7 +94,6 @@ Be flexible and recognize that there are often multiple correct ways to translat
 Return only the evaluation result.`;
 
       const level = getProficiencyForProfile(selectedProfile);
-      const level = getProficiencyForProfile(selectedProfile);
       const response = await aiService.sendChat({
         messages: [{ role: 'user', content: prompt }],
         systemPrompt: `You are a helpful language learning assistant for a learner at level ${level}/5. Be encouraging and recognize that there are often multiple correct ways to translate the same sentence. Focus on meaning and naturalness rather than exact word-for-word matches. Use the specified format for corrections.${level <= 2 ? ` Provide brief clarifications in ${nativeLanguage} along with ${targetLanguage}.` : ''}`,
