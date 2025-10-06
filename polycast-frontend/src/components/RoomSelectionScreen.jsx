@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import apiService from '../services/apiService';
+import { getUIStrings } from '../i18n/index.js';
+import { getNativeLanguageCodeForProfile } from '../utils/profileLanguageMapping.js';
 
-function RoomSelectionScreen({ onRoomSetup }) {
+function RoomSelectionScreen({ onRoomSetup, selectedProfile }) {
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const ui = getUIStrings(getNativeLanguageCodeForProfile(selectedProfile));
 
   const handleStudentSubmit = async (e) => {
     e.preventDefault();
@@ -16,7 +19,7 @@ function RoomSelectionScreen({ onRoomSetup }) {
     
     // Basic validation for room code format (5 digits)
     if (cleanedRoomCode.length !== 5) {
-      setError('Room code must be 5 digits');
+      setError(ui?.errors?.joinRoomCodeLength || 'Room code must be 5 digits.');
       return;
     }
     
@@ -33,7 +36,7 @@ function RoomSelectionScreen({ onRoomSetup }) {
       });
     } catch (err) {
       console.error('Error joining room:', err);
-      setError(`Failed to join room: ${err.message}}`);
+      setError(ui?.errors?.createRoomFailed ? ui.errors.createRoomFailed(err.message) : `Failed to join room: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -41,12 +44,12 @@ function RoomSelectionScreen({ onRoomSetup }) {
 
   return (
     <div className="student-join-container">
-      <p>Enter a 5-digit room code to join as a student</p>
+      <p>{ui?.enterRoomCode || 'Enter room code'}</p>
       <form onSubmit={handleStudentSubmit} className="student-join-form">
         <div className="student-join-row">
           <input
             type="text"
-            placeholder="5-digit room code"
+            placeholder={ui?.enterRoomCode || 'Enter room code'}
             value={roomCode}
             onChange={(e) => setRoomCode(e.target.value)}
             maxLength={5}
@@ -58,7 +61,7 @@ function RoomSelectionScreen({ onRoomSetup }) {
             className="room-btn student-btn"
             disabled={isLoading}
           >
-            {isLoading ? 'Joining...' : 'Join Room'}
+            {isLoading ? (ui?.joining || 'Joining...') : (ui?.joinRoom || 'Join Room')}
           </button>
         </div>
       </form>
@@ -68,7 +71,8 @@ function RoomSelectionScreen({ onRoomSetup }) {
 }
 
 RoomSelectionScreen.propTypes = {
-  onRoomSetup: PropTypes.func.isRequired
+  onRoomSetup: PropTypes.func.isRequired,
+  selectedProfile: PropTypes.string,
 };
 
 export default RoomSelectionScreen;

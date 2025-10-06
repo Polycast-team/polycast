@@ -285,7 +285,7 @@ function AIMode({
                 onClick={handleSend}
                 disabled={isSending}
               >
-                {isSending ? ui?.sending || 'Sending…' : ui?.send || 'Send'}
+                {isSending ? (ui?.sending || 'Sending…') : (ui?.send || 'Send')}
               </button>
             </div>
           </div>

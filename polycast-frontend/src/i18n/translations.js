@@ -54,6 +54,13 @@ const EN_UI = {
   correctedVersion: "Here's the corrected version:",
   nextSentence: 'Next Sentence',
   score: 'Score',
+  ignoreAccents: 'Ignore accents when checking',
+  needHint: 'I need a hint!',
+  hintsOn: 'Hints: ON',
+  conjugationHelp: 'Conjugation help',
+  hintClickInstruction: 'Click any word in the sentence to see a brief translation.',
+  yourSentenceErrors: 'Your sentence (errors struck):',
+  loading: 'Loading…',
 };
 
 const EN_APP = {

@@ -355,16 +355,16 @@ Return only the evaluation result.`;
         <div className="sentence-practice-controls">
           <label className="toggle-accents">
             <input type="checkbox" checked={ignoreAccents} onChange={(e)=> setIgnoreAccents(e.target.checked)} />
-            <span>Ignore accents when checking</span>
+            <span>{ui?.ignoreAccents || 'Ignore accents when checking'}</span>
           </label>
           <button
             className="hint-button"
             onClick={() => {
               setHintMode((v) => !v);
-              setHintMessage('Click any word in the sentence to see a brief translation.');
+              setHintMessage(ui?.hintClickInstruction || 'Click any word in the sentence to see a brief translation.');
             }}
           >
-            {hintMode ? 'Hints: ON' : 'I need a hint!'}
+            {hintMode ? (ui?.hintsOn || 'Hints: ON') : (ui?.needHint || 'I need a hint!')}
           </button>
           {hintMode && (
             <button
@@ -385,7 +385,7 @@ Return only the evaluation result.`;
                 setShowConjugationHelp(true);
               }}
             >
-              Conjugation help
+              {ui?.conjugationHelp || 'Conjugation help'}
             </button>
           )}
         </div>
