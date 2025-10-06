@@ -11,6 +11,7 @@ function Register() {
   const [password, setPassword] = useState('');
   const [nativeLanguageCode, setNativeLanguageCode] = useState('en');
   const [targetLanguageCode, setTargetLanguageCode] = useState('es');
+  const [proficiencyLevel, setProficiencyLevel] = useState(3);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const registerStrings = useMemo(() => getRegisterStrings(nativeLanguageCode), [nativeLanguageCode]);
@@ -31,7 +32,8 @@ function Register() {
         username.trim(),
         password,
         nativeLanguage,
-        targetLanguage
+        targetLanguage,
+        proficiencyLevel
       );
       navigate('/app');
     } catch (e2) {
@@ -56,6 +58,17 @@ function Register() {
             <div className="auth-field">
               <label>{registerStrings.username}</label>
               <input value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" />
+            </div>
+            <div className="auth-field">
+              <label>Proficiency (1-5)</label>
+              <select
+                value={proficiencyLevel}
+                onChange={(e) => setProficiencyLevel(Number(e.target.value))}
+              >
+                {[1,2,3,4,5].map((lvl) => (
+                  <option key={lvl} value={lvl}>{lvl}</option>
+                ))}
+              </select>
             </div>
             <div className="auth-field">
               <label>{registerStrings.password}</label>

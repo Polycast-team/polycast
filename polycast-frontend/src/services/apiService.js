@@ -42,13 +42,12 @@ class ApiService {
     return `${this.baseUrl}/api/dictionary/quick?${params}`;
   }
 
-  // TATOEBA SENTENCES - fetch practice sentences
-  getTatoebaSentencesUrl = (fromLang, toLang, targetWord = null) => {
+  // PRACTICE SENTENCES - Gemini generated unique sentence
+  getPracticeSentenceUrl = (fromLang, toLang, targetWord = null, proficiencyLevel = null) => {
     const params = new URLSearchParams({ fromLang, toLang });
-    if (targetWord) {
-      params.append('targetWord', targetWord);
-    }
-    return `${this.baseUrl}/api/sentences/tatoeba?${params}`;
+    if (targetWord) params.append('targetWord', targetWord);
+    if (Number.isFinite(proficiencyLevel)) params.append('proficiencyLevel', String(proficiencyLevel));
+    return `${this.baseUrl}/api/sentences/practice?${params}`;
   }
 
   // Helper methods for common API patterns

@@ -46,6 +46,14 @@ export const getUITranslationsForProfile = (profile) => {
   return getUIStrings(nativeCode);
 };
 
+export const getProficiencyForProfile = (profile) => {
+  try {
+    return window?.pc_profileProficiency?.[profile] ?? 3;
+  } catch (_) {
+    return 3;
+  }
+};
+
 export const getFlashcardTranslationsForProfile = (profile) => {
   const nativeCode = getNativeLanguageCodeForProfile(profile);
   return getFlashcardStrings(nativeCode);

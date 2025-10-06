@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import WordDefinitionPopup from '../WordDefinitionPopup';
-import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../../utils/profileLanguageMapping';
+import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile, getProficiencyForProfile } from '../../utils/profileLanguageMapping';
 import { extractSentenceWithWord } from '../../utils/wordClickUtils';
 import tokenizeText from '../../utils/tokenizeText';
 import aiService from '../../services/aiService';
@@ -28,9 +28,14 @@ function AIMode({
     if (!nativeLanguage || !targetLanguage) {
       throw new Error('AIMode requires both nativeLanguage and targetLanguage to build system prompt');
     }
-    return DEFAULT_SYSTEM_PROMPT_TEMPLATE
+    const level = getProficiencyForProfile(selectedProfile);
+    const base = DEFAULT_SYSTEM_PROMPT_TEMPLATE
       .replace(/\{nativeLanguage\}/g, nativeLanguage)
       .replace(/\{targetLanguage\}/g, targetLanguage);
+    if (level <= 2) {
+      return `${base} The learner is beginner level (${level}/5). Provide simple explanations and include occasional brief phrases in ${nativeLanguage} to aid understanding, but keep most of the conversation in ${targetLanguage}.`;
+    }
+    return `${base} The learner proficiency is ${level}/5. Keep responses primarily in ${targetLanguage}.`;
   }, [nativeLanguage, targetLanguage]);
 
   const [messages, setMessages] = useState([

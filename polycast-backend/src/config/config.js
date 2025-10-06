@@ -17,7 +17,7 @@ const config = {
 
     // Google AI (Gemini) Configuration
     geminiApiKey: process.env.GEMINI_API_KEY,
-    geminiChatModel: toStringOr(process.env.GEMINI_CHAT_MODEL, 'gemini-2.0-flash'),
+    geminiChatModel: toStringOr(process.env.GEMINI_CHAT_MODEL, 'gemini-2.5-flash-lite-preview-09-2025'),
 
     // Deepgram Configuration
     deepgramApiKey: process.env.DEEPGRAM_API_KEY,

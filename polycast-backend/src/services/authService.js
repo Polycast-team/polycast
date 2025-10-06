@@ -5,12 +5,12 @@ const pool = require('../profile-data/pool');
 const ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
-async function createUser({ username, password, nativeLanguage, targetLanguage }) {
+async function createUser({ username, password, nativeLanguage, targetLanguage, proficiencyLevel = 3 }) {
   const passwordHash = await bcrypt.hash(password, ROUNDS);
-  const sql = `INSERT INTO profiles (username, password_hash, native_language, target_language)
-               VALUES ($1, $2, $3, $4)
-               RETURNING id, username, native_language, target_language, created_at, updated_at`;
-  const { rows } = await pool.query(sql, [username, passwordHash, nativeLanguage, targetLanguage]);
+  const sql = `INSERT INTO profiles (username, password_hash, native_language, target_language, proficiency_level)
+               VALUES ($1, $2, $3, $4, $5)
+               RETURNING id, username, native_language, target_language, proficiency_level, created_at, updated_at`;
+  const { rows } = await pool.query(sql, [username, passwordHash, nativeLanguage, targetLanguage, proficiencyLevel]);
   return rows[0];
 }
 
@@ -28,15 +28,20 @@ function issueToken(profile) {
 }
 
 async function getProfileById(id) {
-  const { rows } = await pool.query('SELECT id, username, native_language, target_language, created_at, updated_at FROM profiles WHERE id=$1', [id]);
+  const { rows } = await pool.query('SELECT id, username, native_language, target_language, proficiency_level, created_at, updated_at FROM profiles WHERE id=$1', [id]);
   return rows[0] || null;
 }
 
-async function updateProfileLanguages(id, { nativeLanguage, targetLanguage }) {
-  const { rows } = await pool.query(
-    'UPDATE profiles SET native_language=$1, target_language=$2, updated_at=now() WHERE id=$3 RETURNING id, username, native_language, target_language, created_at, updated_at',
-    [nativeLanguage, targetLanguage, id]
-  );
+async function updateProfileLanguages(id, { nativeLanguage, targetLanguage, proficiencyLevel }) {
+  const fields = ['native_language', 'target_language'];
+  const values = [nativeLanguage, targetLanguage];
+  if (Number.isFinite(proficiencyLevel)) {
+    fields.push('proficiency_level');
+    values.push(proficiencyLevel);
+  }
+  const setClause = fields.map((f, i) => `${f}=$${i + 1}`).join(', ') + ', updated_at=now()';
+  const sql = `UPDATE profiles SET ${setClause} WHERE id=$${values.length + 1} RETURNING id, username, native_language, target_language, proficiency_level, created_at, updated_at`;
+  const { rows } = await pool.query(sql, [...values, id]);
   return rows[0];
 }
 

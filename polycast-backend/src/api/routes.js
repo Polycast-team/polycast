@@ -22,12 +22,15 @@ router.post('/auth/register', async (req, res) => {
     console.log('[Auth] register hit. content-type:', req.headers['content-type']);
     console.log('[Auth] register body:', req.body);
     try {
-        const { username, password, nativeLanguage, targetLanguage } = req.body || {};
+        const { username, password, nativeLanguage, targetLanguage, proficiencyLevel } = req.body || {};
         if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
         if (!nativeLanguage || !targetLanguage) return res.status(400).json({ error: 'nativeLanguage and targetLanguage are required' });
         const existing = await authService.findUserByUsername(username);
         if (existing) return res.status(409).json({ error: 'Username already exists' });
-        const profile = await authService.createUser({ username, password, nativeLanguage, targetLanguage });
+        let level = parseInt(proficiencyLevel, 10);
+        if (!Number.isFinite(level)) level = 3;
+        level = Math.max(1, Math.min(5, level));
+        const profile = await authService.createUser({ username, password, nativeLanguage, targetLanguage, proficiencyLevel: level });
         const token = authService.issueToken(profile);
         return res.status(201).json({ token, profile });
     } catch (e) {
@@ -52,6 +55,7 @@ router.post('/auth/login', async (req, res) => {
             username: user.username,
             native_language: user.native_language,
             target_language: user.target_language,
+            proficiency_level: user.proficiency_level,
         };
         return res.json({ token, profile });
     } catch (e) {
@@ -96,9 +100,14 @@ router.get('/profiles/me', authMiddleware, async (req, res) => {
 
 router.put('/profiles/me', authMiddleware, async (req, res) => {
     try {
-        const { nativeLanguage, targetLanguage } = req.body || {};
+        const { nativeLanguage, targetLanguage, proficiencyLevel } = req.body || {};
         if (!nativeLanguage || !targetLanguage) return res.status(400).json({ error: 'nativeLanguage and targetLanguage are required' });
-        const updated = await authService.updateProfileLanguages(req.user.id, { nativeLanguage, targetLanguage });
+        let level = undefined;
+        if (proficiencyLevel !== undefined) {
+            const parsed = parseInt(proficiencyLevel, 10);
+            if (Number.isFinite(parsed)) level = Math.max(1, Math.min(5, parsed));
+        }
+        const updated = await authService.updateProfileLanguages(req.user.id, { nativeLanguage, targetLanguage, proficiencyLevel: level });
         return res.json(updated);
     } catch (e) {
         console.error('[Profiles] update me error:', e);
@@ -611,116 +620,80 @@ router.post('/tts', async (req, res) => {
     }
 });
 
-// Tatoeba sentence fetching
-router.get('/sentences/tatoeba', authMiddleware, async (req, res) => {
+// Practice sentence generation using Gemini, enforcing uniqueness
+router.get('/sentences/practice', authMiddleware, async (req, res) => {
     try {
-        const { fromLang, toLang, targetWord } = req.query || {};
-        
-        // Map language names to Tatoeba ISO codes
-        const langMap = {
-            'English': 'eng',
-            'Spanish': 'spa',
-            'French': 'fra',
-            'German': 'deu',
-            'Italian': 'ita',
-            'Portuguese': 'por',
-            'Russian': 'rus',
-            'Japanese': 'jpn',
-            'Chinese': 'cmn',
-            'Korean': 'kor'
-        };
-        
-        const fromCode = langMap[fromLang] || 'eng';
-        const toCode = langMap[toLang] || 'spa';
-        
-        console.log('[Tatoeba] Request params:', { fromLang, toLang, fromCode, toCode, targetWord });
-        
-        // Fetch sentences from Tatoeba - get truly random sentences
-        let searchUrl;
-        if (targetWord) {
-            searchUrl = `https://api.tatoeba.org/v1/sentences/search?from=${fromCode}&query=${encodeURIComponent(targetWord)}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
-        } else {
-            // Get random sentences without any word filtering
-            searchUrl = `https://api.tatoeba.org/v1/sentences/search?from=${fromCode}&trans_filter=limit&trans_link=direct&trans_to=${toCode}&to=${toCode}&limit=200`;
+        if (!config.geminiApiKey) {
+            return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server' });
         }
-        
-        console.log('[Tatoeba] API URL:', searchUrl);
-        
-        const response = await axios.get(searchUrl);
-        
-        console.log('[Tatoeba] Response status:', response.status);
-        console.log('[Tatoeba] Response data:', response.data);
-        
-        if (response.data && response.data.results && response.data.results.length > 0) {
-            // Filter sentences for length and explicit content
-            const minWordCount = 5;
-            const explicitWords = ['fuck', 'shit', 'damn', 'hell', 'bitch', 'ass', 'sex', 'porn', 'nude', 'naked', 'dick', 'pussy', 'cock', 'vagina', 'penis', 'breast', 'boob', 'tit', 'fuck', 'fucking', 'fucked', 'fucks'];
-            
-            const filteredResults = response.data.results.filter(result => {
-                const text = result.text.toLowerCase();
-                const wordCount = result.text.trim().split(/\s+/).length;
-                
-                // Check for explicit content
-                const hasExplicitContent = explicitWords.some(word => text.includes(word));
-                
-                console.log(`[Tatoeba] Sentence: "${result.text}" - Word count: ${wordCount}, Explicit: ${hasExplicitContent}`);
-                
-                return wordCount >= minWordCount && !hasExplicitContent;
-            });
-            
-            console.log(`[Tatoeba] Filtered ${filteredResults.length} sentences with >= ${minWordCount} words from ${response.data.results.length} total results`);
-            
-            let result, nativeSentence, randomIndex;
-            
-            if (filteredResults.length === 0) {
-                console.log('[Tatoeba] No sentences found with minimum word count, falling back to all results');
-                // Fallback to all results if no sentences meet the minimum length
-                randomIndex = Math.floor(Math.random() * response.data.results.length);
-                result = response.data.results[randomIndex];
-                nativeSentence = result.text;
-            } else {
-                // Randomly select a sentence from the filtered results
-                randomIndex = Math.floor(Math.random() * filteredResults.length);
-                result = filteredResults[randomIndex];
-                nativeSentence = result.text;
+        const { fromLang, toLang, targetWord, proficiencyLevel } = req.query || {};
+
+        const level = (() => {
+            const parsed = parseInt(proficiencyLevel, 10);
+            if (Number.isFinite(parsed)) return Math.max(1, Math.min(5, parsed));
+            if (req.user?.id) return undefined; // will fetch from profile
+            return 3;
+        })();
+
+        // Load user profile if no level provided
+        let effectiveLevel = level;
+        if (effectiveLevel === undefined) {
+            try {
+                const profile = await authService.getProfileById(req.user.id);
+                effectiveLevel = Math.max(1, Math.min(5, parseInt(profile?.proficiency_level || 3, 10)));
+            } catch (_) {
+                effectiveLevel = 3;
             }
-            
-            // Log the word count for verification
-            const wordCount = nativeSentence.trim().split(/\s+/).length;
-            console.log(`[Tatoeba] Selected sentence: "${nativeSentence}" - Word count: ${wordCount}`);
-            
-            // Parse translations - Tatoeba API structure
-            let targetSentence = null;
-            if (result.translations && result.translations.length > 0) {
-                // Get the first translation
-                const translation = result.translations[0];
-                if (translation && translation.text) {
-                    targetSentence = translation.text;
+        }
+
+        const genAI = new GoogleGenerativeAI(config.geminiApiKey);
+        const model = genAI.getGenerativeModel({ model: GEMINI_CHAT_MODEL, systemInstruction: `You generate a single natural sentence in ${fromLang}. Target language for translation practice is ${toLang}. The learner proficiency level is ${effectiveLevel} (1=absolute beginner, 5=advanced). Avoid profanity and sensitive content. Keep length 8-18 words. If targetWord is provided, include it naturally. Output only the sentence, no quotes.` });
+
+        // Build prompt
+        const safeWord = (typeof targetWord === 'string' && targetWord.trim()) ? targetWord.trim() : '';
+        const prompt = `Generate one ${fromLang} sentence suitable for a ${toLang} learner at level ${effectiveLevel}. ${safeWord ? `Include the word "${safeWord}" naturally.` : ''} No offensive content. 8-18 words. Respond with only the sentence.`;
+
+        // Uniqueness guard: try a few times to get unseen sentence
+        const seenSet = new Set();
+        let attempts = 0;
+        let finalSentence = '';
+        while (attempts < 5) {
+            attempts++;
+            const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+            let sentence = '';
+            if (result?.response?.text) {
+                const raw = await result.response.text();
+                sentence = (raw || '').replace(/^["'\s]+|["'\s]+$/g, '').trim();
+            }
+            if (!sentence) continue;
+            const normalized = sentence.replace(/\s+/g, ' ').trim().toLowerCase();
+            if (seenSet.has(normalized)) continue;
+
+            // Check DB uniqueness table
+            try {
+                const { rows } = await require('../profile-data/pool').query('INSERT INTO practice_sentences (sentence) VALUES ($1) ON CONFLICT DO NOTHING RETURNING id', [sentence]);
+                if (rows && rows.length > 0) {
+                    finalSentence = sentence;
+                    break;
+                }
+            } catch (_) {
+                // If DB fails, fallback to in-memory seen set only
+                if (!seenSet.has(normalized)) {
+                    finalSentence = sentence;
+                    break;
                 }
             }
-            
-            console.log('[Tatoeba] Parsed result:', { 
-                selectedIndex: randomIndex, 
-                totalResults: response.data.results.length,
-                filteredResults: filteredResults.length,
-                wordCount,
-                nativeSentence, 
-                targetSentence, 
-                targetWord 
-            });
-            
-            return res.json({
-                nativeSentence,
-                targetSentence,
-                targetWord: targetWord || null
-            });
-        } else {
-            console.log('[Tatoeba] No results found');
-            return res.status(404).json({ error: 'No sentences found' });
+            seenSet.add(normalized);
         }
+
+        if (!finalSentence) {
+            return res.status(502).json({ error: 'Failed to generate a unique sentence' });
+        }
+
+        return res.json({ nativeSentence: finalSentence, targetWord: safeWord || null });
     } catch (error) {
-        console.error('[Tatoeba] Error:', error?.response?.data || error?.message || error);
-        res.status(500).json({ error: 'Failed to fetch sentence from Tatoeba' });
+        console.error('[Practice Sentences] Error:', error?.response?.data || error?.message || error);
+        res.status(500).json({ error: 'Failed to generate sentence' });
     }
 });
 

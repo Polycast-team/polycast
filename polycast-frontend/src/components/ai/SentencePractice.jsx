@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile } from '../../utils/profileLanguageMapping';
+import { getLanguageForProfile, getNativeLanguageForProfile, getUITranslationsForProfile, getProficiencyForProfile } from '../../utils/profileLanguageMapping';
 import apiService from '../../services/apiService';
 import aiService from '../../services/aiService';
 import tokenizeText from '../../utils/tokenizeText';
@@ -45,8 +45,9 @@ function SentencePractice({
         ? userDictionary[Math.floor(Math.random() * userDictionary.length)]
         : null;
 
-      // Fetch sentence from Tatoeba via backend
-      const url = apiService.getTatoebaSentencesUrl(nativeLanguage, targetLanguage, targetWordToUse);
+      // Fetch sentence from Gemini via backend (unique per DB)
+      const proficiency = window?.pc_profileProficiency?.[selectedProfile] || 3;
+      const url = apiService.getPracticeSentenceUrl(nativeLanguage, targetLanguage, targetWordToUse, proficiency);
       const response = await apiService.fetchJson(url);
 
       if (response?.nativeSentence) {
@@ -61,7 +62,7 @@ function SentencePractice({
     } finally {
       setIsLoading(false);
     }
-  }, [nativeLanguage, targetLanguage, selectedWords]);
+  }, [nativeLanguage, targetLanguage, selectedWords, selectedProfile]);
 
   const evaluateTranslation = useCallback(async () => {
     if (!userTranslation.trim() || !currentSentence) return;
@@ -92,9 +93,11 @@ Be flexible and recognize that there are often multiple correct ways to translat
 
 Return only the evaluation result.`;
 
+      const level = getProficiencyForProfile(selectedProfile);
+      const level = getProficiencyForProfile(selectedProfile);
       const response = await aiService.sendChat({
         messages: [{ role: 'user', content: prompt }],
-        systemPrompt: "You are a helpful language learning assistant. Be encouraging and recognize that there are often multiple correct ways to translate the same sentence. Focus on meaning and naturalness rather than exact word-for-word matches. Use the specified format for corrections.",
+        systemPrompt: `You are a helpful language learning assistant for a learner at level ${level}/5. Be encouraging and recognize that there are often multiple correct ways to translate the same sentence. Focus on meaning and naturalness rather than exact word-for-word matches. Use the specified format for corrections.${level <= 2 ? ` Provide brief clarifications in ${nativeLanguage} along with ${targetLanguage}.` : ''}`,
       });
 
       if (response?.message?.content) {
@@ -115,7 +118,7 @@ Return only the evaluation result.`;
     } finally {
       setIsEvaluating(false);
     }
-  }, [userTranslation, currentSentence, nativeLanguage, targetLanguage]);
+  }, [userTranslation, currentSentence, nativeLanguage, targetLanguage, selectedProfile]);
 
   const handleNext = useCallback(() => {
     setEvaluationResult(null);
