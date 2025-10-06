@@ -838,6 +838,8 @@ function App({
       // Just update local state for dictionary mode
       console.log('Setting mode to dictionary (local only)');
       setAppMode('dictionary');
+      // Ensure freshest data immediately when switching
+      reloadServerDictionary();
     } else if (newMode === 'flashcard') {
       // Just update local state for flashcard mode
       console.log('Setting mode to flashcard (local only)');
@@ -854,7 +856,14 @@ function App({
       console.log('Setting mode to AI chat');
       setAppMode('ai');
     }
-  }, [appMode, isRecording]);
+  }, [appMode, isRecording, reloadServerDictionary]);
+
+  // Also reload dictionary whenever appMode becomes 'dictionary' (covers programmatic changes)
+  useEffect(() => {
+    if (appMode === 'dictionary') {
+      reloadServerDictionary();
+    }
+  }, [appMode, reloadServerDictionary]);
 
   // Get connection status string
   const connectionStatus = {

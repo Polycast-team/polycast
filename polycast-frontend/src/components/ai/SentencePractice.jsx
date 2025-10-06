@@ -323,18 +323,17 @@ Return only the evaluation result.`;
                     setAddingIndices((prev) => prev.filter((i) => i !== index));
                   }
                 }}
+                className="sp-inline-add-btn"
                 style={{
-                  border: 'none',
-                  background: '#10b981',
+                  background: clickedHints.find(h => h.index === index && h.added) ? '#10b981' : '#2563eb',
                   color: '#0b1728',
-                  fontWeight: 700,
-                  padding: '0 6px',
-                  borderRadius: 4,
                   cursor: addingIndices.includes(index) ? 'default' : 'pointer',
                 }}
                 title="Add to dictionary"
               >
-                {addingIndices.includes(index) ? '…' : (clickedHints.find(h => h.index === index && h.added) ? '✓' : '+')}
+                {addingIndices.includes(index)
+                  ? <span className="sp-inline-add-spinner" />
+                  : (clickedHints.find(h => h.index === index && h.added) ? '✓' : '+')}
               </button>
             </span>
           ) : null}
