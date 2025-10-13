@@ -203,6 +203,7 @@ function App({
   const [toolbarStats, setToolbarStats] = useState({ newCards: 0, learningCards: 0, reviewCards: 0 });
   const [signalLog, setSignalLog] = useState([]); // recent signaling/debug events
   const [srsSettingsVersion, setSrsSettingsVersion] = useState(0);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   // Auto-send functionality removed - using manual Record/Stop button instead
   const notificationTimeoutRef = useRef(null);
   const isRecordingRef = useRef(isRecording); // Ref to track recording state in handlers
@@ -893,7 +894,7 @@ function App({
     0
   );
 
-  // Open join modal when classroom tapped from toolbar
+  // Open join modal when live (audio) tapped from toolbar
   useEffect(() => {
     const open = () => setShowJoinRoomModal(true);
     window.addEventListener('openJoinRoom', open);
@@ -954,7 +955,13 @@ function App({
         aria-label="Toggle Full Screen"
         title="Full Screen (F11)"
       >
-        <span>⛶</span>
+        {/* Fullscreen Icon */}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M9 3H5a2 2 0 0 0-2 2v4" />
+          <path d="M15 3h4a2 2 0 0 1 2 2v4" />
+          <path d="M21 15v4a2 2 0 0 1-2 2h-4" />
+          <path d="M3 15v4a2 2 0 0 0 2 2h4" />
+        </svg>
       </button>
 
       {/* Header container with logo and room code */}
@@ -1076,7 +1083,7 @@ function App({
       {/* Header right: logout + host/join controls */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
         <button
-          onClick={() => { try { authClient.clearToken(); } catch {}; window.location.assign('/'); }}
+          onClick={() => setShowLogoutConfirm(true)}
           style={{ padding: '8px 12px', fontSize: 14, borderRadius: 4, background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}
           title={appStrings.logout}
         >
@@ -1406,6 +1413,65 @@ function App({
         roomSetup={roomSetup}
         selectedProfile={internalSelectedProfile}
       />
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100
+        }}>
+          <div style={{
+            background: '#23243a',
+            borderRadius: 16,
+            padding: 28,
+            minWidth: 360,
+            textAlign: 'center',
+            boxShadow: '0 4px 18px 0 rgba(60, 60, 90, 0.2)'
+          }}>
+            <h2 style={{ color: '#fff', marginBottom: 12 }}>Are you sure you want to log out?</h2>
+            <p style={{ color: '#b3b3e7', marginBottom: 20, fontSize: 14 }}>You will be returned to the login screen.</p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                style={{
+                  padding: '10px 18px',
+                  fontSize: 14,
+                  borderRadius: 6,
+                  background: '#444',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {ui.cancel}
+              </button>
+              <button
+                onClick={() => { try { authClient.clearToken(); } catch {}; window.location.assign('/'); }}
+                style={{
+                  padding: '10px 18px',
+                  fontSize: 14,
+                  borderRadius: 6,
+                  background: '#ef4444',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+                title={appStrings.logout}
+              >
+                {appStrings.logout}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

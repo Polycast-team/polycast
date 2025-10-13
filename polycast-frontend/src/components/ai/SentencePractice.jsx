@@ -338,7 +338,9 @@ Return only the evaluation result.`;
                 {addingIndices.includes(index) ? (
                   <span className="sp-inline-add-spinner" />
                 ) : clickedHints.find(h => h.index === index && h.added) ? (
-                  '✓'
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
                 ) : (
                   '+'
                 )}
@@ -571,7 +573,11 @@ Return only the evaluation result.`;
               <div className="sentence-practice-result">
                 {evaluationResult.isCorrect ? (
                   <div className="result-correct">
-                    <div className="result-icon">✓</div>
+                    <div className="result-icon" aria-hidden>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    </div>
                     <div className="result-text">
                       <h4>{ui?.correct || "Correct!"}</h4>
                       <p>{ui?.wellDone || "Well done! Your translation is correct."}</p>
@@ -579,7 +585,12 @@ Return only the evaluation result.`;
                   </div>
                 ) : (
                   <div className="result-incorrect">
-                    <div className="result-icon">✗</div>
+                    <div className="result-icon" aria-hidden>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6L6 18" />
+                        <path d="M6 6l12 12" />
+                      </svg>
+                    </div>
                     <div className="result-text">
                       <h4>{ui?.needsCorrection || "Needs Correction"}</h4>
                       <div className="correction-display">

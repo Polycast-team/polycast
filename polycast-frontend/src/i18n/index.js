@@ -46,7 +46,8 @@ export function translate(languageCode, path, ...args) {
   if (typeof value === 'function') {
     return value(...args);
   }
-  return value;
+  // Strip any emoji/pictograph characters from returned strings
+  return removeEmojis(value);
 }
 
 function buildSection(languageCode, section, keys) {
@@ -141,5 +142,12 @@ export function getLanguageOptions() {
 
 export function noteFallbackUsed(value) {
   return typeof value === 'string' && value.startsWith(FALLBACK_PREFIX);
+}
+
+// Remove emoji/pictograph characters globally from UI strings
+const EMOJI_REGEX = /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
+function removeEmojis(input) {
+  if (typeof input !== 'string') return input;
+  return input.replace(EMOJI_REGEX, '').trim();
 }
 

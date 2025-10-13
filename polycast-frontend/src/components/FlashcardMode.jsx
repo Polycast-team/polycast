@@ -569,7 +569,12 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
     return (
       <div className="flashcard-completion">
         <div className="completion-content">
-          <div className="completion-icon">🎉</div>
+          <div className="completion-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M2 5l10 6 10-6v2l-10 6L2 7V5z" />
+              <path d="M2 11l10 6 10-6v2l-10 6L2 13v-2z" />
+            </svg>
+          </div>
           <h2>{t.sessionComplete}</h2>
           <p>You've completed all cards for today.</p>
           
@@ -604,7 +609,12 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
       <div className="flashcard-study-container">
         <div className="desktop-card-container">
           <div className="no-flashcards-message">
-            <div className="no-flashcards-icon">📚</div>
+            <div className="no-flashcards-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <path d="M4 4h13a3 3 0 0 1 3 3v13h-2V7a1 1 0 0 0-1-1H4V4z" />
+                <path d="M2 6h13a3 3 0 0 1 3 3v11H5a3 3 0 0 1-3-3V6z" />
+              </svg>
+            </div>
             <h2>{t.noFlashcardsTitle}</h2>
             <p>{t.noFlashcardsMessage}</p>
             <div className="no-flashcards-instructions">
@@ -719,7 +729,17 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
                       }}
                       disabled={audioState.loading}
                     >
-                      {audioState.loading ? '🔄' : '🔊'} Play Audio
+                      {audioState.loading ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <path d="M21 12a9 9 0 1 1-9-9" />
+                        </svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                          <path d="M11 5l-4 4H4v6h3l4 4V5z" />
+                          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" fill="none" stroke="currentColor" strokeWidth="2" />
+                          <path d="M18.07 5.93a9 9 0 0 1 0 12.73" fill="none" stroke="currentColor" strokeWidth="2" />
+                        </svg>
+                      )} Play Audio
                     </button>
                   </div>
                 );
@@ -737,7 +757,12 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           onClick={() => markCard('incorrect')}
           disabled={!isFlipped}
         >
-          <div className="desktop-btn-emoji">❌</div>
+          <div className="desktop-btn-emoji" aria-hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6L6 18" />
+              <path d="M6 6l12 12" />
+            </svg>
+          </div>
           <div className="desktop-btn-label">{t.again}</div>
           <div className="desktop-btn-time">
             {buttonTimes.incorrect.time}
@@ -749,7 +774,11 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           onClick={() => markCard('correct')}
           disabled={!isFlipped}
         >
-          <div className="desktop-btn-emoji">✓</div>
+          <div className="desktop-btn-emoji" aria-hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
           <div className="desktop-btn-label">{t.good}</div>
           <div className="desktop-btn-time">
             {buttonTimes.correct.time}
@@ -761,7 +790,11 @@ const FlashcardMode = ({ selectedWords, wordDefinitions, setWordDefinitions, eng
           onClick={() => markCard('easy')}
           disabled={!isFlipped}
         >
-          <div className="desktop-btn-emoji">⭐</div>
+          <div className="desktop-btn-emoji" aria-hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+            </svg>
+          </div>
           <div className="desktop-btn-label">{t.easy}</div>
           <div className="desktop-btn-time">
             {buttonTimes.easy.time}

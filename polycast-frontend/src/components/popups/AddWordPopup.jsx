@@ -67,7 +67,12 @@ const AddWordPopup = ({ isOpen, onClose, onSelectSenses, selectedProfile }) => {
     <div className="tba-popup-overlay" onClick={onClose}>
       <div className="tba-popup" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
         <div className="tba-popup-header">
-          <div className="tba-popup-icon">📚</div>
+          <div className="tba-popup-icon" aria-hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M4 4v15.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5" />
+            </svg>
+          </div>
           <h3 className="tba-popup-title">Add Word</h3>
           <button className="tba-popup-close" onClick={onClose}>×</button>
         </div>

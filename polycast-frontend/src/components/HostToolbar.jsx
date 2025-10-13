@@ -11,7 +11,7 @@ const iconColor = '#a0a0b8';
 
 
 /**
- * Toolbar component for host/classroom mode.
+ * Toolbar component for host/live mode.
  * Contains profile selection, recording controls, and font size controls.
  */
 function HostToolbar({ 
@@ -95,7 +95,17 @@ function HostToolbar({
                       transition: 'background-color 0.2s ease'
                     }}
                   >
-                    <span style={{ fontSize: '16px' }}>{isRecording ? '⏹️' : '🎙️'}</span>
+                    {isRecording ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <rect x="6" y="6" width="12" height="12" rx="1" />
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <path d="M12 3a4 4 0 0 0-4 4v5a4 4 0 1 0 8 0V7a4 4 0 0 0-4-4z" />
+                        <path d="M19 11a7 7 0 0 1-14 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        <path d="M12 18v3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    )}
                     {isRecording ? ui.stopRecording : ui.record}
                   </button>
                 )}

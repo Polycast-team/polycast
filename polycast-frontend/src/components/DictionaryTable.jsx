@@ -333,16 +333,28 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
         <div className="dictionary-controls" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             onClick={() => setIsSearchOpen(true)}
-            style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+            style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
+            <span aria-hidden>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.3-4.3" />
+              </svg>
+            </span>
             {dictionaryStrings.searchButton}
           </button>
           <button
-            onClick={() => setIsAddOpen(true)}
-            style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
-          >
-            {dictionaryStrings.addWordButton}
-          </button>
+          onClick={() => setIsAddOpen(true)}
+          style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <span aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </span>
+          {dictionaryStrings.addWordButton}
+        </button>
           {/* Calendar button */}
           <button 
             onClick={() => window.dispatchEvent(new CustomEvent('toggleFlashcardCalendar', { detail: true }))}
@@ -402,14 +414,26 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
       <div className="dictionary-controls" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button
           onClick={() => setIsSearchOpen(true)}
-          style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+          style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
+          <span aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+          </span>
           {dictionaryStrings.searchButton}
         </button>
         <button
           onClick={() => setIsAddOpen(true)}
-          style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer' }}
+          style={{ background: '#3f3969', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
+          <span aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </span>
           {dictionaryStrings.addWordButton}
         </button>
         
@@ -439,8 +463,8 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
         {/* Stats and word count */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ color: '#ccc', fontSize: '13px' }}>
-            <span style={{color: '#5f72ff'}}>{ui.new}: {toolbarStats?.newCards ?? 0}</span> • 
-            <span style={{color: '#ef4444', marginLeft: '4px'}}>{ui.learning}: {toolbarStats?.learningCards ?? 0}</span> • 
+            <span style={{color: '#5f72ff'}}>{ui.new}: {toolbarStats?.newCards ?? 0}</span> <span aria-hidden>•</span> 
+            <span style={{color: '#ef4444', marginLeft: '4px'}}>{ui.learning}: {toolbarStats?.learningCards ?? 0}</span> <span aria-hidden style={{marginLeft:4}}>•</span> 
             <span style={{color: '#10b981', marginLeft: '4px'}}>{ui.review}: {toolbarStats?.reviewCards ?? 0}</span>
           </div>
           <div style={{ color: '#aaa', fontSize: 13 }}>
@@ -504,7 +528,15 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
                 gap: '5px'
               }}
             >
-              <span style={{ fontSize: '16px' }}>⌨️</span> {dictionaryStrings.keyboardShortcutsButton}
+              <span aria-hidden>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="6" width="18" height="12" rx="2" />
+                  <path d="M7 10h0" />
+                  <path d="M11 10h0" />
+                  <path d="M15 10h0" />
+                  <path d="M7 14h10" />
+                </svg>
+              </span> {dictionaryStrings.keyboardShortcutsButton}
             </button>
             
             {showKeyboardShortcuts && (
@@ -661,7 +693,13 @@ const DictionaryTable = ({ wordDefinitions, onRemoveWord, onAddWord, onAddWordSe
                               title={`Remove this definition of ${word}`}
                               className="remove-definition-button"
                             >
-                              🗑️
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                <path d="M10 11v6"/>
+                                <path d="M14 11v6"/>
+                                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                              </svg>
                             </button>
                           )}
                         </div>
