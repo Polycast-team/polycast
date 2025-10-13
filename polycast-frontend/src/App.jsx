@@ -946,17 +946,17 @@ function App({
           fontWeight: 700,
           cursor: 'pointer',
           transition: 'background 0.2s',
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backdropFilter: 'blur(10px)',
+          lineHeight: 0,
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
         }}
         aria-label="Toggle Full Screen"
         title="Full Screen (F11)"
       >
         {/* Fullscreen Icon */}
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden focusable="false" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
           <path d="M9 3H5a2 2 0 0 0-2 2v4" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M15 3h4a2 2 0 0 1 2 2v4" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M21 15v4a2 2 0 0 1-2 2h-4" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
