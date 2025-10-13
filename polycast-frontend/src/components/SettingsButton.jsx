@@ -122,7 +122,7 @@ export default function SettingsButton({ onSrsChange }) {
         onClick={() => setOpen(v => !v)}
         style={buttonStyle}
       >
-        <SettingsIcon size={20} strokeWidth={1.8} style={{ display: 'block' }} />
+        <SettingsIcon size={20} style={{ display: 'block' }} />
       </button>
 
       {open && (
@@ -166,4 +166,3 @@ export default function SettingsButton({ onSrsChange }) {
 SettingsButton.propTypes = {
   onSrsChange: PropTypes.func,
 };
-

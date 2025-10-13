@@ -957,7 +957,7 @@ function App({
         aria-label="Toggle Full Screen"
         title="Full Screen (F11)"
       >
-        <FullscreenIcon size={20} strokeWidth={2.2} style={{ display: 'block' }} />
+        <FullscreenIcon size={20} style={{ display: 'block' }} />
       </button>
 
       {/* Header container with logo and room code */}
