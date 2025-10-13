@@ -17,7 +17,7 @@ function AudioRecorder({ sendMessage, isRecording, selectedProfile }) {
       try {
         streamRef.current = await navigator.mediaDevices.getUserMedia({ 
           audio: {
-            sampleRate: 16000, // Deepgram prefers 16kHz for speech
+            sampleRate: 16000, // Chirp 3 expects 16kHz mono PCM
             channelCount: 1,   // Mono audio
             echoCancellation: true,
             noiseSuppression: true,
@@ -102,7 +102,7 @@ function AudioRecorder({ sendMessage, isRecording, selectedProfile }) {
         audioContextRef.current = null;
       }
       
-      // Send signal to close Deepgram streaming session
+      // Send signal to close server-side streaming session
       sendMessage('STOP_STREAM');
     }
   }, [isRecording, sendMessage, micError, hasStream]);

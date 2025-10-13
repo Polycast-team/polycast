@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const { createStreamingSession } = require('../services/deepgramService');
+const { createStreamingSession } = require('../services/speechService');
 const redisService = require('../services/redisService');
 
 async function handleWebSocketMessage(ws, message, clientData) {
@@ -48,14 +48,14 @@ async function handleWebSocketMessage(ws, message, clientData) {
     } else if (typeof message === 'string') {
         // Handle STOP_STREAM sent as a plain text frame
         if (message === 'STOP_STREAM') {
-            if (ws.deepgramSession) {
-                console.log('[Audio] Closing Deepgram streaming session (string STOP_STREAM)');
+            if (ws.speechSession) {
+                console.log('[Audio] Closing speech streaming session (string STOP_STREAM)');
                 try {
-                    ws.deepgramSession.close();
+                    ws.speechSession.close();
                 } catch (e) {
-                    console.warn('[Audio] Error closing Deepgram session:', e);
+                    console.warn('[Audio] Error closing speech session:', e);
                 }
-                ws.deepgramSession = null;
+                ws.speechSession = null;
             }
             return;
         }
@@ -146,20 +146,21 @@ async function handleAudioMessage(ws, message, clientData) {
 
     // Handle stop streaming signal
     if (message.toString() === 'STOP_STREAM') {
-        if (ws.deepgramSession) {
-            console.log('[Audio] Closing Deepgram streaming session');
-            ws.deepgramSession.close();
-            ws.deepgramSession = null;
+        if (ws.speechSession) {
+            console.log('[Audio] Closing speech streaming session');
+            ws.speechSession.close();
+            ws.speechSession = null;
         }
         return;
     }
 
-    // Initialize Deepgram streaming session if not exists
-    if (!ws.deepgramSession) {
-        console.log('[Audio] Creating new Deepgram streaming session');
+    // Initialize Google Speech streaming session if not exists
+    if (!ws.speechSession) {
+        console.log('[Audio] Creating new Chirp 3 streaming session');
         console.log('[Audio] Environment:', process.env.NODE_ENV || 'development');
-        console.log('[Audio] Deepgram API Key configured:', !!require('../config/config').deepgramApiKey);
-        ws.deepgramSession = createStreamingSession(
+        const currentConfig = require('../config/config');
+        console.log('[Audio] Google recognizer configured:', !!currentConfig.googleSpeechRecognizer);
+        ws.speechSession = createStreamingSession(
             (transcript, isInterim) => {
                 // Send real-time updates to frontend
                 const response = {
@@ -202,8 +203,9 @@ async function handleAudioMessage(ws, message, clientData) {
                 // Translation calls removed
             },
             (error) => {
-                console.error('[Deepgram] Streaming error:', error.message || error);
-                console.error('[Deepgram] Error details:', JSON.stringify(error));
+                console.error('[Speech] Streaming error:', error?.message || error);
+                console.error('[Speech] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+                ws.speechSession = null;
                 ws.send(JSON.stringify({
                     type: 'error',
                     message: 'Streaming transcription error: ' + error.message
@@ -212,12 +214,12 @@ async function handleAudioMessage(ws, message, clientData) {
         );
     }
     
-    // Forward audio chunk to Deepgram
+    // Forward audio chunk to Speech API
     try {
-        // console.log('[Audio] Forwarding', message.length, 'bytes to Deepgram'); // noisy; keep commented
-        ws.deepgramSession.send(message);
+        // console.log('[Audio] Forwarding', message.length, 'bytes to speech API'); // noisy; keep commented
+        ws.speechSession.send(message);
     } catch (err) {
-        console.error('[Audio] Error sending to Deepgram:', err.message || err);
+        console.error('[Audio] Error sending to speech service:', err.message || err);
         ws.send(JSON.stringify({
             type: 'error',
             message: 'Failed to send audio to transcription service'

@@ -211,14 +211,14 @@ function handleWebSocketConnection(ws, req, heartbeat) {
         console.log('[WebSocket] Client disconnected');
         clearTimeout(joinRoomTimeout);
 
-        // Clean up Deepgram streaming session if exists
-        if (ws.deepgramSession) {
+        // Clean up speech streaming session if exists
+        if (ws.speechSession) {
             try {
-                console.log('[Cleanup] Closing Deepgram streaming session for disconnected client');
-                ws.deepgramSession.close();
-                ws.deepgramSession = null;
+                console.log('[Cleanup] Closing speech streaming session for disconnected client');
+                ws.speechSession.close();
+                ws.speechSession = null;
             } catch (error) {
-                console.error('[Cleanup] Error closing Deepgram session:', error);
+                console.error('[Cleanup] Error closing speech session:', error);
             }
         }
 
@@ -261,13 +261,13 @@ function handleWebSocketConnection(ws, req, heartbeat) {
         clientTextBuffers.delete(ws);
         clientTargetLanguages.delete(ws);
 
-        // Clean up Deepgram session if exists
-        if (ws.deepgramSession) {
+        // Clean up speech session if exists
+        if (ws.speechSession) {
             try {
-                ws.deepgramSession.close();
-                ws.deepgramSession = null;
+                ws.speechSession.close();
+                ws.speechSession = null;
             } catch (cleanupError) {
-                console.error('[Cleanup] Error closing Deepgram session on WebSocket error:', cleanupError);
+                console.error('[Cleanup] Error closing speech session on WebSocket error:', cleanupError);
             }
         }
     });

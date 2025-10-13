@@ -13,7 +13,11 @@ runConfig:
 env:
   - variable: GEMINI_API_KEY
     secret: geminiApiKey
-  - variable: DEEPGRAM_API_KEY
-    secret: deepgramApiKey
+  - variable: GOOGLE_SPEECH_RECOGNIZER
+    secret: googleSpeechRecognizer
+  - variable: GOOGLE_SPEECH_REGION
+    value: us
+  - variable: GOOGLE_SPEECH_ENDPOINT
+    value: us-speech.googleapis.com
   - variable: REDIS_URL
     secret: redisUrl

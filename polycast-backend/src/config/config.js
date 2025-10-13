@@ -19,8 +19,10 @@ const config = {
     geminiApiKey: process.env.GEMINI_API_KEY,
     geminiChatModel: toStringOr(process.env.GEMINI_CHAT_MODEL, 'gemini-2.5-flash-lite-preview-09-2025'),
 
-    // Deepgram Configuration
-    deepgramApiKey: process.env.DEEPGRAM_API_KEY,
+    // Google Speech-to-Text (Chirp 3) Configuration
+    googleSpeechRegion: toStringOr(process.env.GOOGLE_SPEECH_REGION, 'us'),
+    googleSpeechEndpoint: toStringOr(process.env.GOOGLE_SPEECH_ENDPOINT, 'us-speech.googleapis.com'),
+    googleSpeechRecognizer: toStringOr(process.env.GOOGLE_SPEECH_RECOGNIZER, ''),
 
     // OpenAI Configuration (used for realtime voice and TTS)
     openaiApiKey: process.env.OPENAI_API_KEY,
@@ -37,14 +39,15 @@ const config = {
 };
 
 // Debug log for API key status
-console.log('Config deepgramApiKey:', config.deepgramApiKey ? 'CONFIGURED' : 'NOT SET');
+console.log('Config googleSpeechRecognizer:', config.googleSpeechRecognizer ? 'CONFIGURED' : 'NOT SET');
+console.log('Config googleSpeechRegion:', config.googleSpeechRegion || 'NOT SET');
 console.log('Config geminiApiKey:', config.geminiApiKey ? 'CONFIGURED' : 'NOT SET');
 console.log('Config openaiApiKey:', config.openaiApiKey ? 'CONFIGURED' : 'NOT SET');
 
 // Perform validation immediately when the module is loaded
 config.validateKeys = function() {
     console.log('Validating API keys...');
-    const requiredKeys = ['GEMINI_API_KEY', 'DEEPGRAM_API_KEY'];
+    const requiredKeys = ['GEMINI_API_KEY', 'GOOGLE_SPEECH_RECOGNIZER'];
     const optionalKeys = ['OPENAI_API_KEY']; // OpenAI now optional (only for TTS)
     const missingRequired = requiredKeys.filter(key => !process.env[key]);
     const missingOptional = optionalKeys.filter(key => !process.env[key]);

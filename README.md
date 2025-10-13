@@ -18,7 +18,7 @@ This repository contains a real-time language learning platform with a React (Vi
 
 ## Backend (polycast-backend)
 - `src/server.js`: Express + WebSocket server
-- `src/config/config.js`: Env config (PORT, GEMINI_API_KEY, DEEPGRAM_API_KEY, optional OPENAI_API_KEY/REDIS_URL)
+- `src/config/config.js`: Env config (PORT, GEMINI_API_KEY, GOOGLE_SPEECH_RECOGNIZER/REGION/ENDPOINT, optional OPENAI_API_KEY/REDIS_URL)
 - `src/api/routes.js`: REST API
   - Auth: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
   - Profiles: `GET /api/profiles/me`, `PUT /api/profiles/me`
@@ -43,7 +43,7 @@ This repository contains a real-time language learning platform with a React (Vi
 
 ## Environment variables
 - Frontend: `VITE_API_BASE_URL`, `VITE_WS_BASE_URL`
-- Backend (current): `PORT`, `GEMINI_API_KEY`, `DEEPGRAM_API_KEY`; optional `OPENAI_API_KEY`, `REDIS_URL`
+- Backend (current): `PORT`, `GEMINI_API_KEY`, `GOOGLE_SPEECH_RECOGNIZER`, `GOOGLE_SPEECH_REGION`, `GOOGLE_SPEECH_ENDPOINT`; optional `OPENAI_API_KEY`, `REDIS_URL`
 - Backend (DB): `DATABASE_URL` (External, often with `?sslmode=require`), `JWT_SECRET`, optional `BCRYPT_ROUNDS`
 
 ## Local development
