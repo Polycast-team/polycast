@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import apiService from '../services/apiService';
 import authClient from '../services/authClient';
 import { getSRSSettings, saveSRSSettings } from '../utils/srsSettings';
+import SettingsIcon from './icons/SettingsIcon';
 // Removed theme palette imports
 
 const popoverContainerStyle = {
@@ -14,11 +15,12 @@ const popoverContainerStyle = {
 
 const buttonStyle = {
   background: 'rgba(35, 35, 58, 0.9)',
-  color: '#fff',
+  color: '#f8fafc',
   border: 'none',
   borderRadius: 8,
   width: 44,
   height: 44,
+  padding: 0,
   fontSize: 18,
   fontWeight: 700,
   cursor: 'pointer',
@@ -120,9 +122,7 @@ export default function SettingsButton({ onSrsChange }) {
         onClick={() => setOpen(v => !v)}
         style={buttonStyle}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff" aria-hidden focusable="false" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
-          <path d="M11.25 2.25a.75.75 0 0 1 1.5 0v1.232a7.498 7.498 0 0 1 3.033 1.258l.872-.872a.75.75 0 1 1 1.06 1.06l-.872.872c.526.872.901 1.848 1.099 2.89h1.232a.75.75 0 0 1 0 1.5h-1.232a7.498 7.498 0 0 1-1.258 3.033l.872.872a.75.75 0 1 1-1.06 1.06l-.872-.872a7.498 7.498 0 0 1-3.033 1.099v1.232a.75.75 0 0 1-1.5 0v-1.232a7.498 7.498 0 0 1-3.033-1.258l-.872.872a.75.75 0 1 1-1.06-1.06l.872-.872a7.498 7.498 0 0 1-1.099-3.033H2.25a.75.75 0 0 1 0-1.5h1.232a7.498 7.498 0 0 1 1.258-3.033l-.872-.872a.75.75 0 1 1 1.06-1.06l.872.872A7.498 7.498 0 0 1 11.25 3.482V2.25zm.75 5.25a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
-        </svg>
+        <SettingsIcon size={20} strokeWidth={1.8} style={{ display: 'block' }} />
       </button>
 
       {open && (
@@ -166,5 +166,4 @@ export default function SettingsButton({ onSrsChange }) {
 SettingsButton.propTypes = {
   onSrsChange: PropTypes.func,
 };
-
 

@@ -449,8 +449,6 @@ router.post('/ai/voice/session', async (req, res) => {
                 modalities: ['audio', 'text'],
                 // Enable tuned server-side VAD so the model knows when you're done speaking
                 turn_detection: turnDetection,
-                // Enable user speech transcription events over the data channel
-                input_audio_transcription: { model: 'whisper-1' },
             };
 
             const noiseReductionType = typeof config.openaiRealtimeNoiseReduction === 'string'

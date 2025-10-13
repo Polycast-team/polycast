@@ -36,6 +36,7 @@ import { extractSentenceWithWord, markClickedWordInSentence } from './utils/word
 import ModeSelector from './components/ModeSelector';
 import AIMode from './components/ai/AIMode';
 import SettingsButton from './components/SettingsButton';
+import FullscreenIcon from './components/icons/FullscreenIcon';
 
 
 
@@ -937,11 +938,12 @@ function App({
           left: '72px',
           zIndex: 1001,
           background: 'rgba(35, 35, 58, 0.9)',
-          color: '#fff',
+          color: '#f8fafc',
           border: 'none',
           borderRadius: 8,
           width: 44,
           height: 44,
+          padding: 0,
           fontSize: 20,
           fontWeight: 700,
           cursor: 'pointer',
@@ -955,13 +957,7 @@ function App({
         aria-label="Toggle Full Screen"
         title="Full Screen (F11)"
       >
-        {/* Fullscreen Icon */}
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden focusable="false" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
-          <path d="M9 3H5a2 2 0 0 0-2 2v4" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M15 3h4a2 2 0 0 1 2 2v4" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M21 15v4a2 2 0 0 1-2 2h-4" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M3 15v4a2 2 0 0 0 2 2h4" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <FullscreenIcon size={20} strokeWidth={2.2} style={{ display: 'block' }} />
       </button>
 
       {/* Header container with logo and room code */}
