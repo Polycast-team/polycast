@@ -1,8 +1,179 @@
 const { v2: speech } = require('@google-cloud/speech');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const config = require('../config/config');
 
 let speechClient;
 let recognizerPromise;
+let explicitCredentials;
+let explicitCredentialsChecked = false;
+
+function normalisePrivateKey(key) {
+    if (typeof key !== 'string') return key;
+    return key.includes('\\n') ? key.replace(/\\n/g, '\n') : key;
+}
+
+function buildCredentialResponse(raw, source) {
+    if (!raw || typeof raw !== 'object') {
+        console.error(`[Speech] Ignoring malformed credentials from ${source || 'unknown source'}. Expected JSON object.`);
+        return null;
+    }
+
+    const clientEmail = raw.client_email;
+    const privateKey = normalisePrivateKey(raw.private_key);
+
+    if (!clientEmail || !privateKey) {
+        console.error('[Speech] Service account JSON is missing client_email or private_key.');
+        return null;
+    }
+
+    return {
+        credentials: {
+            client_email: clientEmail,
+            private_key: privateKey,
+        },
+        projectId: raw.project_id,
+        source: source || 'environment',
+    };
+}
+
+function tryParseJson(value, sourceLabel) {
+    if (!value) return null;
+    try {
+        return JSON.parse(value);
+    } catch (err) {
+        console.error(`[Speech] Failed to parse JSON credentials from ${sourceLabel}:`, err?.message || err);
+        return null;
+    }
+}
+
+function resolveCredentialFilePath(candidatePath) {
+    if (!candidatePath || typeof candidatePath !== 'string') return null;
+
+    const expanded = candidatePath.startsWith('~')
+        ? path.join(os.homedir(), candidatePath.slice(1))
+        : candidatePath;
+
+    const attempts = new Set([
+        expanded,
+        path.resolve(expanded),
+    ]);
+
+    // Add potential "latest" suffixes (for secret manager mounts)
+    Array.from(attempts).forEach((attempt) => {
+        attempts.add(path.join(attempt, 'latest'));
+        if (attempt.endsWith('latest')) {
+            attempts.add(attempt);
+        }
+    });
+
+    for (const attempt of attempts) {
+        try {
+            const stat = fs.statSync(attempt);
+            if (stat.isFile()) {
+                return attempt;
+            }
+            if (stat.isDirectory()) {
+                const latestPath = path.join(attempt, 'latest');
+                if (fs.existsSync(latestPath) && fs.statSync(latestPath).isFile()) {
+                    return latestPath;
+                }
+            }
+        } catch {
+            // Ignore missing paths
+        }
+    }
+
+    return null;
+}
+
+function loadExplicitCredentials() {
+    // Base64-encoded credentials (prefer explicit speech-specific variables)
+    const base64Candidates = [
+        { value: process.env.GOOGLE_SPEECH_CREDENTIALS_BASE64, source: 'GOOGLE_SPEECH_CREDENTIALS_BASE64' },
+        { value: process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64, source: 'GOOGLE_APPLICATION_CREDENTIALS_BASE64' },
+    ];
+
+    for (const { value, source } of base64Candidates) {
+        if (!value) continue;
+        try {
+            const decoded = Buffer.from(value.trim(), 'base64').toString('utf8');
+            const parsed = tryParseJson(decoded, source);
+            if (parsed) {
+                const result = buildCredentialResponse(parsed, source);
+                if (result) return result;
+            }
+        } catch (err) {
+            console.error(`[Speech] Failed to decode base64 credentials from ${source}:`, err?.message || err);
+        }
+    }
+
+    // Plain JSON stored directly in an env variable
+    const jsonCandidates = [
+        { value: process.env.GOOGLE_SPEECH_CREDENTIALS_JSON, source: 'GOOGLE_SPEECH_CREDENTIALS_JSON' },
+        { value: process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON, source: 'GOOGLE_APPLICATION_CREDENTIALS_JSON' },
+    ];
+
+    for (const { value, source } of jsonCandidates) {
+        if (!value) continue;
+        const parsed = tryParseJson(value, source);
+        if (parsed) {
+            const result = buildCredentialResponse(parsed, source);
+            if (result) return result;
+        }
+    }
+
+    // Fall back to GOOGLE_APPLICATION_CREDENTIALS path (or speech-specific override)
+    const pathCandidates = [
+        { value: process.env.GOOGLE_SPEECH_CREDENTIALS_PATH, source: 'GOOGLE_SPEECH_CREDENTIALS_PATH' },
+        { value: process.env.GOOGLE_APPLICATION_CREDENTIALS, source: 'GOOGLE_APPLICATION_CREDENTIALS' },
+    ];
+
+    for (const { value, source } of pathCandidates) {
+        if (!value) continue;
+        const resolvedPath = resolveCredentialFilePath(value.trim());
+        if (!resolvedPath) {
+            console.warn(`[Speech] Credentials path ${value} not found or unreadable.`);
+            continue;
+        }
+        try {
+            const fileContents = fs.readFileSync(resolvedPath, 'utf8');
+            const parsed = tryParseJson(fileContents, `${source} (${resolvedPath})`);
+            if (parsed) {
+                const result = buildCredentialResponse(parsed, `${source} (${resolvedPath})`);
+                if (result) {
+                    // Update environment to the resolved path so downstream libraries can use it.
+                    process.env.GOOGLE_APPLICATION_CREDENTIALS = resolvedPath;
+                    return result;
+                }
+            }
+        } catch (err) {
+            console.error(`[Speech] Failed to read credentials file at ${resolvedPath}:`, err?.message || err);
+        }
+    }
+
+    return null;
+}
+
+function getExplicitCredentials() {
+    if (explicitCredentialsChecked) {
+        return explicitCredentials;
+    }
+    explicitCredentialsChecked = true;
+    explicitCredentials = loadExplicitCredentials();
+
+    if (explicitCredentials) {
+        console.log(`[Speech] Loaded explicit Google credentials from ${explicitCredentials.source}.`);
+        if (!process.env.GOOGLE_CLOUD_PROJECT && explicitCredentials.projectId) {
+            process.env.GOOGLE_CLOUD_PROJECT = explicitCredentials.projectId;
+        }
+    } else {
+        console.log('[Speech] Using Application Default Credentials for Google Speech API.');
+    }
+
+    return explicitCredentials;
+}
 
 function getSpeechClient() {
     if (!config.googleSpeechRecognizer) {
@@ -10,9 +181,19 @@ function getSpeechClient() {
     }
 
     if (!speechClient) {
-        speechClient = new speech.SpeechClient({
+        const clientConfig = {
             apiEndpoint: config.googleSpeechEndpoint || 'us-speech.googleapis.com',
-        });
+        };
+
+        const explicit = getExplicitCredentials();
+        if (explicit) {
+            clientConfig.credentials = explicit.credentials;
+            if (explicit.projectId) {
+                clientConfig.projectId = explicit.projectId;
+            }
+        }
+
+        speechClient = new speech.SpeechClient(clientConfig);
     }
     return speechClient;
 }

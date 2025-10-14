@@ -173,4 +173,33 @@ describe('speechService', () => {
 
         expect(errors).toEqual([sampleError]);
     });
+
+    test('loads inline credentials when provided', async () => {
+        const previousJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+        try {
+            process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify({
+                client_email: 'service-account@test-project.iam.gserviceaccount.com',
+                private_key: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----\\n',
+                project_id: 'inline-project',
+            });
+
+            const speechService = await loadService();
+            await speechService.transcribeAudio(Buffer.from('hi'));
+
+            expect(SpeechClientConstructor).toHaveBeenCalledWith({
+                apiEndpoint: 'us-speech.googleapis.com',
+                credentials: {
+                    client_email: 'service-account@test-project.iam.gserviceaccount.com',
+                    private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n',
+                },
+                projectId: 'inline-project',
+            });
+        } finally {
+            if (previousJson !== undefined) {
+                process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = previousJson;
+            } else {
+                delete process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+            }
+        }
+    });
 });
