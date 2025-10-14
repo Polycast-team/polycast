@@ -113,6 +113,7 @@ function loadExplicitCredentials() {
     const jsonCandidates = [
         { value: process.env.GOOGLE_SPEECH_CREDENTIALS_JSON, source: 'GOOGLE_SPEECH_CREDENTIALS_JSON' },
         { value: process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON, source: 'GOOGLE_APPLICATION_CREDENTIALS_JSON' },
+        { value: process.env.GOOGLE_CLOUD_KEYFILE_CONTENT, source: 'GOOGLE_CLOUD_KEYFILE_CONTENT' },
     ];
 
     for (const { value, source } of jsonCandidates) {

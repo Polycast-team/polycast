@@ -176,6 +176,7 @@ describe('speechService', () => {
 
     test('loads inline credentials when provided', async () => {
         const previousJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+        const previousCloudContent = process.env.GOOGLE_CLOUD_KEYFILE_CONTENT;
         try {
             process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify({
                 client_email: 'service-account@test-project.iam.gserviceaccount.com',
@@ -199,6 +200,40 @@ describe('speechService', () => {
                 process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = previousJson;
             } else {
                 delete process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+            }
+            if (previousCloudContent !== undefined) {
+                process.env.GOOGLE_CLOUD_KEYFILE_CONTENT = previousCloudContent;
+            } else {
+                delete process.env.GOOGLE_CLOUD_KEYFILE_CONTENT;
+            }
+        }
+    });
+
+    test('loads GOOGLE_CLOUD_KEYFILE_CONTENT when available', async () => {
+        const previousContent = process.env.GOOGLE_CLOUD_KEYFILE_CONTENT;
+        try {
+            process.env.GOOGLE_CLOUD_KEYFILE_CONTENT = JSON.stringify({
+                client_email: 'cloud-content@test-project.iam.gserviceaccount.com',
+                private_key: '-----BEGIN PRIVATE KEY-----\\nxyz\\n-----END PRIVATE KEY-----\\n',
+                project_id: 'cloud-content-project',
+            });
+
+            const speechService = await loadService();
+            await speechService.transcribeAudio(Buffer.from('hi'));
+
+            expect(SpeechClientConstructor).toHaveBeenCalledWith({
+                apiEndpoint: 'us-speech.googleapis.com',
+                credentials: {
+                    client_email: 'cloud-content@test-project.iam.gserviceaccount.com',
+                    private_key: '-----BEGIN PRIVATE KEY-----\nxyz\n-----END PRIVATE KEY-----\n',
+                },
+                projectId: 'cloud-content-project',
+            });
+        } finally {
+            if (previousContent !== undefined) {
+                process.env.GOOGLE_CLOUD_KEYFILE_CONTENT = previousContent;
+            } else {
+                delete process.env.GOOGLE_CLOUD_KEYFILE_CONTENT;
             }
         }
     });
