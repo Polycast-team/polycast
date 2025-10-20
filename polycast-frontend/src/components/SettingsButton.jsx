@@ -114,6 +114,11 @@ export default function SettingsButton({ onSrsChange }) {
     }
   };
 
+  const handleLogout = () => {
+    try { authClient.clearToken(); } catch {}
+    window.location.assign('/');
+  };
+
   return (
     <div style={popoverContainerStyle}>
       <button
@@ -156,6 +161,10 @@ export default function SettingsButton({ onSrsChange }) {
 
           <div style={{ marginTop: 8 }}>
             <button onClick={handleDeleteAccount} style={dangerButtonStyle}>Delete Account</button>
+          </div>
+
+          <div style={{ marginTop: 8 }}>
+            <button onClick={handleLogout} style={{ ...dangerButtonStyle, border: '1px solid #7c2d12', background: '#b45309' }}>Logout</button>
           </div>
         </div>
       )}

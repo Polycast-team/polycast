@@ -836,6 +836,13 @@ function App({
       setIsRecording(false);
     }
     
+    // Ensure live (audio) and video use separate room codes: clear room when switching between them
+    if ((appMode === 'audio' && newMode === 'video') || (appMode === 'video' && newMode === 'audio')) {
+      if (roomSetup && onReset) {
+        onReset();
+      }
+    }
+
     if (newMode === 'dictionary') {
       // Just update local state for dictionary mode
       console.log('Setting mode to dictionary (local only)');
@@ -1076,40 +1083,33 @@ function App({
         </div>
       )}
       
-      {/* Header right: logout + host/join controls */}
+      {/* Header right: host/join controls and room code display */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <button
-          onClick={() => setShowLogoutConfirm(true)}
-          style={{ padding: '8px 12px', fontSize: 14, borderRadius: 4, background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}
-          title={appStrings.logout}
-        >
-          {appStrings.logout}
-        </button>
         {(appMode === 'video' || appMode === 'audio') && !roomSetup && (
           <>
             <button
               onClick={async () => {
-                // Preserve current mode; ask parent to host and update props in place
                 try { await onHostRoom?.(); }
                 catch (e) { alert(errorStrings.createRoomFailed(e?.message || e)); }
               }}
               style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#3b82f6', color: '#fff', border: 'none', cursor: 'pointer' }}
             >
-              {appStrings.hostCall}
+              {appMode === 'audio' ? (appStrings.hostRoom || 'Host room') : appStrings.hostCall}
             </button>
             <button
               onClick={() => setShowJoinRoomModal(true)}
               style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer' }}
             >
-              {appStrings.joinCall}
+              {appMode === 'audio' ? ui.joinRoom : appStrings.joinCall}
             </button>
           </>
         )}
 
-        {appMode === 'video' && roomSetup && (
+        {/* Show room pill in top-right when in video OR when hosting in audio (live) */}
+        {((appMode === 'video' && roomSetup) || (appMode === 'audio' && roomSetup && roomSetup.isHost)) && (
           <>
-            <div 
-              className="room-info-display" 
+            <div
+              className="room-info-display"
               style={{
                 color: '#fff',
                 fontSize: 14,
@@ -1122,7 +1122,12 @@ function App({
             >
               {roomSetup.isHost ? `${ui.room}: ${roomSetup.roomCode}` : `${ui.student} • ${ui.room}: ${roomSetup.roomCode}`}
             </div>
-            <button onClick={onReset} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>{appStrings.endCall}</button>
+            <button
+              onClick={onReset}
+              style={{ padding: '8px 16px', fontSize: 14, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              {appMode === 'audio' ? ui.exitRoom : appStrings.endCall}
+            </button>
           </>
         )}
       </div>

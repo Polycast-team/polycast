@@ -67,6 +67,7 @@ const EN_APP = {
   loadingProfile: 'Loading profile…',
   appName: 'Polycast',
   logout: 'Logout',
+  hostRoom: 'Host room',
   hostCall: 'Host call',
   joinCall: 'Join call',
   endCall: 'End call',
