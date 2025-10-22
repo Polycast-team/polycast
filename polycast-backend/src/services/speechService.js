@@ -194,6 +194,12 @@ function getSpeechClient() {
             }
         }
 
+        console.log('[Speech] Initializing SpeechClient with config:', {
+            apiEndpoint: clientConfig.apiEndpoint,
+            hasExplicitCredentials: !!explicit,
+            projectId: clientConfig.projectId || '(unset)',
+        });
+
         speechClient = new speech.SpeechClient(clientConfig);
     }
     return speechClient;
@@ -208,6 +214,7 @@ async function resolveRecognizerName() {
             }
 
             if (raw.startsWith('projects/')) {
+                console.log('[Speech] Using fully-qualified recognizer from config:', raw);
                 return raw;
             }
 
@@ -220,6 +227,12 @@ async function resolveRecognizerName() {
 
             const client = getSpeechClient();
             const projectId = envProject || await client.getProjectId().catch(() => null);
+            console.log('[Speech] Resolving recognizer name:', {
+                providedValue: raw,
+                resolvedProjectId: projectId || '(unknown)',
+                region: config.googleSpeechRegion || 'us',
+                endpoint: config.googleSpeechEndpoint || 'us-speech.googleapis.com',
+            });
             if (!projectId) {
                 throw new Error(
                     'Unable to determine Google Cloud project. Provide a full recognizer resource name or set GOOGLE_CLOUD_PROJECT.',
@@ -227,7 +240,9 @@ async function resolveRecognizerName() {
             }
 
             const region = config.googleSpeechRegion || 'us';
-            return `projects/${projectId}/locations/${region}/recognizers/${raw}`;
+            const resolved = `projects/${projectId}/locations/${region}/recognizers/${raw}`;
+            console.log('[Speech] Computed recognizer resource:', resolved);
+            return resolved;
         })();
     }
     return recognizerPromise;
@@ -410,6 +425,15 @@ function createStreamingSession(onTranscript, onError = () => {}, options = {}) 
             if (options.configMask) {
                 streamingConfig.configMask = options.configMask;
             }
+
+            console.log('[Speech] Starting streaming session with recognizer:', recognizer, {
+                interimResults: streamingFeatures.interimResults,
+                enableVoiceActivityEvents: streamingFeatures.enableVoiceActivityEvents || false,
+                voiceActivityTimeout: streamingFeatures.voiceActivityTimeout || null,
+                model: recognitionConfig.model,
+                languageCodes: recognitionConfig.languageCodes,
+                endpoint: config.googleSpeechEndpoint || 'us-speech.googleapis.com',
+            });
 
             stream.write({
                 recognizer,
