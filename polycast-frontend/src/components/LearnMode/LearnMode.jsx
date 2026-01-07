@@ -7,6 +7,7 @@ import SubtitleDisplay from './SubtitleDisplay.jsx';
 import WordDefinitionPopup from '../WordDefinitionPopup.jsx';
 import { useYouTubePlayer } from '../../hooks/useYouTubePlayer.js';
 import { useSubtitles } from '../../hooks/useSubtitles.js';
+import apiService from '../../services/apiService.js';
 import './LearnMode.css';
 
 function LearnMode({
@@ -23,6 +24,8 @@ function LearnMode({
     position: { x: 0, y: 0 },
     contextSentence: '',
   });
+  const [wordDefinition, setWordDefinition] = useState(null);
+  const [loadingDefinition, setLoadingDefinition] = useState(false);
 
   // Subtitle management
   const {
@@ -75,14 +78,48 @@ function LearnMode({
   }, [clearSubtitles]);
 
   // Handle word click for translation popup
-  const handleWordClick = useCallback((word, position, contextSentence) => {
+  const handleWordClick = useCallback(async (word, position, contextSentence) => {
+    const cleanWord = word.toLowerCase();
+    const sentence = contextSentence || fullTranscript || '';
+
+    // Show popup immediately
     setPopupState({
       isVisible: true,
-      word: word.toLowerCase(),
+      word: cleanWord,
       position,
-      contextSentence: contextSentence || fullTranscript,
+      contextSentence: sentence,
     });
-  }, [fullTranscript]);
+
+    // Reset and start loading
+    setWordDefinition(null);
+    setLoadingDefinition(true);
+
+    try {
+      // Mark the word in the sentence for context
+      const sentenceWithMarkedWord = sentence.replace(
+        new RegExp(`\\b(${word})\\b`, 'gi'),
+        (match, index) => index === 0 ? `~${match}~` : match
+      );
+
+      // Fetch definition using quick API
+      const url = apiService.getQuickWordDataUrl(
+        cleanWord,
+        sentenceWithMarkedWord,
+        nativeLanguage || 'English',
+        targetLanguage || 'Spanish'
+      );
+
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setWordDefinition(data);
+      }
+    } catch (error) {
+      console.error('[LearnMode] Error fetching word definition:', error);
+    } finally {
+      setLoadingDefinition(false);
+    }
+  }, [fullTranscript, nativeLanguage, targetLanguage]);
 
   // Handle popup close
   const handlePopupClose = useCallback(() => {
@@ -175,13 +212,13 @@ function LearnMode({
       {popupState.isVisible && (
         <WordDefinitionPopup
           word={popupState.word}
+          definition={wordDefinition}
           position={popupState.position}
-          contextSentence={popupState.contextSentence}
-          targetLanguage={targetLanguage}
-          nativeLanguage={nativeLanguage}
-          selectedProfile={selectedProfile}
+          loading={loadingDefinition}
+          nativeLanguage={nativeLanguage || 'English'}
           onClose={handlePopupClose}
-          onAddWord={handleAddWordToDictionary}
+          onAddToDictionary={() => handleAddWordToDictionary(popupState.word)}
+          onRemoveFromDictionary={() => {}}
           isInDictionary={isWordInDictionary(popupState.word)}
         />
       )}
