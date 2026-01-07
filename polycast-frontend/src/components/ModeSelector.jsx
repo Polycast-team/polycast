@@ -17,6 +17,7 @@ function ModeSelector({
     { base: '#2563eb', hover: '#3b82f6', active: '#1d4ed8' }, // Blue
     { base: '#14b8a6', hover: '#2dd4bf', active: '#0f766e' }, // Teal
     { base: '#8b5cf6', hover: '#a78bfa', active: '#7c3aed' }, // Purple
+    { base: '#f59e0b', hover: '#fbbf24', active: '#d97706' }, // Amber (Learn)
   ];
 
   const buttons = [
@@ -84,6 +85,19 @@ function ModeSelector({
       ),
       colorIndex: 3,
       onClick: () => onModeChange('ai')
+    },
+    {
+      mode: 'learn',
+      label: ui.learnMode || 'Learn',
+      icon: (
+        // YouTube play button icon
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="3"/>
+          <polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/>
+        </svg>
+      ),
+      colorIndex: 5,
+      onClick: () => onModeChange('learn')
     },
     {
       mode: 'video',

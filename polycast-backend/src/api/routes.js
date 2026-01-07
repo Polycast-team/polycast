@@ -5,6 +5,7 @@ const popupGeminiService = require('../services/popupGeminiService');
 const dictService = require('../profile-data/dictionaryService');
 const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { YoutubeTranscript } = require('youtube-transcript');
 const config = require('../config/config');
 const authService = require('../services/authService');
 const authMiddleware = require('./middleware/auth');
@@ -694,6 +695,181 @@ IMPORTANT: The sentence must be written entirely in ${fromLang} with no code-swi
     } catch (error) {
         console.error('[Practice Sentences] Error:', error?.response?.data || error?.message || error);
         res.status(500).json({ error: 'Failed to generate sentence' });
+    }
+});
+
+// YouTube API - Search for videos with captions
+router.get('/youtube/search', async (req, res) => {
+    if (!config.youtubeApiKey) {
+        return res.status(500).json({ error: 'YOUTUBE_API_KEY is not configured on the server' });
+    }
+
+    try {
+        const { q, language = 'en', pageToken, maxResults = 12 } = req.query || {};
+        if (!q || !q.trim()) {
+            return res.status(400).json({ error: 'Search query (q) is required' });
+        }
+
+        // Search YouTube for videos with captions
+        const searchParams = new URLSearchParams({
+            part: 'snippet',
+            q: q.trim(),
+            type: 'video',
+            videoCaption: 'closedCaption', // Only videos with captions
+            relevanceLanguage: language,
+            maxResults: Math.min(50, Math.max(1, parseInt(maxResults, 10) || 12)),
+            key: config.youtubeApiKey,
+        });
+
+        if (pageToken) {
+            searchParams.append('pageToken', pageToken);
+        }
+
+        const searchResponse = await axios.get(
+            `https://www.googleapis.com/youtube/v3/search?${searchParams.toString()}`
+        );
+
+        const videoIds = (searchResponse.data.items || [])
+            .map(item => item.id?.videoId)
+            .filter(Boolean);
+
+        if (videoIds.length === 0) {
+            return res.json({
+                videos: [],
+                nextPageToken: searchResponse.data.nextPageToken || null,
+                prevPageToken: searchResponse.data.prevPageToken || null,
+            });
+        }
+
+        // Get video details including content details for caption info
+        const videosParams = new URLSearchParams({
+            part: 'snippet,contentDetails',
+            id: videoIds.join(','),
+            key: config.youtubeApiKey,
+        });
+
+        const videosResponse = await axios.get(
+            `https://www.googleapis.com/youtube/v3/videos?${videosParams.toString()}`
+        );
+
+        // Get caption details for each video to determine if human or auto-generated
+        const captionPromises = videoIds.map(async (videoId) => {
+            try {
+                const captionsParams = new URLSearchParams({
+                    part: 'snippet',
+                    videoId,
+                    key: config.youtubeApiKey,
+                });
+                const captionsResponse = await axios.get(
+                    `https://www.googleapis.com/youtube/v3/captions?${captionsParams.toString()}`
+                );
+                const captions = captionsResponse.data.items || [];
+                // Check if there are manual (human) captions vs auto-generated
+                const hasManual = captions.some(c => c.snippet?.trackKind === 'standard');
+                const hasAuto = captions.some(c => c.snippet?.trackKind === 'asr');
+                return {
+                    videoId,
+                    captionType: hasManual ? 'human' : (hasAuto ? 'auto' : 'unknown'),
+                    availableLanguages: captions.map(c => c.snippet?.language).filter(Boolean),
+                };
+            } catch (err) {
+                console.warn(`[YouTube] Failed to get captions for ${videoId}:`, err?.message);
+                return { videoId, captionType: 'unknown', availableLanguages: [] };
+            }
+        });
+
+        const captionInfos = await Promise.all(captionPromises);
+        const captionMap = {};
+        captionInfos.forEach(info => { captionMap[info.videoId] = info; });
+
+        const videos = (videosResponse.data.items || []).map(video => {
+            const captionInfo = captionMap[video.id] || {};
+            return {
+                videoId: video.id,
+                title: video.snippet?.title,
+                description: video.snippet?.description,
+                thumbnail: video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url,
+                channelTitle: video.snippet?.channelTitle,
+                publishedAt: video.snippet?.publishedAt,
+                duration: video.contentDetails?.duration,
+                captionType: captionInfo.captionType || 'unknown',
+                availableLanguages: captionInfo.availableLanguages || [],
+            };
+        });
+
+        return res.json({
+            videos,
+            nextPageToken: searchResponse.data.nextPageToken || null,
+            prevPageToken: searchResponse.data.prevPageToken || null,
+        });
+    } catch (error) {
+        console.error('[YouTube Search] Error:', error?.response?.data || error?.message || error);
+        const message = error?.response?.data?.error?.message || error?.message || 'Failed to search YouTube';
+        res.status(error?.response?.status || 500).json({ error: message });
+    }
+});
+
+// YouTube API - Get subtitles/transcript for a video
+router.get('/youtube/subtitles/:videoId', async (req, res) => {
+    try {
+        const { videoId } = req.params;
+        const { language } = req.query;
+
+        if (!videoId) {
+            return res.status(400).json({ error: 'Video ID is required' });
+        }
+
+        console.log(`[YouTube Subtitles] Fetching subtitles for video: ${videoId}, language: ${language || 'auto'}`);
+
+        // Use youtube-transcript library to fetch subtitles
+        let transcript;
+        try {
+            if (language) {
+                transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: language });
+            } else {
+                transcript = await YoutubeTranscript.fetchTranscript(videoId);
+            }
+        } catch (transcriptError) {
+            // Try without language specification if it fails
+            if (language) {
+                console.warn(`[YouTube Subtitles] Failed with language ${language}, trying without...`);
+                transcript = await YoutubeTranscript.fetchTranscript(videoId);
+            } else {
+                throw transcriptError;
+            }
+        }
+
+        if (!transcript || transcript.length === 0) {
+            return res.status(404).json({ error: 'No subtitles available for this video' });
+        }
+
+        // Format subtitles with timing info
+        const subtitles = transcript.map((item, index) => ({
+            index,
+            text: item.text,
+            start: item.offset / 1000, // Convert ms to seconds
+            duration: item.duration / 1000,
+            end: (item.offset + item.duration) / 1000,
+        }));
+
+        return res.json({
+            videoId,
+            language: language || 'auto',
+            subtitles,
+            totalCount: subtitles.length,
+        });
+    } catch (error) {
+        console.error('[YouTube Subtitles] Error:', error?.message || error);
+        const message = error?.message || 'Failed to fetch subtitles';
+
+        if (message.includes('disabled') || message.includes('Transcript is disabled')) {
+            return res.status(403).json({ error: 'Subtitles are disabled for this video' });
+        }
+        if (message.includes('not found') || message.includes('No transcript')) {
+            return res.status(404).json({ error: 'No subtitles available for this video' });
+        }
+
+        res.status(500).json({ error: message });
     }
 });
 

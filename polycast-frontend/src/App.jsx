@@ -13,6 +13,7 @@ import ErrorPopup from './components/ErrorPopup';
 import TBAPopup from './components/popups/TBAPopup';
 import ModeSelector from './components/ModeSelector';
 import AIMode from './components/ai/AIMode';
+import { LearnMode } from './components/LearnMode';
 import SettingsButton from './components/SettingsButton';
 import FullscreenIcon from './components/icons/FullscreenIcon';
 import AppHeader from './components/AppHeader';
@@ -32,6 +33,7 @@ import { useRoomConnection } from './hooks/useRoomConnection';
 // Utils and services
 import {
   getLanguageForProfile,
+  getNativeLanguageForProfile,
   getFlashcardTranslationsForProfile,
   getUITranslationsForProfile,
   getRegisteredProfiles,
@@ -446,6 +448,14 @@ function App({
             wordDefinitions={wordDefinitions}
             setWordDefinitions={setWordDefinitions}
             onAddWord={handleAddWord}
+          />
+        ) : appMode === 'learn' ? (
+          <LearnMode
+            targetLanguage={profileLanguage}
+            nativeLanguage={getNativeLanguageForProfile(internalSelectedProfile)}
+            selectedProfile={internalSelectedProfile}
+            onAddWord={handleAddWord}
+            wordDefinitions={wordDefinitions}
           />
         ) : (
           <TranscriptionDisplay

@@ -37,6 +37,7 @@ const EN_UI = {
   voiceHint: 'Speak naturally — Polycast is listening and will respond in real time.',
   voiceWaiting: 'Waiting for the conversation to begin…',
   aiMode: 'AI Mode',
+  learnMode: 'Learn',
   aiChatting: 'Chatting',
   aiChattingDescription: 'Have a conversation with Polycast AI',
   aiSentencePractice: 'Sentence Practice',

@@ -36,6 +36,9 @@ const config = {
 
     // Redis Configuration
     redisUrl: process.env.REDIS_URL,
+
+    // YouTube API Configuration
+    youtubeApiKey: process.env.YOUTUBE_API_KEY,
 };
 
 // Debug log for API key status

@@ -50,6 +50,31 @@ class ApiService {
     return `${this.baseUrl}/api/sentences/practice?${params}`;
   }
 
+  // YOUTUBE API - Search for videos with captions
+  getYouTubeSearchUrl = (query, language = 'en', pageToken = null, maxResults = 12) => {
+    const params = new URLSearchParams({ q: query, language, maxResults: String(maxResults) });
+    if (pageToken) params.append('pageToken', pageToken);
+    return `${this.baseUrl}/api/youtube/search?${params}`;
+  }
+
+  // YOUTUBE API - Get subtitles for a video
+  getYouTubeSubtitlesUrl = (videoId, language = null) => {
+    const params = language ? new URLSearchParams({ language }) : '';
+    return `${this.baseUrl}/api/youtube/subtitles/${videoId}${params ? '?' + params : ''}`;
+  }
+
+  // YouTube search helper
+  async searchYouTubeVideos(query, language = 'en', pageToken = null, maxResults = 12) {
+    const url = this.getYouTubeSearchUrl(query, language, pageToken, maxResults);
+    return this.fetchJson(url);
+  }
+
+  // YouTube subtitles helper
+  async getVideoSubtitles(videoId, language = null) {
+    const url = this.getYouTubeSubtitlesUrl(videoId, language);
+    return this.fetchJson(url);
+  }
+
   // Helper methods for common API patterns
   async fetchJson(url, options = {}) {
     const token = authClient.getToken?.();
