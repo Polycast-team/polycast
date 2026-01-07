@@ -845,29 +845,12 @@ router.get('/youtube/subtitles/:videoId', async (req, res) => {
         const langCode = language ? resolveLanguageCode(language) : null;
         console.log(`[YouTube Subtitles] Fetching subtitles for video: ${videoId}, language: ${langCode || 'auto'}`);
 
-        // Use youtube-transcript library to fetch subtitles
-        // Try multiple approaches for better compatibility
+        // Fetch subtitles - no fallbacks, must be in the requested language
         let transcript;
-        const attempts = [
-            // First try with specific language code
-            langCode ? () => YoutubeTranscript.fetchTranscript(videoId, { lang: langCode }) : null,
-            // Then try without language (auto-detect)
-            () => YoutubeTranscript.fetchTranscript(videoId),
-            // Try with 'en' as fallback
-            langCode !== 'en' ? () => YoutubeTranscript.fetchTranscript(videoId, { lang: 'en' }) : null,
-        ].filter(Boolean);
-
-        for (const attempt of attempts) {
-            try {
-                transcript = await attempt();
-                if (transcript && transcript.length > 0) break;
-            } catch (err) {
-                console.warn(`[YouTube Subtitles] Attempt failed: ${err.message}`);
-            }
-        }
-
-        if (!transcript) {
-            throw new Error('Could not fetch transcript after multiple attempts');
+        if (langCode) {
+            transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: langCode });
+        } else {
+            transcript = await YoutubeTranscript.fetchTranscript(videoId);
         }
 
         if (!transcript || transcript.length === 0) {
