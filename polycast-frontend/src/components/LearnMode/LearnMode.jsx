@@ -145,6 +145,7 @@ function LearnMode({
           isPlaying={isPlaying}
           isFullscreen={isFullscreen}
           currentSubtitle={currentSubtitle}
+          videoTitle={selectedVideo.title}
           onWordClick={handleWordClick}
           onToggleFullscreen={toggleFullscreen}
           onExitFullscreen={exitFullscreen}
@@ -165,13 +166,7 @@ function LearnMode({
         {/* Video Info */}
         {!isFullscreen && (
           <div className="video-meta">
-            <h3>{selectedVideo.title}</h3>
             <p>{selectedVideo.channelTitle}</p>
-            {selectedVideo.captionType && (
-              <span className={`caption-type-badge ${selectedVideo.captionType}`}>
-                {selectedVideo.captionType === 'human' ? 'Human Subtitles' : 'Auto-generated'}
-              </span>
-            )}
           </div>
         )}
       </div>
