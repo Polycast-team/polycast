@@ -841,24 +841,33 @@ router.get('/youtube/subtitles/:videoId', async (req, res) => {
             return res.status(400).json({ error: 'Video ID is required' });
         }
 
-        console.log(`[YouTube Subtitles] Fetching subtitles for video: ${videoId}, language: ${language || 'auto'}`);
+        // Convert language name to code if needed
+        const langCode = language ? resolveLanguageCode(language) : null;
+        console.log(`[YouTube Subtitles] Fetching subtitles for video: ${videoId}, language: ${langCode || 'auto'}`);
 
         // Use youtube-transcript library to fetch subtitles
+        // Try multiple approaches for better compatibility
         let transcript;
-        try {
-            if (language) {
-                transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: language });
-            } else {
-                transcript = await YoutubeTranscript.fetchTranscript(videoId);
+        const attempts = [
+            // First try with specific language code
+            langCode ? () => YoutubeTranscript.fetchTranscript(videoId, { lang: langCode }) : null,
+            // Then try without language (auto-detect)
+            () => YoutubeTranscript.fetchTranscript(videoId),
+            // Try with 'en' as fallback
+            langCode !== 'en' ? () => YoutubeTranscript.fetchTranscript(videoId, { lang: 'en' }) : null,
+        ].filter(Boolean);
+
+        for (const attempt of attempts) {
+            try {
+                transcript = await attempt();
+                if (transcript && transcript.length > 0) break;
+            } catch (err) {
+                console.warn(`[YouTube Subtitles] Attempt failed: ${err.message}`);
             }
-        } catch (transcriptError) {
-            // Try without language specification if it fails
-            if (language) {
-                console.warn(`[YouTube Subtitles] Failed with language ${language}, trying without...`);
-                transcript = await YoutubeTranscript.fetchTranscript(videoId);
-            } else {
-                throw transcriptError;
-            }
+        }
+
+        if (!transcript) {
+            throw new Error('Could not fetch transcript after multiple attempts');
         }
 
         if (!transcript || transcript.length === 0) {

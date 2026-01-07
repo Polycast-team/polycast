@@ -4,7 +4,9 @@ import apiService from '../../services/apiService.js';
 import './LearnMode.css';
 
 // Default search queries by language for initial recommendations
+// Keys support both language codes and full names
 const DEFAULT_QUERIES = {
+  // By code
   es: 'noticias en español',
   fr: 'actualités en français',
   de: 'nachrichten auf deutsch',
@@ -17,7 +19,26 @@ const DEFAULT_QUERIES = {
   ar: 'أخبار عربية',
   hi: 'हिंदी समाचार',
   en: 'english learning',
+  // By full name (lowercase)
+  spanish: 'noticias en español',
+  french: 'actualités en français',
+  german: 'nachrichten auf deutsch',
+  italian: 'notizie in italiano',
+  portuguese: 'notícias em português',
+  japanese: '日本語 ニュース',
+  korean: '한국어 뉴스',
+  chinese: '中文 新闻',
+  russian: 'новости на русском',
+  arabic: 'أخبار عربية',
+  hindi: 'हिंदी समाचार',
+  english: 'english learning',
 };
+
+function getDefaultQuery(language) {
+  if (!language) return DEFAULT_QUERIES.en;
+  const lower = language.toLowerCase().trim();
+  return DEFAULT_QUERIES[lower] || DEFAULT_QUERIES.en;
+}
 
 function VideoSearch({ targetLanguage, onVideoSelect }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,7 +89,7 @@ function VideoSearch({ targetLanguage, onVideoSelect }) {
     if (initialLoadDone.current) return;
     initialLoadDone.current = true;
 
-    const defaultQuery = DEFAULT_QUERIES[targetLanguage] || DEFAULT_QUERIES.en;
+    const defaultQuery = getDefaultQuery(targetLanguage);
     searchVideos(defaultQuery, null, true);
   }, [targetLanguage, searchVideos]);
 
