@@ -5,7 +5,7 @@ const popupGeminiService = require('../services/popupGeminiService');
 const dictService = require('../profile-data/dictionaryService');
 const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { YoutubeTranscript } = require('youtube-transcript');
+const { Innertube } = require('youtubei.js');
 const config = require('../config/config');
 const authService = require('../services/authService');
 const authMiddleware = require('./middleware/auth');
@@ -845,30 +845,66 @@ router.get('/youtube/subtitles/:videoId', async (req, res) => {
         const langCode = language ? resolveLanguageCode(language) : null;
         console.log(`[YouTube Subtitles] Fetching subtitles for video: ${videoId}, language: ${langCode || 'auto'}`);
 
-        // Fetch subtitles - no fallbacks, must be in the requested language
-        let transcript;
-        if (langCode) {
-            transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: langCode });
-        } else {
-            transcript = await YoutubeTranscript.fetchTranscript(videoId);
-        }
+        // Use youtubei.js to fetch captions
+        const yt = await Innertube.create();
+        const info = await yt.getInfo(videoId);
 
-        if (!transcript || transcript.length === 0) {
+        // Get available caption tracks
+        const captionTracks = info.captions?.caption_tracks || [];
+
+        if (captionTracks.length === 0) {
             return res.status(404).json({ error: 'No subtitles available for this video' });
         }
 
+        // Find the caption track for the requested language
+        let selectedTrack = null;
+        if (langCode) {
+            // First try exact match
+            selectedTrack = captionTracks.find(t => t.language_code === langCode);
+            // Try partial match (e.g., 'es' matches 'es-419')
+            if (!selectedTrack) {
+                selectedTrack = captionTracks.find(t => t.language_code?.startsWith(langCode));
+            }
+        }
+
+        // If no language specified or not found, use first available
+        if (!selectedTrack) {
+            selectedTrack = captionTracks[0];
+        }
+
+        if (!selectedTrack) {
+            return res.status(404).json({
+                error: `No ${langCode || ''} subtitles available for this video`,
+                availableLanguages: captionTracks.map(t => t.language_code)
+            });
+        }
+
+        // Fetch the actual transcript
+        const transcript = await selectedTrack.toTranscript();
+        const segments = transcript?.content?.body?.initial_segments || [];
+
+        if (segments.length === 0) {
+            return res.status(404).json({ error: 'No subtitle segments found' });
+        }
+
         // Format subtitles with timing info
-        const subtitles = transcript.map((item, index) => ({
-            index,
-            text: item.text,
-            start: item.offset / 1000, // Convert ms to seconds
-            duration: item.duration / 1000,
-            end: (item.offset + item.duration) / 1000,
-        }));
+        const subtitles = segments.map((seg, index) => {
+            const startMs = parseInt(seg.start_ms || 0, 10);
+            const endMs = parseInt(seg.end_ms || 0, 10);
+            const text = seg.snippet?.text || '';
+
+            return {
+                index,
+                text,
+                start: startMs / 1000,
+                duration: (endMs - startMs) / 1000,
+                end: endMs / 1000,
+            };
+        });
 
         return res.json({
             videoId,
-            language: language || 'auto',
+            language: selectedTrack.language_code || langCode || 'auto',
             subtitles,
             totalCount: subtitles.length,
         });
@@ -876,7 +912,7 @@ router.get('/youtube/subtitles/:videoId', async (req, res) => {
         console.error('[YouTube Subtitles] Error:', error?.message || error);
         const message = error?.message || 'Failed to fetch subtitles';
 
-        if (message.includes('disabled') || message.includes('Transcript is disabled')) {
+        if (message.includes('disabled') || message.includes('unavailable')) {
             return res.status(403).json({ error: 'Subtitles are disabled for this video' });
         }
         if (message.includes('not found') || message.includes('No transcript')) {
