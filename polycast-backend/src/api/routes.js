@@ -879,28 +879,49 @@ router.get('/youtube/subtitles/:videoId', async (req, res) => {
             });
         }
 
-        // Fetch the actual transcript
-        const transcript = await selectedTrack.toTranscript();
-        const segments = transcript?.content?.body?.initial_segments || [];
-
-        if (segments.length === 0) {
-            return res.status(404).json({ error: 'No subtitle segments found' });
+        // Fetch the actual transcript from the base_url (returns XML)
+        const captionUrl = selectedTrack.base_url;
+        if (!captionUrl) {
+            return res.status(404).json({ error: 'No caption URL available' });
         }
 
-        // Format subtitles with timing info
-        const subtitles = segments.map((seg, index) => {
-            const startMs = parseInt(seg.start_ms || 0, 10);
-            const endMs = parseInt(seg.end_ms || 0, 10);
-            const text = seg.snippet?.text || '';
+        const captionResponse = await axios.get(captionUrl);
+        const captionXml = captionResponse.data;
 
-            return {
-                index,
-                text,
-                start: startMs / 1000,
-                duration: (endMs - startMs) / 1000,
-                end: endMs / 1000,
-            };
-        });
+        // Parse the XML caption format
+        // Format: <transcript><text start="0.0" dur="2.5">caption text</text>...</transcript>
+        const subtitles = [];
+        const textRegex = /<text[^>]*start="([^"]*)"[^>]*dur="([^"]*)"[^>]*>([\s\S]*?)<\/text>/g;
+        let match;
+        let index = 0;
+
+        while ((match = textRegex.exec(captionXml)) !== null) {
+            const start = parseFloat(match[1]) || 0;
+            const duration = parseFloat(match[2]) || 0;
+            // Decode HTML entities and clean up the text
+            let text = match[3]
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/\n/g, ' ')
+                .trim();
+
+            if (text) {
+                subtitles.push({
+                    index: index++,
+                    text,
+                    start,
+                    duration,
+                    end: start + duration,
+                });
+            }
+        }
+
+        if (subtitles.length === 0) {
+            return res.status(404).json({ error: 'No subtitle segments found in caption data' });
+        }
 
         return res.json({
             videoId,
