@@ -1,7 +1,23 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import apiService from '../../services/apiService.js';
 import './LearnMode.css';
+
+// Default search queries by language for initial recommendations
+const DEFAULT_QUERIES = {
+  es: 'noticias en español',
+  fr: 'actualités en français',
+  de: 'nachrichten auf deutsch',
+  it: 'notizie in italiano',
+  pt: 'notícias em português',
+  ja: '日本語 ニュース',
+  ko: '한국어 뉴스',
+  zh: '中文 新闻',
+  ru: 'новости на русском',
+  ar: 'أخبار عربية',
+  hi: 'हिंदी समाचार',
+  en: 'english learning',
+};
 
 function VideoSearch({ targetLanguage, onVideoSelect }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -10,12 +26,14 @@ function VideoSearch({ targetLanguage, onVideoSelect }) {
   const [error, setError] = useState(null);
   const [nextPageToken, setNextPageToken] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isRecommended, setIsRecommended] = useState(true);
+  const initialLoadDone = useRef(false);
 
-  const searchVideos = useCallback(async (query = searchQuery, pageToken = null) => {
-    if (!query.trim()) return;
+  const searchVideos = useCallback(async (query, pageToken = null, isInitial = false) => {
+    if (!query || !query.trim()) return;
 
     setIsLoading(true);
-    setError(null);
+    if (!isInitial) setError(null);
 
     try {
       const data = await apiService.searchYouTubeVideos(
@@ -33,22 +51,36 @@ function VideoSearch({ targetLanguage, onVideoSelect }) {
 
       setNextPageToken(data.nextPageToken || null);
       setHasSearched(true);
+      if (!isInitial) setError(null);
     } catch (err) {
       console.error('[VideoSearch] Error:', err);
-      setError(err.message || 'Failed to search videos');
+      // Only show error for user-initiated searches, not initial load
+      if (!isInitial) {
+        setError(err.message || 'Failed to search videos');
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, targetLanguage]);
+  }, [targetLanguage]);
+
+  // Auto-load recommended videos on mount
+  useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+
+    const defaultQuery = DEFAULT_QUERIES[targetLanguage] || DEFAULT_QUERIES.en;
+    searchVideos(defaultQuery, null, true);
+  }, [targetLanguage, searchVideos]);
 
   const handleSearch = useCallback((e) => {
     e.preventDefault();
-    searchVideos(searchQuery, null);
+    setIsRecommended(false);
+    searchVideos(searchQuery, null, false);
   }, [searchQuery, searchVideos]);
 
   const handleLoadMore = useCallback(() => {
     if (nextPageToken && !isLoading) {
-      searchVideos(searchQuery, nextPageToken);
+      searchVideos(searchQuery, nextPageToken, false);
     }
   }, [nextPageToken, isLoading, searchQuery, searchVideos]);
 
@@ -100,6 +132,21 @@ function VideoSearch({ targetLanguage, onVideoSelect }) {
         <div className="search-error">
           {error}
         </div>
+      )}
+
+      {/* Loading state for initial recommendations */}
+      {isLoading && videos.length === 0 && (
+        <div className="video-loading">
+          <div className="loading-spinner"></div>
+          <span>Loading recommended videos...</span>
+        </div>
+      )}
+
+      {/* Section header */}
+      {videos.length > 0 && (
+        <h3 className="video-section-header">
+          {isRecommended ? 'Recommended for You' : 'Search Results'}
+        </h3>
       )}
 
       {videos.length > 0 && (

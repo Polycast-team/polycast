@@ -95,6 +95,23 @@
   margin-bottom: 16px;
 }
 
+.video-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-secondary, #a0a0a0);
+  gap: 16px;
+}
+
+.video-section-header {
+  color: var(--text-primary, #ffffff);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
 /* Video Grid */
 .video-grid {
   display: grid;
