@@ -39,7 +39,6 @@ import {
   getVoiceTranslationsForProfile,
   getErrorTranslationsForProfile,
 } from './utils/profileLanguageMapping.js';
-import { getAppStrings } from './i18n/index.js';
 import apiService from './services/apiService.js';
 
 function App({
@@ -56,14 +55,9 @@ function App({
   onFlashcardModeChange,
   onProfileChange,
 }) {
-  const fallbackAppStrings = getAppStrings('en');
-
-  // Loading state
+  // Loading state - show simple loading message (no fallback prefix needed)
   if (profileLoading) {
-    const interimAppStrings = selectedProfile
-      ? getAppTranslationsForProfile(selectedProfile)
-      : { ...fallbackAppStrings, loadingProfile: `[fallback:en] ${fallbackAppStrings.loadingProfile}` };
-    return <div className="app-loading-state">{interimAppStrings.loadingProfile}</div>;
+    return <div className="app-loading-state">Loading...</div>;
   }
 
   if (!selectedProfile) throw new Error('App requires a selected profile before rendering');

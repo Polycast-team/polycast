@@ -1,9 +1,6 @@
 import TRANSLATIONS from './translations.js';
 import { TOP_LANGUAGES, findLanguageByCode, findLanguageByName, assertSupportedLanguage } from './languages.js';
 
-const FALLBACK_PREFIX = '[fallback:en] ';
-const FALLBACK_EVENT = '[i18n-fallback]';
-
 function deepGet(source, path) {
   if (!source) return undefined;
   const segments = path.split('.');
@@ -15,11 +12,23 @@ function deepGet(source, path) {
   return current;
 }
 
+// Emit a custom event for missing translations so ErrorPopup can display them
+function emitMissingTranslationError(languageCode, path) {
+  const message = `Missing translation: "${path}" for language "${languageCode}"`;
+  console.error(`[i18n] ${message}`);
+
+  // Dispatch custom event that ErrorPopup can listen to
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('i18n-missing-translation', {
+      detail: { languageCode, path, message }
+    }));
+  }
+}
+
 function wrapFunctionWithFallback(fn, languageCode, path) {
   return (...args) => {
-    console.warn(`${FALLBACK_EVENT} Missing translation for ${path} in ${languageCode}; using English.`);
-    const value = fn(...args);
-    return `${FALLBACK_PREFIX}${value}`;
+    emitMissingTranslationError(languageCode, path);
+    return fn(...args); // Return value without prefix - error is shown in popup
   };
 }
 
@@ -37,8 +46,8 @@ function translateValue(languageCode, path) {
     return wrapFunctionWithFallback(english, languageCode, path);
   }
 
-  console.warn(`${FALLBACK_EVENT} Missing translation for ${path} in ${languageCode}; using English.`);
-  return `${FALLBACK_PREFIX}${english}`;
+  emitMissingTranslationError(languageCode, path);
+  return english; // Return English value without prefix - error is shown in popup
 }
 
 export function translate(languageCode, path, ...args) {
@@ -108,7 +117,11 @@ export function getDictionaryStrings(languageCode) {
       if (languageDictionary && typeof languageDictionary[key] === 'function') {
         final[key] = languageDictionary[key];
       } else if (typeof TRANSLATIONS.en.dictionary[key] === 'function') {
-        final[key] = wrapFunctionWithFallback(TRANSLATIONS.en.dictionary[key], languageCode, `dictionary.${key}`);
+        // Use English function but emit error for missing translation
+        final[key] = (...args) => {
+          emitMissingTranslationError(languageCode, `dictionary.${key}`);
+          return TRANSLATIONS.en.dictionary[key](...args);
+        };
       } else {
         throw new Error(`Dictionary translation for ${key} must be a function.`);
       }
@@ -140,8 +153,9 @@ export function getLanguageOptions() {
   return TOP_LANGUAGES.map(({ code, englishName, nativeName }) => ({ code, englishName, nativeName }));
 }
 
+// Deprecated - fallbacks no longer use prefix, errors are shown via events
 export function noteFallbackUsed(value) {
-  return typeof value === 'string' && value.startsWith(FALLBACK_PREFIX);
+  return false;
 }
 
 // Remove emoji/pictograph characters globally from UI strings
