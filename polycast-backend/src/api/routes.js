@@ -698,6 +698,25 @@ IMPORTANT: The sentence must be written entirely in ${fromLang} with no code-swi
     }
 });
 
+// Language name to ISO 639-1 code mapping for YouTube API
+const LANGUAGE_TO_CODE = {
+    english: 'en', spanish: 'es', french: 'fr', german: 'de', italian: 'it',
+    portuguese: 'pt', russian: 'ru', japanese: 'ja', korean: 'ko', chinese: 'zh',
+    arabic: 'ar', hindi: 'hi', dutch: 'nl', polish: 'pl', turkish: 'tr',
+    vietnamese: 'vi', thai: 'th', swedish: 'sv', norwegian: 'no', danish: 'da',
+    finnish: 'fi', greek: 'el', hebrew: 'he', indonesian: 'id', malay: 'ms',
+    czech: 'cs', romanian: 'ro', hungarian: 'hu', ukrainian: 'uk',
+};
+
+function resolveLanguageCode(lang) {
+    if (!lang) return 'en';
+    const lower = lang.toLowerCase().trim();
+    // If already a 2-letter code, use it
+    if (lower.length === 2) return lower;
+    // Look up in mapping
+    return LANGUAGE_TO_CODE[lower] || 'en';
+}
+
 // YouTube API - Search for videos with captions
 router.get('/youtube/search', async (req, res) => {
     if (!config.youtubeApiKey) {
@@ -710,13 +729,16 @@ router.get('/youtube/search', async (req, res) => {
             return res.status(400).json({ error: 'Search query (q) is required' });
         }
 
+        // Convert language name to ISO 639-1 code
+        const langCode = resolveLanguageCode(language);
+
         // Search YouTube for videos with captions
         const searchParams = new URLSearchParams({
             part: 'snippet',
             q: q.trim(),
             type: 'video',
             videoCaption: 'closedCaption', // Only videos with captions
-            relevanceLanguage: language,
+            relevanceLanguage: langCode,
             maxResults: Math.min(50, Math.max(1, parseInt(maxResults, 10) || 12)),
             key: config.youtubeApiKey,
         });
