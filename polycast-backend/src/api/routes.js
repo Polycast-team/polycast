@@ -845,87 +845,102 @@ router.get('/youtube/subtitles/:videoId', async (req, res) => {
         const langCode = language ? resolveLanguageCode(language) : null;
         console.log(`[YouTube Subtitles] Fetching subtitles for video: ${videoId}, language: ${langCode || 'auto'}`);
 
-        // Use youtubei.js to fetch captions
-        const yt = await Innertube.create();
-        const info = await yt.getInfo(videoId);
+        // Step 1: Fetch the YouTube page to get transcript params
+        const pageResponse = await axios.get(`https://www.youtube.com/watch?v=${videoId}`, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9'
+            }
+        });
 
-        // Get available caption tracks
-        const captionTracks = info.captions?.caption_tracks || [];
+        const html = pageResponse.data;
 
-        if (captionTracks.length === 0) {
+        // Extract transcript params from the page
+        const paramsMatch = html.match(/"getTranscriptEndpoint"\s*:\s*{\s*"params"\s*:\s*"([^"]+)"/);
+        if (!paramsMatch) {
             return res.status(404).json({ error: 'No subtitles available for this video' });
         }
 
-        // Find the caption track for the requested language
-        let selectedTrack = null;
-        if (langCode) {
-            // First try exact match
-            selectedTrack = captionTracks.find(t => t.language_code === langCode);
-            // Try partial match (e.g., 'es' matches 'es-419')
-            if (!selectedTrack) {
-                selectedTrack = captionTracks.find(t => t.language_code?.startsWith(langCode));
+        const transcriptParams = paramsMatch[1];
+
+        // Step 2: Call the YouTube transcript API using ANDROID client
+        const transcriptBody = {
+            context: {
+                client: {
+                    clientName: 'ANDROID',
+                    clientVersion: '19.02.39',
+                    hl: 'en',
+                    gl: 'US'
+                }
+            },
+            params: transcriptParams
+        };
+
+        const transcriptResponse = await axios.post(
+            'https://www.youtube.com/youtubei/v1/get_transcript?key=AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w',
+            transcriptBody,
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'com.google.android.youtube/19.02.39 (Linux; U; Android 11) gzip',
+                    'Origin': 'https://www.youtube.com'
+                }
             }
-        }
+        );
 
-        // If no language specified or not found, use first available
-        if (!selectedTrack) {
-            selectedTrack = captionTracks[0];
-        }
-
-        if (!selectedTrack) {
-            return res.status(404).json({
-                error: `No ${langCode || ''} subtitles available for this video`,
-                availableLanguages: captionTracks.map(t => t.language_code)
-            });
-        }
-
-        // Fetch the actual transcript from the base_url (returns XML)
-        const captionUrl = selectedTrack.base_url;
-        if (!captionUrl) {
-            return res.status(404).json({ error: 'No caption URL available' });
-        }
-
-        const captionResponse = await axios.get(captionUrl);
-        const captionXml = captionResponse.data;
-
-        // Parse the XML caption format
-        // Format: <transcript><text start="0.0" dur="2.5">caption text</text>...</transcript>
-        const subtitles = [];
-        const textRegex = /<text[^>]*start="([^"]*)"[^>]*dur="([^"]*)"[^>]*>([\s\S]*?)<\/text>/g;
-        let match;
-        let index = 0;
-
-        while ((match = textRegex.exec(captionXml)) !== null) {
-            const start = parseFloat(match[1]) || 0;
-            const duration = parseFloat(match[2]) || 0;
-            // Decode HTML entities and clean up the text
-            let text = match[3]
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&quot;/g, '"')
-                .replace(/&#39;/g, "'")
-                .replace(/\n/g, ' ')
-                .trim();
-
-            if (text) {
-                subtitles.push({
-                    index: index++,
-                    text,
-                    start,
-                    duration,
-                    end: start + duration,
-                });
+        // Step 3: Find segments in the response
+        const findSegments = (obj) => {
+            if (!obj || typeof obj !== 'object') return null;
+            if (Array.isArray(obj.initialSegments)) return obj.initialSegments;
+            for (const key of Object.keys(obj)) {
+                const found = findSegments(obj[key]);
+                if (found) return found;
             }
+            return null;
+        };
+
+        const segments = findSegments(transcriptResponse.data);
+
+        if (!segments || segments.length === 0) {
+            return res.status(404).json({ error: 'No subtitle segments found' });
         }
+
+        // Step 4: Extract text from segments
+        const subtitles = segments.map((segment, index) => {
+            const renderer = segment.transcriptSegmentRenderer;
+            if (!renderer) return null;
+
+            const startMs = parseInt(renderer.startMs || '0');
+            const endMs = parseInt(renderer.endMs || '0');
+
+            // Extract text from elementsAttributedString.content
+            let text = '';
+            if (renderer.snippet?.elementsAttributedString?.content) {
+                text = renderer.snippet.elementsAttributedString.content;
+            } else if (renderer.snippet?.runs) {
+                text = renderer.snippet.runs.map(r => r.text).join('');
+            }
+
+            if (!text) return null;
+
+            return {
+                index,
+                text,
+                start: startMs / 1000,
+                duration: (endMs - startMs) / 1000,
+                end: endMs / 1000,
+            };
+        }).filter(Boolean);
 
         if (subtitles.length === 0) {
-            return res.status(404).json({ error: 'No subtitle segments found in caption data' });
+            return res.status(404).json({ error: 'No subtitle text found' });
         }
+
+        console.log(`[YouTube Subtitles] Found ${subtitles.length} subtitle segments`);
 
         return res.json({
             videoId,
-            language: selectedTrack.language_code || langCode || 'auto',
+            language: langCode || 'auto',
             subtitles,
             totalCount: subtitles.length,
         });
