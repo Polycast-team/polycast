@@ -84,6 +84,18 @@ function App({
   const { error: popupError, showError, clearError } = useErrorHandler();
   const { tba: popupTBA, showTBA, clearTBA } = useTBAHandler();
 
+  // Listen for i18n missing translation errors (debug mode)
+  useEffect(() => {
+    const handleMissingTranslation = (e) => {
+      const { message } = e.detail || {};
+      if (message) {
+        showError(`[DEBUG] ${message}`);
+      }
+    };
+    window.addEventListener('i18n-missing-translation', handleMissingTranslation);
+    return () => window.removeEventListener('i18n-missing-translation', handleMissingTranslation);
+  }, [showError]);
+
   // Calculate effective languages
   const profileLanguage = getLanguageForProfile(internalSelectedProfile);
   const registeredProfiles = getRegisteredProfiles();
