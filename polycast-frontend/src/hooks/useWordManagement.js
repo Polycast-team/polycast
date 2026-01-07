@@ -32,6 +32,7 @@ export function useWordManagement(selectedProfile, fullTranscript, showError) {
           translation: u.translation || '',
           definition: u.definition || '',
           frequency: u.frequency || 5,
+          example: u.exampleForDictionary || u.example || '',
           exampleSentencesGenerated: u.exampleSentencesGenerated || '',
           exampleForDictionary: u.exampleForDictionary || '',
           contextualExplanation: u.definition || '',
