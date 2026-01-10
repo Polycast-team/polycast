@@ -845,32 +845,69 @@ router.get('/youtube/subtitles/:videoId', async (req, res) => {
         const langCode = language ? resolveLanguageCode(language) : null;
         console.log(`[YouTube Subtitles] Fetching subtitles for video: ${videoId}, language: ${langCode || 'auto'}`);
 
-        // Import youtube-transcript library
-        const { YoutubeTranscript } = await import('youtube-transcript');
+        // Use youtubei.js to fetch captions (bypasses rate limits via InnerTube API)
+        const { Innertube } = await import('youtubei.js');
+        const yt = await Innertube.create();
+        const info = await yt.getInfo(videoId);
 
-        // Fetch transcript using the library (handles rate limits better)
-        const transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
-            lang: langCode || undefined, // Use specified language or let it auto-detect
-        });
+        // Get available caption tracks
+        const captionTracks = info.captions?.caption_tracks || [];
 
-        if (!transcriptData || transcriptData.length === 0) {
+        if (captionTracks.length === 0) {
             return res.status(404).json({ error: 'No subtitles available for this video' });
         }
 
-        // Convert to our format
-        const subtitles = transcriptData.map((item, index) => ({
-            index,
-            text: item.text,
-            start: item.offset / 1000, // Convert ms to seconds
-            duration: item.duration / 1000, // Convert ms to seconds
-            end: (item.offset + item.duration) / 1000,
-        }));
+        // Find the caption track for the requested language
+        let selectedTrack = null;
+        if (langCode) {
+            // First try exact match
+            selectedTrack = captionTracks.find(t => t.language_code === langCode);
+            // Try partial match (e.g., 'es' matches 'es-419')
+            if (!selectedTrack) {
+                selectedTrack = captionTracks.find(t => t.language_code?.startsWith(langCode));
+            }
+        }
+
+        // If no language specified or not found, use first available
+        if (!selectedTrack) {
+            selectedTrack = captionTracks[0];
+        }
+
+        if (!selectedTrack) {
+            return res.status(404).json({
+                error: `No ${langCode || ''} subtitles available for this video`,
+                availableLanguages: captionTracks.map(t => t.language_code)
+            });
+        }
+
+        // Fetch the actual transcript
+        const transcript = await selectedTrack.toTranscript();
+        const segments = transcript?.content?.body?.initial_segments || [];
+
+        if (segments.length === 0) {
+            return res.status(404).json({ error: 'No subtitle segments found' });
+        }
+
+        // Format subtitles with timing info
+        const subtitles = segments.map((seg, index) => {
+            const startMs = parseInt(seg.start_ms || 0, 10);
+            const endMs = parseInt(seg.end_ms || 0, 10);
+            const text = seg.snippet?.text || '';
+
+            return {
+                index,
+                text,
+                start: startMs / 1000,
+                duration: (endMs - startMs) / 1000,
+                end: endMs / 1000,
+            };
+        });
 
         console.log(`[YouTube Subtitles] Found ${subtitles.length} subtitle segments`);
 
         return res.json({
             videoId,
-            language: langCode || 'auto',
+            language: selectedTrack.language_code || langCode || 'auto',
             subtitles,
             totalCount: subtitles.length,
         });
