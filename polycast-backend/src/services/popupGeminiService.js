@@ -6,7 +6,7 @@ class PopupGeminiService {
     this.genAI = new GoogleGenerativeAI(config.geminiApiKey);
     // Configure Gemini with thinking off
     this.model = this.genAI.getGenerativeModel({
-      model: config.geminiChatModel,
+      model: 'gemini-3-flash-preview',
       generationConfig: {
         temperature: 0.1,
         topK: 1,
