@@ -2,11 +2,11 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const config = require('../config/config');
 
 class PopupGeminiService {
-  constructor() {    
+  constructor() {
     this.genAI = new GoogleGenerativeAI(config.geminiApiKey);
-    // Configure Gemini 2.5 Flash Lite with thinking off
-    this.model = this.genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash-lite-preview-09-2025',
+    // Configure Gemini with thinking off
+    this.model = this.genAI.getGenerativeModel({
+      model: config.geminiChatModel,
       generationConfig: {
         temperature: 0.1,
         topK: 1,
