@@ -15,13 +15,26 @@ function TranscriptPanel({
   const containerRef = useRef(null);
   const currentItemRef = useRef(null);
 
-  // Auto-scroll to current subtitle
+  // Auto-scroll to current subtitle within transcript container only
   useEffect(() => {
     if (currentItemRef.current && containerRef.current) {
-      currentItemRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
+      const container = containerRef.current.querySelector('.transcript-list');
+      const item = currentItemRef.current;
+
+      if (container && item) {
+        const containerRect = container.getBoundingClientRect();
+        const itemRect = item.getBoundingClientRect();
+
+        // Check if item is outside visible area
+        if (itemRect.top < containerRect.top || itemRect.bottom > containerRect.bottom) {
+          // Scroll within container only, not the whole window
+          const scrollTop = item.offsetTop - container.offsetTop - (container.clientHeight / 2) + (item.clientHeight / 2);
+          container.scrollTo({
+            top: scrollTop,
+            behavior: 'smooth'
+          });
+        }
+      }
     }
   }, [currentIndex]);
 
@@ -32,7 +45,9 @@ function TranscriptPanel({
   }, []);
 
   const handleWordClick = useCallback((e, word, subtitleText) => {
+    console.log('[TranscriptPanel] Word clicked:', word);
     e.stopPropagation();
+    e.preventDefault();
 
     const rect = e.target.getBoundingClientRect();
     const position = {
@@ -40,6 +55,7 @@ function TranscriptPanel({
       y: rect.top,
     };
 
+    console.log('[TranscriptPanel] Calling onWordClick with:', { word, position, subtitleText });
     onWordClick(word, position, subtitleText);
   }, [onWordClick]);
 
@@ -78,13 +94,26 @@ function TranscriptPanel({
           <span
             key={index}
             className="transcript-word"
-            onClick={(e) => handleWordClick(e, cleanWord, subtitleText)}
+            onClick={(e) => {
+              console.log('[TranscriptPanel] CLICK EVENT FIRED for word:', cleanWord);
+              handleWordClick(e, cleanWord, subtitleText);
+            }}
+            onMouseDown={(e) => {
+              console.log('[TranscriptPanel] MOUSEDOWN EVENT for word:', cleanWord);
+              e.stopPropagation();
+            }}
+            onMouseUp={(e) => {
+              console.log('[TranscriptPanel] MOUSEUP EVENT for word:', cleanWord);
+            }}
             onMouseEnter={(e) => handleWordHover(e, cleanWord, subtitleText)}
             onMouseLeave={handleWordLeave}
-            onFocus={(e) => handleWordHover(e, cleanWord, subtitleText)}
-            onBlur={handleWordLeave}
-            role="button"
-            tabIndex={0}
+            style={{
+              cursor: 'pointer',
+              userSelect: 'none',
+              display: 'inline-block',
+              position: 'relative',
+              zIndex: 10
+            }}
           >
             {word}
           </span>
@@ -150,9 +179,12 @@ function TranscriptPanel({
               key={subtitle.index}
               ref={isCurrent ? currentItemRef : null}
               className={`transcript-item ${isCurrent ? 'current' : ''}`}
-              onClick={() => onSeek(subtitle.start)}
             >
-              <span className="transcript-time">
+              <span
+                className="transcript-time"
+                onClick={() => onSeek(subtitle.start)}
+                style={{ cursor: 'pointer' }}
+              >
                 {formatTime(subtitle.start)}
               </span>
               <span className="transcript-text">

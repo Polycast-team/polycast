@@ -37,8 +37,9 @@ const config = {
     // Redis Configuration
     redisUrl: process.env.REDIS_URL,
 
-    // YouTube API Configuration
-    youtubeApiKey: process.env.YOUTUBE_API_KEY,
+    // YouTube API Configuration (OPTIONAL - not needed for video search)
+    // Video search now uses InnerTube API (no API key required)
+    youtubeApiKey: process.env.YOUTUBE_API_KEY || null,
 };
 
 // Debug log for API key status

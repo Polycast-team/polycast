@@ -7,12 +7,18 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 export function useYouTubePlayer(videoId, onTimeUpdate) {
   const playerRef = useRef(null);
   const containerRef = useRef(null);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const timeUpdateIntervalRef = useRef(null);
+
+  // Keep onTimeUpdateRef in sync with onTimeUpdate prop
+  useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdate;
+  }, [onTimeUpdate]);
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -62,14 +68,18 @@ export function useYouTubePlayer(videoId, onTimeUpdate) {
             console.log('[YouTube] Player ready');
             setIsReady(true);
             setDuration(event.target.getDuration() || 0);
+            // Start paused time updates since player starts paused by default
+            startPausedTimeUpdates();
           },
           onStateChange: (event) => {
             const state = event.data;
             if (state === window.YT.PlayerState.PLAYING) {
               setIsPlaying(true);
               startTimeUpdates();
-            } else if (state === window.YT.PlayerState.PAUSED ||
-                       state === window.YT.PlayerState.ENDED) {
+            } else if (state === window.YT.PlayerState.PAUSED) {
+              setIsPlaying(false);
+              startPausedTimeUpdates(); // Keep updating (slowly) when paused for accurate highlighting
+            } else if (state === window.YT.PlayerState.ENDED) {
               setIsPlaying(false);
               stopTimeUpdates();
             }
@@ -104,17 +114,31 @@ export function useYouTubePlayer(videoId, onTimeUpdate) {
     };
   }, [videoId]);
 
-  // Time update loop
+  // Time update loop - runs when playing for smooth subtitle sync
   const startTimeUpdates = useCallback(() => {
+    console.log('[YouTube] Starting time updates');
     stopTimeUpdates();
     timeUpdateIntervalRef.current = setInterval(() => {
       if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
         const time = playerRef.current.getCurrentTime() || 0;
         setCurrentTime(time);
-        onTimeUpdate?.(time);
+        onTimeUpdateRef.current?.(time);
       }
     }, 100); // Update every 100ms for smooth subtitle sync
-  }, [onTimeUpdate]);
+  }, []);
+
+  // Slower time update loop for when paused (to keep highlighting in sync after seeks)
+  const startPausedTimeUpdates = useCallback(() => {
+    console.log('[YouTube] Starting paused time updates');
+    stopTimeUpdates();
+    timeUpdateIntervalRef.current = setInterval(() => {
+      if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+        const time = playerRef.current.getCurrentTime() || 0;
+        setCurrentTime(time);
+        onTimeUpdateRef.current?.(time);
+      }
+    }, 500); // Update every 500ms when paused (less frequent)
+  }, []);
 
   const stopTimeUpdates = useCallback(() => {
     if (timeUpdateIntervalRef.current) {
@@ -147,10 +171,22 @@ export function useYouTubePlayer(videoId, onTimeUpdate) {
   const seekTo = useCallback((seconds, allowSeekAhead = true) => {
     if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
       playerRef.current.seekTo(seconds, allowSeekAhead);
+
+      // Immediately update with requested time
       setCurrentTime(seconds);
-      onTimeUpdate?.(seconds);
+      onTimeUpdateRef.current?.(seconds);
+
+      // After a brief delay, get the actual current time from the player
+      // to ensure highlighting is accurate (YouTube may not seek to exact time)
+      setTimeout(() => {
+        if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+          const actualTime = playerRef.current.getCurrentTime() || seconds;
+          setCurrentTime(actualTime);
+          onTimeUpdateRef.current?.(actualTime);
+        }
+      }, 100);
     }
-  }, [onTimeUpdate]);
+  }, []);
 
   // Fullscreen handling
   const toggleFullscreen = useCallback(() => {

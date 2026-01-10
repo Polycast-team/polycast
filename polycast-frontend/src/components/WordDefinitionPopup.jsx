@@ -27,7 +27,7 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
   }, [onClose]);
 
   if (!word) return null;
-  
+
   // Use either external or local state to determine if word is in dictionary
   const isWordInDictionary = isInDictionary || localAdded;
   
@@ -50,7 +50,9 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
                      '';
   
   // Get the contextual explanation from the API response (in target language)
-  const contextualExplanation = definition?.contextualExplanation || 
+  // Check for both contextualExplanation (old format) and definition (quick API format)
+  const contextualExplanation = definition?.contextualExplanation ||
+                               definition?.definition ||
                                disambiguatedDefinition?.contextualExplanation ||
                                '';
   
@@ -101,14 +103,15 @@ const WordDefinitionPopup = ({ word, definition, dictDefinition, disambiguatedDe
   const viewportHeight = window.innerHeight;
   const popupHeight = 300; // Approximate height
   const yPos = Math.min(position.y + 60, viewportHeight - popupHeight - 10);
-  
+  const finalLeft = Math.max(5, Math.min(viewportWidth - popupWidth - 5, xPos));
+
   return (
-    <div 
+    <div
       ref={popupRef}
       className="word-definition-popup"
       style={{
         top: `${yPos}px`,
-        left: `${Math.max(5, Math.min(viewportWidth - popupWidth - 5, xPos))}px`,
+        left: `${finalLeft}px`,
       }}
     >
       {/* Close button */}

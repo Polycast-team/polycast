@@ -201,6 +201,8 @@ function LearnMode({
 
   // Handle word click for translation popup
   const handleWordClick = useCallback(async (word, position, contextSentence) => {
+    console.log('[LearnMode] Word clicked:', word, 'at position:', position);
+
     // Close hover tooltip
     setHoverState(prev => ({ ...prev, isVisible: false }));
     setWasPlayingBeforeHover(false); // Don't auto-resume on click
@@ -213,8 +215,10 @@ function LearnMode({
 
     const cleanWord = word.toLowerCase();
     const sentence = contextSentence || fullTranscript || '';
+    console.log('[LearnMode] Fetching definition for:', cleanWord);
 
     // Show popup immediately
+    console.log('[LearnMode] Setting popup visible with word:', cleanWord, 'position:', position);
     setPopupState({
       isVisible: true,
       word: cleanWord,
@@ -225,6 +229,7 @@ function LearnMode({
     // Reset and start loading
     setWordDefinition(null);
     setLoadingDefinition(true);
+    console.log('[LearnMode] Popup state set, loading definition...');
 
     try {
       // Mark the word in the sentence for context
@@ -241,10 +246,17 @@ function LearnMode({
         targetLanguage || 'Spanish'
       );
 
+      console.log('[LearnMode] Fetching from URL:', url);
       const response = await fetch(url);
+      console.log('[LearnMode] Response status:', response.status, response.statusText);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('[LearnMode] Got definition data:', data);
         setWordDefinition(data);
+      } else {
+        const errorText = await response.text();
+        console.error('[LearnMode] API error:', response.status, errorText);
       }
     } catch (error) {
       console.error('[LearnMode] Error fetching word definition:', error);
@@ -329,21 +341,7 @@ function LearnMode({
   // Video player view
   return (
     <div className={`learn-mode with-video ${isFullscreen ? 'fullscreen-mode' : ''}`}>
-      {/* Left Panel: Transcript (hidden in fullscreen) */}
-      {!isFullscreen && (
-        <TranscriptPanel
-          subtitles={subtitles}
-          currentIndex={currentIndex}
-          onSeek={seekTo}
-          onWordClick={handleWordClick}
-          onWordHover={handleWordHover}
-          onWordLeave={handleWordLeave}
-          isLoading={subtitlesLoading}
-          error={subtitlesError}
-        />
-      )}
-
-      {/* Right Panel: Video Player */}
+      {/* Video Section (full width) */}
       <div className="video-section">
         <VideoPlayer
           containerRef={containerRef}
@@ -362,24 +360,18 @@ function LearnMode({
           onClose={handleCloseVideo}
         />
 
-        {/* Current Subtitle Display (non-fullscreen) */}
-        {!isFullscreen && currentSubtitle && (
-          <div className="current-subtitle-section">
-            <SubtitleDisplay
-              subtitle={currentSubtitle}
-              onWordClick={handleWordClick}
-              onWordHover={handleWordHover}
-              onWordLeave={handleWordLeave}
-              isOverlay={false}
-            />
-          </div>
-        )}
-
-        {/* Video Info */}
+        {/* Transcript Below Video (hidden in fullscreen) */}
         {!isFullscreen && (
-          <div className="video-meta">
-            <p>{selectedVideo.channelTitle}</p>
-          </div>
+          <TranscriptPanel
+            subtitles={subtitles}
+            currentIndex={currentIndex}
+            onSeek={seekTo}
+            onWordClick={handleWordClick}
+            onWordHover={handleWordHover}
+            onWordLeave={handleWordLeave}
+            isLoading={subtitlesLoading}
+            error={subtitlesError}
+          />
         )}
       </div>
 

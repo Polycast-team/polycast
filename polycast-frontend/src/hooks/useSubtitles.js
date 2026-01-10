@@ -43,14 +43,24 @@ export function useSubtitles(videoId, language = null) {
       return null;
     }
 
-    // Find the subtitle that contains the current time
-    const index = subtitles.findIndex(sub =>
-      currentTime >= sub.start && currentTime < sub.end
-    );
+    // Find the subtitle with the most recent start time <= currentTime
+    // This handles overlapping subtitles correctly (common in auto-generated captions)
+    let index = -1;
+    for (let i = 0; i < subtitles.length; i++) {
+      if (subtitles[i].start <= currentTime) {
+        index = i;
+      } else {
+        break; // Subtitles are sorted by start time, so we can stop here
+      }
+    }
+
+    if (index !== -1 && index !== currentIndex) {
+      console.log('[useSubtitles] Current subtitle updated to index:', index, 'at time:', currentTime.toFixed(1));
+    }
 
     setCurrentIndex(index);
     return index >= 0 ? subtitles[index] : null;
-  }, [subtitles]);
+  }, [subtitles, currentIndex]);
 
   // Get current subtitle
   const currentSubtitle = useMemo(() => {

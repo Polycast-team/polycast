@@ -95,9 +95,26 @@ function VideoSearch({ targetLanguage, onVideoSelect }) {
 
   const handleSearch = useCallback((e) => {
     e.preventDefault();
+
+    // Check if it's a YouTube URL or video ID
+    const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})|^([a-zA-Z0-9_-]{11})$/;
+    const match = searchQuery.match(youtubeRegex);
+
+    if (match) {
+      const videoId = match[1] || match[2];
+      // Directly select the video without searching
+      onVideoSelect({
+        videoId,
+        title: 'Video from URL',
+        channelTitle: 'Unknown',
+        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
+      });
+      return;
+    }
+
     setIsRecommended(false);
     searchVideos(searchQuery, null, false);
-  }, [searchQuery, searchVideos]);
+  }, [searchQuery, searchVideos, onVideoSelect]);
 
   const handleLoadMore = useCallback(() => {
     if (nextPageToken && !isLoading) {
@@ -122,12 +139,9 @@ function VideoSearch({ targetLanguage, onVideoSelect }) {
   };
 
   const getCaptionBadge = (captionType) => {
-    if (captionType === 'human') {
-      return <span className="caption-badge human">CC</span>;
-    } else if (captionType === 'auto') {
-      return <span className="caption-badge auto">Auto</span>;
-    }
-    return <span className="caption-badge unknown">?</span>;
+    // Always show "CC" since we don't pre-check captions anymore
+    // Captions are verified when user clicks the video
+    return <span className="caption-badge unknown">CC</span>;
   };
 
   return (
@@ -137,7 +151,7 @@ function VideoSearch({ targetLanguage, onVideoSelect }) {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={`Search videos in ${targetLanguage || 'target language'}...`}
+          placeholder={`Paste YouTube URL or search...`}
           className="search-input"
         />
         <button
@@ -151,7 +165,9 @@ function VideoSearch({ targetLanguage, onVideoSelect }) {
 
       {error && (
         <div className="search-error">
-          {error}
+          <strong>Search unavailable:</strong> {error}
+          <br />
+          <em>Tip: Paste a YouTube URL directly (e.g., https://www.youtube.com/watch?v=pjq7RLJnd1Q)</em>
         </div>
       )}
 

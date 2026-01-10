@@ -31,7 +31,10 @@ Inputs:
 - targetLanguage (language of the sentence/headword): ${targetLanguage}
 
 Task:
-Analyze the ~marked~ instance of the headword in the sentence and return EXACTLY ONE LINE:
+First, check if the headword is actually a valid word in ${targetLanguage}. If it appears to be in ${nativeLanguage} or any other language (not ${targetLanguage}), respond with:
+Not a ${targetLanguage} word//This appears to be in ${nativeLanguage} or another language.
+
+Otherwise, analyze the ~marked~ instance of the headword in the sentence and return EXACTLY ONE LINE:
 [TRANSLATION in ${nativeLanguage}]//[CONCISE ${nativeLanguage} EXPLANATION of the meaning in THIS SENTENCE (<= 15 words)]
 
 Rules:

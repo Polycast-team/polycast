@@ -8,7 +8,8 @@ function setupExpress(app) {
       'http://localhost:3000',
       'https://polycast-205e8.web.app',
       'https://polycast-205e8.firebaseapp.com',
-      'https://polycast-frontend.onrender.com'
+      'https://polycast-frontend.onrender.com',
+      'https://www.youtube.com'  // Allow Chrome extension on YouTube
     ];
 
     app.use(cors({
