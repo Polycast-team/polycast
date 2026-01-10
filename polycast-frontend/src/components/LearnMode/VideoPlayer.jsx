@@ -10,9 +10,13 @@ function VideoPlayer({
   isFullscreen,
   currentSubtitle,
   videoTitle,
+  autoPauseEnabled,
   onWordClick,
+  onWordHover,
+  onWordLeave,
   onToggleFullscreen,
   onExitFullscreen,
+  onToggleAutoPause,
   onClose,
 }) {
   // Handle escape key to exit fullscreen
@@ -50,6 +54,22 @@ function VideoPlayer({
 
         <div className="video-header-actions">
           <button
+            className={`video-control-button auto-pause-toggle ${autoPauseEnabled ? 'active' : ''}`}
+            onClick={onToggleAutoPause}
+            title={autoPauseEnabled ? 'Disable auto-pause' : 'Enable auto-pause'}
+            aria-pressed={autoPauseEnabled}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {autoPauseEnabled ? (
+                <path d="M6 4h4v16H6zM14 4h4v16h-4z"/>
+              ) : (
+                <path d="M8 5v14l11-7z"/>
+              )}
+            </svg>
+            Auto-pause
+          </button>
+
+          <button
             className="video-control-button"
             onClick={onToggleFullscreen}
             title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
@@ -85,6 +105,8 @@ function VideoPlayer({
           <SubtitleDisplay
             subtitle={currentSubtitle}
             onWordClick={onWordClick}
+            onWordHover={onWordHover}
+            onWordLeave={onWordLeave}
             isOverlay={true}
           />
         </div>
@@ -104,9 +126,13 @@ VideoPlayer.propTypes = {
     end: PropTypes.number,
   }),
   videoTitle: PropTypes.string,
+  autoPauseEnabled: PropTypes.bool.isRequired,
   onWordClick: PropTypes.func.isRequired,
+  onWordHover: PropTypes.func,
+  onWordLeave: PropTypes.func,
   onToggleFullscreen: PropTypes.func.isRequired,
   onExitFullscreen: PropTypes.func.isRequired,
+  onToggleAutoPause: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
 };
 

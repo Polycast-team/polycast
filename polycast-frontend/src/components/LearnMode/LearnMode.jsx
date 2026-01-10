@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import VideoSearch from './VideoSearch.jsx';
 import VideoPlayer from './VideoPlayer.jsx';
 import TranscriptPanel from './TranscriptPanel.jsx';
 import SubtitleDisplay from './SubtitleDisplay.jsx';
 import WordDefinitionPopup from '../WordDefinitionPopup.jsx';
+import QuickTranslationTooltip from './QuickTranslationTooltip.jsx';
 import { useYouTubePlayer } from '../../hooks/useYouTubePlayer.js';
 import { useSubtitles } from '../../hooks/useSubtitles.js';
 import apiService from '../../services/apiService.js';
@@ -26,6 +27,25 @@ function LearnMode({
   });
   const [wordDefinition, setWordDefinition] = useState(null);
   const [loadingDefinition, setLoadingDefinition] = useState(false);
+
+  // Hover translation state
+  const [hoverState, setHoverState] = useState({
+    isVisible: false,
+    word: '',
+    position: { x: 0, y: 0 },
+    translation: null,
+    loading: false,
+  });
+  const [wasPlayingBeforeHover, setWasPlayingBeforeHover] = useState(false);
+  const hoverTimeoutRef = useRef(null);
+  const hoverAbortControllerRef = useRef(null);
+
+  // Auto-pause feature state
+  const [autoPauseEnabled, setAutoPauseEnabled] = useState(() => {
+    const saved = localStorage.getItem('learnMode.autoPauseEnabled');
+    return saved ? JSON.parse(saved) : false;
+  });
+  const previousSubtitleRef = useRef(null);
 
   // Subtitle management
   const {
@@ -50,6 +70,8 @@ function LearnMode({
     isReady,
     isPlaying,
     isFullscreen,
+    play,
+    pause,
     seekTo,
     toggleFullscreen,
     exitFullscreen,
@@ -77,8 +99,118 @@ function LearnMode({
     setPopupState(prev => ({ ...prev, isVisible: false }));
   }, [clearSubtitles]);
 
+  // Handle word hover for quick translation
+  const handleWordHover = useCallback((word, position, contextSentence) => {
+    // Don't show hover tooltip if click popup is visible
+    if (popupState.isVisible) return;
+
+    const cleanWord = word.toLowerCase();
+    const sentence = contextSentence || fullTranscript || '';
+
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    // Debounce: wait 300ms before showing tooltip
+    hoverTimeoutRef.current = setTimeout(async () => {
+      // Pause video if playing
+      if (isPlaying) {
+        setWasPlayingBeforeHover(true);
+        pause();
+      }
+
+      // Show tooltip immediately with loading state
+      setHoverState({
+        isVisible: true,
+        word: cleanWord,
+        position,
+        translation: null,
+        loading: true,
+      });
+
+      // Cancel any pending request
+      if (hoverAbortControllerRef.current) {
+        hoverAbortControllerRef.current.abort();
+      }
+
+      // Fetch quick translation
+      try {
+        hoverAbortControllerRef.current = new AbortController();
+
+        const sentenceWithMarkedWord = sentence.replace(
+          new RegExp(`\\b(${word})\\b`, 'gi'),
+          (match, index) => index === 0 ? `~${match}~` : match
+        );
+
+        const url = apiService.getQuickWordDataUrl(
+          cleanWord,
+          sentenceWithMarkedWord,
+          nativeLanguage || 'English',
+          targetLanguage || 'Spanish'
+        );
+
+        const response = await fetch(url, {
+          signal: hoverAbortControllerRef.current.signal,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setHoverState(prev => ({
+            ...prev,
+            translation: data.translation || data.contextualExplanation || data.definition,
+            loading: false,
+          }));
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('[LearnMode] Error fetching hover translation:', error);
+          setHoverState(prev => ({
+            ...prev,
+            translation: null,
+            loading: false,
+          }));
+        }
+      }
+    }, 300);
+  }, [fullTranscript, nativeLanguage, targetLanguage, popupState.isVisible, isPlaying, pause]);
+
+  // Handle word leave (mouse out)
+  const handleWordLeave = useCallback(() => {
+    // Clear pending timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+
+    // Cancel pending request
+    if (hoverAbortControllerRef.current) {
+      hoverAbortControllerRef.current.abort();
+      hoverAbortControllerRef.current = null;
+    }
+
+    // Hide tooltip
+    setHoverState(prev => ({ ...prev, isVisible: false }));
+
+    // Resume video if it was playing before hover
+    if (wasPlayingBeforeHover) {
+      play();
+      setWasPlayingBeforeHover(false);
+    }
+  }, [wasPlayingBeforeHover, play]);
+
   // Handle word click for translation popup
   const handleWordClick = useCallback(async (word, position, contextSentence) => {
+    // Close hover tooltip
+    setHoverState(prev => ({ ...prev, isVisible: false }));
+    setWasPlayingBeforeHover(false); // Don't auto-resume on click
+
+    // Clear any pending hover timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+
     const cleanWord = word.toLowerCase();
     const sentence = contextSentence || fullTranscript || '';
 
@@ -143,6 +275,41 @@ function LearnMode({
     );
   }, [wordDefinitions]);
 
+  // Cleanup hover timeout and abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+      if (hoverAbortControllerRef.current) {
+        hoverAbortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Auto-pause when subtitle changes
+  useEffect(() => {
+    if (!autoPauseEnabled || !currentSubtitle) return;
+
+    // Check if subtitle changed (previous one ended)
+    if (previousSubtitleRef.current &&
+        previousSubtitleRef.current.index !== currentSubtitle.index) {
+      pause();
+    }
+
+    previousSubtitleRef.current = currentSubtitle;
+  }, [currentSubtitle, autoPauseEnabled, pause]);
+
+  // Persist auto-pause preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('learnMode.autoPauseEnabled', JSON.stringify(autoPauseEnabled));
+  }, [autoPauseEnabled]);
+
+  // Toggle auto-pause
+  const handleToggleAutoPause = useCallback(() => {
+    setAutoPauseEnabled(prev => !prev);
+  }, []);
+
   // If no video selected, show search
   if (!selectedVideo) {
     return (
@@ -169,6 +336,8 @@ function LearnMode({
           currentIndex={currentIndex}
           onSeek={seekTo}
           onWordClick={handleWordClick}
+          onWordHover={handleWordHover}
+          onWordLeave={handleWordLeave}
           isLoading={subtitlesLoading}
           error={subtitlesError}
         />
@@ -183,9 +352,13 @@ function LearnMode({
           isFullscreen={isFullscreen}
           currentSubtitle={currentSubtitle}
           videoTitle={selectedVideo.title}
+          autoPauseEnabled={autoPauseEnabled}
           onWordClick={handleWordClick}
+          onWordHover={handleWordHover}
+          onWordLeave={handleWordLeave}
           onToggleFullscreen={toggleFullscreen}
           onExitFullscreen={exitFullscreen}
+          onToggleAutoPause={handleToggleAutoPause}
           onClose={handleCloseVideo}
         />
 
@@ -195,6 +368,8 @@ function LearnMode({
             <SubtitleDisplay
               subtitle={currentSubtitle}
               onWordClick={handleWordClick}
+              onWordHover={handleWordHover}
+              onWordLeave={handleWordLeave}
               isOverlay={false}
             />
           </div>
@@ -208,7 +383,16 @@ function LearnMode({
         )}
       </div>
 
-      {/* Word Definition Popup */}
+      {/* Quick Translation Tooltip (Hover) */}
+      <QuickTranslationTooltip
+        word={hoverState.word}
+        translation={hoverState.translation}
+        position={hoverState.position}
+        loading={hoverState.loading}
+        visible={hoverState.isVisible}
+      />
+
+      {/* Word Definition Popup (Click) */}
       {popupState.isVisible && (
         <WordDefinitionPopup
           word={popupState.word}

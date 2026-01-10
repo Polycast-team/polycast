@@ -1,0 +1,77 @@
+.quick-translation-tooltip {
+  position: fixed;
+  z-index: 100;
+  max-width: 200px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% + 5px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%);
+  }
+}
+
+.tooltip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tooltip-word {
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.tooltip-translation {
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.tooltip-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.loading-spinner-small {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(245, 158, 11, 0.2);
+  border-top-color: #f59e0b;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tooltip-error {
+  color: #ef4444;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Ensure tooltip is visible in fullscreen mode */
+.fullscreen-mode .quick-translation-tooltip {
+  position: fixed;
+}

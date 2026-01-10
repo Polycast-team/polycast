@@ -7,6 +7,8 @@ function TranscriptPanel({
   currentIndex,
   onSeek,
   onWordClick,
+  onWordHover,
+  onWordLeave,
   isLoading,
   error,
 }) {
@@ -41,6 +43,24 @@ function TranscriptPanel({
     onWordClick(word, position, subtitleText);
   }, [onWordClick]);
 
+  const handleWordHover = useCallback((e, word, subtitleText) => {
+    if (!onWordHover) return;
+
+    const rect = e.target.getBoundingClientRect();
+    const position = {
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    };
+
+    onWordHover(word, position, subtitleText);
+  }, [onWordHover]);
+
+  const handleWordLeave = useCallback(() => {
+    if (onWordLeave) {
+      onWordLeave();
+    }
+  }, [onWordLeave]);
+
   const renderClickableText = useCallback((text, subtitleText) => {
     const tokens = [];
     const regex = /(\S+)(\s*)/g;
@@ -59,6 +79,10 @@ function TranscriptPanel({
             key={index}
             className="transcript-word"
             onClick={(e) => handleWordClick(e, cleanWord, subtitleText)}
+            onMouseEnter={(e) => handleWordHover(e, cleanWord, subtitleText)}
+            onMouseLeave={handleWordLeave}
+            onFocus={(e) => handleWordHover(e, cleanWord, subtitleText)}
+            onBlur={handleWordLeave}
             role="button"
             tabIndex={0}
           >
@@ -77,7 +101,7 @@ function TranscriptPanel({
     }
 
     return tokens;
-  }, [handleWordClick]);
+  }, [handleWordClick, handleWordHover, handleWordLeave]);
 
   if (isLoading) {
     return (
@@ -152,6 +176,8 @@ TranscriptPanel.propTypes = {
   currentIndex: PropTypes.number,
   onSeek: PropTypes.func.isRequired,
   onWordClick: PropTypes.func.isRequired,
+  onWordHover: PropTypes.func,
+  onWordLeave: PropTypes.func,
   isLoading: PropTypes.bool,
   error: PropTypes.string,
 };

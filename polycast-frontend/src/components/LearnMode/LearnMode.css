@@ -397,6 +397,18 @@
   background: var(--bg-secondary, #1a1a2e);
 }
 
+.video-control-button.auto-pause-toggle.active {
+  background: var(--accent-color, #f59e0b);
+  color: #000;
+  font-weight: 600;
+  border-color: var(--accent-color, #f59e0b);
+}
+
+.video-control-button.auto-pause-toggle.active:hover {
+  background: #fbbf24;
+  border-color: #fbbf24;
+}
+
 .video-header-title {
   flex: 1;
   color: var(--text-primary, #fff);

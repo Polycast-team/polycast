@@ -2,7 +2,7 @@ import React, { useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import './LearnMode.css';
 
-function SubtitleDisplay({ subtitle, onWordClick, isOverlay = false }) {
+function SubtitleDisplay({ subtitle, onWordClick, onWordHover, onWordLeave, isOverlay = false }) {
   // Parse subtitle text into clickable word tokens
   const wordTokens = useMemo(() => {
     if (!subtitle?.text) return [];
@@ -54,6 +54,24 @@ function SubtitleDisplay({ subtitle, onWordClick, isOverlay = false }) {
     onWordClick(token.cleanWord, position, subtitle.text);
   }, [onWordClick, subtitle?.text]);
 
+  const handleWordHover = useCallback((e, token) => {
+    if (!token.isClickable || !token.cleanWord || !onWordHover) return;
+
+    const rect = e.target.getBoundingClientRect();
+    const position = {
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    };
+
+    onWordHover(token.cleanWord, position, subtitle.text);
+  }, [onWordHover, subtitle?.text]);
+
+  const handleWordLeave = useCallback(() => {
+    if (onWordLeave) {
+      onWordLeave();
+    }
+  }, [onWordLeave]);
+
   if (!subtitle?.text) {
     return null;
   }
@@ -67,6 +85,10 @@ function SubtitleDisplay({ subtitle, onWordClick, isOverlay = false }) {
               <span
                 className="clickable-word"
                 onClick={(e) => handleWordClick(e, token)}
+                onMouseEnter={(e) => handleWordHover(e, token)}
+                onMouseLeave={handleWordLeave}
+                onFocus={(e) => handleWordHover(e, token)}
+                onBlur={handleWordLeave}
                 role="button"
                 tabIndex={0}
               >
@@ -91,6 +113,8 @@ SubtitleDisplay.propTypes = {
     index: PropTypes.number,
   }),
   onWordClick: PropTypes.func.isRequired,
+  onWordHover: PropTypes.func,
+  onWordLeave: PropTypes.func,
   isOverlay: PropTypes.bool,
 };
 
