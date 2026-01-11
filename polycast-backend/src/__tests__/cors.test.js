@@ -108,4 +108,64 @@ describe('CORS Configuration', () => {
             expect(response.body).toEqual({ ok: true });
         });
     });
+
+    describe('Chrome Extension CORS', () => {
+        const originalEnv = process.env.ALLOWED_EXTENSION_IDS;
+
+        afterEach(() => {
+            // Restore original environment variable
+            if (originalEnv !== undefined) {
+                process.env.ALLOWED_EXTENSION_IDS = originalEnv;
+            } else {
+                delete process.env.ALLOWED_EXTENSION_IDS;
+            }
+        });
+
+        test('should allow requests from whitelisted chrome extension', async () => {
+            process.env.ALLOWED_EXTENSION_IDS = 'test-extension-id-123';
+
+            const response = await makeRequest('chrome-extension://test-extension-id-123');
+
+            expect(response.status).toBe(200);
+            expect(response.headers['access-control-allow-origin']).toBe('chrome-extension://test-extension-id-123');
+            expect(response.headers['access-control-allow-credentials']).toBe('true');
+        });
+
+        test('should block requests from non-whitelisted chrome extension', async () => {
+            process.env.ALLOWED_EXTENSION_IDS = 'test-extension-id-123';
+
+            const response = await makeRequest('chrome-extension://malicious-extension-456');
+
+            // CORS error - no allow-origin header for blocked extension
+            expect(response.headers['access-control-allow-origin']).toBeUndefined();
+        });
+
+        test('should support multiple extension IDs', async () => {
+            process.env.ALLOWED_EXTENSION_IDS = 'ext-id-1,ext-id-2,ext-id-3';
+
+            const response1 = await makeRequest('chrome-extension://ext-id-1');
+            const response2 = await makeRequest('chrome-extension://ext-id-2');
+            const response3 = await makeRequest('chrome-extension://ext-id-3');
+
+            expect(response1.headers['access-control-allow-origin']).toBe('chrome-extension://ext-id-1');
+            expect(response2.headers['access-control-allow-origin']).toBe('chrome-extension://ext-id-2');
+            expect(response3.headers['access-control-allow-origin']).toBe('chrome-extension://ext-id-3');
+        });
+
+        test('should block all chrome extensions when ALLOWED_EXTENSION_IDS not set', async () => {
+            delete process.env.ALLOWED_EXTENSION_IDS;
+
+            const response = await makeRequest('chrome-extension://any-extension-id');
+
+            expect(response.headers['access-control-allow-origin']).toBeUndefined();
+        });
+
+        test('should handle extension IDs with whitespace in comma-separated list', async () => {
+            process.env.ALLOWED_EXTENSION_IDS = ' ext-1 , ext-2 , ext-3 ';
+
+            const response = await makeRequest('chrome-extension://ext-2');
+
+            expect(response.headers['access-control-allow-origin']).toBe('chrome-extension://ext-2');
+        });
+    });
 });
